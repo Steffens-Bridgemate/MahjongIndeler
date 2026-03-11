@@ -31,6 +31,9 @@ jobs:
       - name: Publish
         run: dotnet publish Tsump/Tsump.csproj -c Release -o release
 
+      - name: Set base path for GitHub Pages
+        run: sed -i 's|<base href="/" />|<base href="/MahjongIndeler/" />|' release/wwwroot/index.html
+
       - name: Add .nojekyll
         run: touch release/wwwroot/.nojekyll
 
