@@ -1,0 +1,193 @@
+@page "/history"
+@using Tsump.Models
+@using Tsump.Services
+@inject SessionService SessionService
+@inject MemberService MemberService
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>@Lang.Get("SessionHistory") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("SessionHistory")</h1>
+
+@if (sessions == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else if (sessions.Count == 0)
+{
+    <p class="text-muted">@Lang.Get("NoSessionsYet") <a href="/session">@Lang.Get("CreateFirstSession")</a>.</p>
+}
+else
+{
+    <div class="accordion" id="historyAccordion">
+        @foreach (var session in sessions.OrderByDescending(s => s.Date))
+        {
+            var collapseId = $"collapse-{session.Id:N}";
+            var headingId = $"heading-{session.Id:N}";
+            var tableWord = session.Tables.Count == 1 ? Lang.Get("table") : Lang.Get("tables");
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="@headingId">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                        @session.Date.ToString("dddd, MMMM d, yyyy") &mdash;
+                        @session.PresentMemberIds.Count @Lang.Get("present"),
+                        @session.Tables.Count @tableWord
+                    </button>
+                </h2>
+                <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#historyAccordion">
+                    <div class="accordion-body">
+                        <h6>@Lang.Get("PresentPlayers")</h6>
+                        <div class="mb-3">
+                            @foreach (var playerId in session.PresentMemberIds)
+                            {
+                                var name = GetMemberName(playerId);
+                                <span class="badge bg-success me-1 mb-1">@name</span>
+                            }
+                        </div>
+
+                        @if (session.AbsentMemberIds.Count > 0)
+                        {
+                            <h6>@Lang.Get("AbsentPlayers")</h6>
+                            <div class="mb-3">
+                                @foreach (var playerId in session.AbsentMemberIds)
+                                {
+                                    var name = GetMemberName(playerId);
+                                    <span class="badge bg-secondary me-1 mb-1">@name</span>
+                                }
+                            </div>
+                        }
+
+                        @if (session.Tables.Count > 0)
+                        {
+                            <h6>@Lang.Get("TableAssignments")</h6>
+                            <div class="row">
+                                @foreach (var table in session.Tables)
+                                {
+                                    <div class="col-md-4 mb-2">
+                                        <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
+                                            <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white") py-1">
+                                                @Lang.Get("Table") @table.TableNumber (@table.PlayerCount)
+                                            </div>
+                                            <ul class="list-group list-group-flush">
+                                                @foreach (var pid in table.PlayerIds)
+                                                {
+                                                    <li class="list-group-item py-1">@GetMemberName(pid)</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <button class="btn btn-sm btn-outline-danger mt-2" @onclick="() => DeleteSession(session.Id)">
+                            @Lang.Get("DeleteSession")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="mt-4">
+        <h4>@Lang.Get("PlayerStatistics")</h4>
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>@Lang.Get("Player")</th>
+                    <th>@Lang.Get("SessionsAttended")</th>
+                    <th>@Lang.Get("TimesAt3Table")</th>
+                    <th>@Lang.Get("TimesAt4Table")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var stat in playerStats.OrderBy(s => s.Name))
+                {
+                    <tr>
+                        <td>@stat.Name</td>
+                        <td>@stat.SessionsAttended</td>
+                        <td>@stat.ThreePlayerCount</td>
+                        <td>@stat.FourPlayerCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<WeeklySession>? sessions;
+    private List<Member> members = new();
+    private List<PlayerStat> playerStats = new();
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            members = await MemberService.GetAllAsync();
+            sessions = await SessionService.GetAllAsync();
+            CalculateStats();
+            StateHasChanged();
+        }
+    }
+
+    private string GetMemberName(Guid id)
+    {
+        return members.FirstOrDefault(m => m.Id == id)?.Name ?? Lang.Get("Unknown");
+    }
+
+    private void CalculateStats()
+    {
+        if (sessions == null) return;
+
+        var stats = new Dictionary<Guid, PlayerStat>();
+        foreach (var member in members)
+        {
+            stats[member.Id] = new PlayerStat { Name = member.Name };
+        }
+
+        foreach (var session in sessions)
+        {
+            foreach (var pid in session.PresentMemberIds)
+            {
+                if (stats.TryGetValue(pid, out var stat))
+                    stat.SessionsAttended++;
+            }
+
+            foreach (var table in session.Tables)
+            {
+                foreach (var pid in table.PlayerIds)
+                {
+                    if (stats.TryGetValue(pid, out var stat))
+                    {
+                        if (table.PlayerCount == 3)
+                            stat.ThreePlayerCount++;
+                        else if (table.PlayerCount == 4)
+                            stat.FourPlayerCount++;
+                    }
+                }
+            }
+        }
+
+        playerStats = stats.Values.Where(s => s.SessionsAttended > 0).ToList();
+    }
+
+    private async Task DeleteSession(Guid id)
+    {
+        await SessionService.DeleteAsync(id);
+        sessions = await SessionService.GetAllAsync();
+        CalculateStats();
+    }
+
+    private class PlayerStat
+    {
+        public string Name { get; set; } = "";
+        public int SessionsAttended { get; set; }
+        public int ThreePlayerCount { get; set; }
+        public int FourPlayerCount { get; set; }
+    }
+}

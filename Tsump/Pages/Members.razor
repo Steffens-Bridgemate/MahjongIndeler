@@ -1,0 +1,155 @@
+@page "/members"
+@using Tsump.Models
+@using Tsump.Services
+@inject MemberService MemberService
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>@Lang.Get("Members") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("ClubMembers")</h1>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="ShowAddForm">@Lang.Get("AddMember")</button>
+</div>
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">@(isEditing ? Lang.Get("EditMember") : Lang.Get("AddNewMember"))</h5>
+            <EditForm Model="currentMember" OnValidSubmit="SaveMember">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label">@Lang.Get("Name")</label>
+                    <InputText class="form-control" @bind-Value="currentMember.Name" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">@Lang.Get("Email")</label>
+                    <InputText class="form-control" @bind-Value="currentMember.Email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">@Lang.Get("Phone")</label>
+                    <InputText class="form-control" @bind-Value="currentMember.Phone" />
+                </div>
+                <div class="mb-3 form-check">
+                    <InputCheckbox class="form-check-input" @bind-Value="currentMember.IsActive" />
+                    <label class="form-check-label">@Lang.Get("Active")</label>
+                </div>
+                <button type="submit" class="btn btn-success me-2">@Lang.Get("Save")</button>
+                <button type="button" class="btn btn-secondary" @onclick="CancelForm">@Lang.Get("Cancel")</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (members == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else if (members.Count == 0)
+{
+    <p class="text-muted">@Lang.Get("NoMembersYet")</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>@Lang.Get("Name")</th>
+                <th>@Lang.Get("Email")</th>
+                <th>@Lang.Get("Phone")</th>
+                <th>@Lang.Get("Joined")</th>
+                <th>@Lang.Get("Status")</th>
+                <th>@Lang.Get("Actions")</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var member in members.OrderBy(m => m.Name))
+            {
+                <tr>
+                    <td>@member.Name</td>
+                    <td>@member.Email</td>
+                    <td>@member.Phone</td>
+                    <td>@member.JoinedDate.ToShortDateString()</td>
+                    <td>
+                        <span class="badge @(member.IsActive ? "bg-success" : "bg-secondary")">
+                            @(member.IsActive ? Lang.Get("Active") : Lang.Get("Inactive"))
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditMember(member)">@Lang.Get("Edit")</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMember(member.Id)">@Lang.Get("Remove")</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p class="text-muted">@Lang.Get("Total"): @members.Count @Lang.Get("members") (@members.Count(m => m.IsActive) @Lang.Get("active"))</p>
+}
+
+@code {
+    private List<Member>? members;
+    private Member currentMember = new();
+    private bool showForm;
+    private bool isEditing;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            members = await MemberService.GetAllAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        currentMember = new Member();
+        isEditing = false;
+        showForm = true;
+    }
+
+    private void EditMember(Member member)
+    {
+        currentMember = new Member
+        {
+            Id = member.Id,
+            Name = member.Name,
+            Email = member.Email,
+            Phone = member.Phone,
+            JoinedDate = member.JoinedDate,
+            IsActive = member.IsActive
+        };
+        isEditing = true;
+        showForm = true;
+    }
+
+    private async Task SaveMember()
+    {
+        if (string.IsNullOrWhiteSpace(currentMember.Name))
+            return;
+
+        if (isEditing)
+            await MemberService.UpdateAsync(currentMember);
+        else
+            await MemberService.AddAsync(currentMember);
+
+        members = await MemberService.GetAllAsync();
+        showForm = false;
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+    }
+
+    private async Task DeleteMember(Guid id)
+    {
+        await MemberService.DeleteAsync(id);
+        members = await MemberService.GetAllAsync();
+    }
+}

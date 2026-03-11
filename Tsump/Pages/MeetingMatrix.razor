@@ -1,0 +1,230 @@
+@page "/matrix"
+@using Tsump.Models
+@using Tsump.Services
+@inject SessionService SessionService
+@inject MemberService MemberService
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>@Lang.Get("MeetingMatrixTitle") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("MeetingMatrixTitle")</h1>
+<p class="text-muted">@Lang.Get("MeetingMatrixSubtitle")</p>
+
+@if (members == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else if (activePlayers.Count == 0)
+{
+    <p class="text-muted">@Lang.Get("NoSessionData")</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm meeting-matrix">
+            <thead>
+                <tr>
+                    <th class="sticky-col"></th>
+                    @foreach (var player in activePlayers)
+                    {
+                        <th class="text-center rotate-header">
+                            <div><span>@player.Name</span></div>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in activePlayers)
+                {
+                    <tr>
+                        <td class="sticky-col fw-bold text-nowrap">@row.Name</td>
+                        @foreach (var col in activePlayers)
+                        {
+                            @if (row.Id == col.Id)
+                            {
+                                <td class="text-center bg-dark text-white">&mdash;</td>
+                            }
+                            else
+                            {
+                                var key = MakeKey(row.Id, col.Id);
+                                var count = matrix.GetValueOrDefault(key, 0);
+                                <td class="text-center @GetCellClass(count)">@count</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-3">
+        <h5>@Lang.Get("Legend")</h5>
+        <span class="badge bg-light text-dark border me-2">@Lang.Get("NeverMet")</span>
+        <span class="badge matrix-low me-2">@Lang.Get("Meetings1_2")</span>
+        <span class="badge matrix-mid me-2">@Lang.Get("Meetings3_5")</span>
+        <span class="badge matrix-high me-2">@Lang.Get("Meetings6Plus")</span>
+    </div>
+
+    <div class="mt-3">
+        <h5>@Lang.Get("Summary")</h5>
+        <ul>
+            <li>@Lang.Get("TotalPairs"): @totalPairs</li>
+            <li>@Lang.Get("PairsMet"): @metPairs</li>
+            <li>@Lang.Get("PairsNeverMet"): @(totalPairs - metPairs)</li>
+            @if (metPairs > 0)
+            {
+                <li>@Lang.Get("AvgMeetings"): @avgMeetings.ToString("F1")</li>
+                <li>@Lang.Get("MinMeetings"): @minMeetings / @Lang.Get("MaxMeetings"): @maxMeetings</li>
+            }
+        </ul>
+    </div>
+}
+
+<style>
+    .meeting-matrix {
+        font-size: 0.8rem;
+    }
+
+    .meeting-matrix th.rotate-header {
+        height: 120px;
+        white-space: nowrap;
+        vertical-align: bottom;
+        padding: 0 4px;
+    }
+
+    .meeting-matrix th.rotate-header > div {
+        transform: rotate(-60deg);
+        transform-origin: left bottom;
+        width: 1.5em;
+    }
+
+    .meeting-matrix th.rotate-header > div > span {
+        display: inline-block;
+        padding-bottom: 4px;
+    }
+
+    .meeting-matrix td, .meeting-matrix th {
+        padding: 2px 4px;
+        min-width: 28px;
+    }
+
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 1;
+    }
+
+    .matrix-low {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .matrix-mid {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .matrix-high {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .cell-zero {
+        background-color: #f8f9fa;
+        color: #adb5bd;
+    }
+
+    .cell-low {
+        background-color: #d4edda;
+    }
+
+    .cell-mid {
+        background-color: #fff3cd;
+    }
+
+    .cell-high {
+        background-color: #f8d7da;
+    }
+</style>
+
+@code {
+    private List<Member>? members;
+    private List<Member> activePlayers = new();
+    private Dictionary<string, int> matrix = new();
+    private int totalPairs;
+    private int metPairs;
+    private double avgMeetings;
+    private int minMeetings;
+    private int maxMeetings;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            members = await MemberService.GetAllAsync();
+            var sessions = await SessionService.GetAllAsync();
+            BuildMatrix(sessions);
+            StateHasChanged();
+        }
+    }
+
+    private void BuildMatrix(List<WeeklySession> sessions)
+    {
+        var attendedIds = new HashSet<Guid>(
+            sessions.SelectMany(s => s.PresentMemberIds));
+
+        activePlayers = members!
+            .Where(m => attendedIds.Contains(m.Id))
+            .OrderBy(m => m.Name)
+            .ToList();
+
+        matrix.Clear();
+
+        foreach (var session in sessions)
+        {
+            foreach (var table in session.Tables)
+            {
+                for (int i = 0; i < table.PlayerIds.Count; i++)
+                {
+                    for (int j = i + 1; j < table.PlayerIds.Count; j++)
+                    {
+                        var key = MakeKey(table.PlayerIds[i], table.PlayerIds[j]);
+                        matrix[key] = matrix.GetValueOrDefault(key, 0) + 1;
+                    }
+                }
+            }
+        }
+
+        var n = activePlayers.Count;
+        totalPairs = n * (n - 1) / 2;
+        metPairs = matrix.Count(kv => kv.Value > 0);
+
+        if (metPairs > 0)
+        {
+            var values = matrix.Values.Where(v => v > 0).ToList();
+            avgMeetings = values.Average();
+            minMeetings = values.Min();
+            maxMeetings = values.Max();
+        }
+    }
+
+    private static string MakeKey(Guid a, Guid b)
+    {
+        return string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) < 0
+            ? $"{a}_{b}"
+            : $"{b}_{a}";
+    }
+
+    private static string GetCellClass(int count) => count switch
+    {
+        0 => "cell-zero",
+        <= 2 => "cell-low",
+        <= 5 => "cell-mid",
+        _ => "cell-high"
+    };
+}

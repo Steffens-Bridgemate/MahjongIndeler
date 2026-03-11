@@ -1,0 +1,38 @@
+@inherits LayoutComponentBase
+@using Tsump.Services
+@inject LanguageService Lang
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <button class="btn btn-sm @(Lang.IsDutch ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("nl")'>NL</button>
+            <button class="btn btn-sm @(Lang.IsEnglish ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("en")'>EN</button>
+            <a href="https://www.mahjongclubtsumo.nl/" target="_blank">@Lang.Get("MahjongclubTsumo")</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Lang.OnLanguageChanged += StateHasChanged;
+    }
+
+    private void SetLanguage(string lang)
+    {
+        Lang.SetLanguage(lang);
+    }
+
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+    }
+}

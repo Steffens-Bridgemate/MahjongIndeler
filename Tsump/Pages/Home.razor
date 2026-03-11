@@ -1,0 +1,60 @@
+@page "/"
+@using Tsump.Services
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>Tsumo! - @Lang.Get("ClubManager")</PageTitle>
+
+<div class="text-center mt-4">
+    <div class="mb-4">
+        <img src="https://www.mahjongclubtsumo.nl/images/headers/header-logo.jpg"
+             alt="Mahjongclub Tsumo"
+             class="img-fluid"
+             style="max-width: 100%; border-radius: 3px;" />
+    </div>
+    <p class="lead">@Lang.Get("ClubManager")</p>
+    <hr />
+    <div class="row justify-content-center mt-4">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@Lang.Get("Members")</h5>
+                    <p class="card-text">@Lang.Get("MembersDesc")</p>
+                    <a href="/members" class="btn btn-primary">@Lang.Get("ManageMembers")</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@Lang.Get("WeeklySession")</h5>
+                    <p class="card-text">@Lang.Get("WeeklySessionDesc")</p>
+                    <a href="/session" class="btn btn-primary">@Lang.Get("StartSession")</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@Lang.Get("History")</h5>
+                    <p class="card-text">@Lang.Get("HistoryDesc")</p>
+                    <a href="/history" class="btn btn-primary">@Lang.Get("ViewHistory")</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@Lang.Get("MeetingMatrix")</h5>
+                    <p class="card-text">@Lang.Get("MeetingMatrixDesc")</p>
+                    <a href="/matrix" class="btn btn-primary">@Lang.Get("ViewMatrix")</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+}

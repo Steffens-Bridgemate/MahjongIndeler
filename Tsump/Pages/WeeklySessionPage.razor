@@ -1,0 +1,287 @@
+@page "/session"
+@using Tsump.Models
+@using Tsump.Services
+@inject MemberService MemberService
+@inject SessionService SessionService
+@inject TableAssignmentService TableAssignmentService
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>@Lang.Get("WeeklySession") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("WeeklySession")</h1>
+
+<div class="mb-3">
+    <label class="form-label"><strong>@Lang.Get("SessionDate")</strong></label>
+    <input type="date" class="form-control" style="max-width: 250px;"
+           value="@sessionDate.ToString("yyyy-MM-dd")"
+           @onchange="OnDateChanged" />
+</div>
+
+@if (IsLockedPastSession)
+{
+    <div class="alert alert-warning">
+        @Lang.Get("PastSessionReadOnly")
+    </div>
+}
+
+@if (members == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else if (members.Count == 0)
+{
+    <p class="text-muted">@Lang.Get("NoMembersRegistered") <a href="/members">@Lang.Get("AddMembersLink")</a>.</p>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">@Lang.Get("Attendance") (@presentIds.Count @Lang.Get("present") @Lang.Get("of") @activeMembers.Count @Lang.Get("active"))</h5>
+            @if (!IsLockedPastSession)
+            {
+                <div class="mb-2">
+                    <button class="btn btn-sm btn-outline-success me-1" @onclick="SelectAll">@Lang.Get("AllPresent")</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="SelectNone">@Lang.Get("AllAbsent")</button>
+                </div>
+            }
+            <div class="mb-3">
+                <input type="text" class="form-control" placeholder="@Lang.Get("SearchMembers")"
+                       style="max-width: 300px; border-radius: 15px;"
+                       @bind="searchText" @bind:event="oninput" />
+            </div>
+            <div class="row">
+                @foreach (var member in FilteredMembers())
+                {
+                    <div class="col-md-4 col-sm-6 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   checked="@presentIds.Contains(member.Id)"
+                                   disabled="@IsLockedPastSession"
+                                   @onchange="e => ToggleAttendance(member.Id, (bool)(e.Value ?? false))" />
+                            <label class="form-check-label">@member.Name</label>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (!IsLockedPastSession)
+    {
+        <div class="mb-3">
+            @if (showRegenerateConfirm)
+            {
+                <div class="alert alert-warning d-inline-block me-2">
+                    @Lang.Get("RegenerateConfirm")
+                    <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="CancelRegenerate">@Lang.Get("Cancel")</button>
+                </div>
+            }
+            else
+            {
+                <button class="btn btn-primary me-2" @onclick="GenerateTables" disabled="@(presentIds.Count < 3)">
+                    @Lang.Get("GenerateTableAssignments")
+                </button>
+            }
+            <button class="btn btn-success" @onclick="SaveSession" disabled="@(tables.Count == 0)">
+                @Lang.Get("SaveSession")
+            </button>
+            @if (presentIds.Count < 3)
+            {
+                <span class="text-warning ms-2">@Lang.Get("NeedAtLeast3")</span>
+            }
+        </div>
+    }
+
+    @if (tables.Count > 0)
+    {
+        <h4>@Lang.Get("TableAssignments")</h4>
+        <div class="row">
+            @foreach (var table in tables)
+            {
+                <div class="col-md-4 mb-3">
+                    <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
+                        <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
+                            @Lang.Get("Table") @table.TableNumber (@table.PlayerCount @Lang.Get("players"))
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            @foreach (var playerId in table.PlayerIds)
+                            {
+                                var player = members.FirstOrDefault(m => m.Id == playerId);
+                                <li class="list-group-item">@(player?.Name ?? Lang.Get("Unknown"))</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (presentIds.Count - tables.Sum(t => t.PlayerCount) > 0)
+        {
+            <div class="alert alert-info">
+                @(presentIds.Count - tables.Sum(t => t.PlayerCount)) @Lang.Get("UnassignedPlayers")
+            </div>
+        }
+    }
+
+    @if (saved)
+    {
+        <div class="alert alert-success mt-3">@Lang.Get("SessionSaved")</div>
+    }
+}
+
+@code {
+    private List<Member>? members;
+    private List<Member> activeMembers = new();
+    private HashSet<Guid> presentIds = new();
+    private List<TableAssignment> tables = new();
+    private DateTime sessionDate = DateTime.Today;
+    private bool saved;
+    private string searchText = string.Empty;
+    private bool existingSessionIsFinalized;
+    private bool showRegenerateConfirm;
+
+    private bool IsLockedPastSession =>
+        sessionDate.Date < DateTime.Today && existingSessionIsFinalized;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    private IEnumerable<Member> FilteredMembers()
+    {
+        var ordered = activeMembers.OrderBy(m => m.Name);
+        if (string.IsNullOrWhiteSpace(searchText))
+            return ordered;
+        return ordered.Where(m => m.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            members = await MemberService.GetAllAsync();
+            activeMembers = members.Where(m => m.IsActive).ToList();
+            await LoadExistingSession();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadExistingSession()
+    {
+        var sessions = await SessionService.GetAllAsync();
+        var existing = sessions.FirstOrDefault(s => s.Date.Date == sessionDate.Date);
+        if (existing != null)
+        {
+            presentIds = new HashSet<Guid>(existing.PresentMemberIds);
+            tables = existing.Tables;
+            existingSessionIsFinalized = existing.IsFinalized;
+        }
+        else
+        {
+            presentIds.Clear();
+            tables.Clear();
+            existingSessionIsFinalized = false;
+        }
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private async Task OnDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            sessionDate = date;
+            await LoadExistingSession();
+        }
+    }
+
+    private void ToggleAttendance(Guid memberId, bool isPresent)
+    {
+        if (IsLockedPastSession) return;
+
+        if (isPresent)
+            presentIds.Add(memberId);
+        else
+            presentIds.Remove(memberId);
+        tables.Clear();
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private void SelectAll()
+    {
+        if (IsLockedPastSession) return;
+
+        presentIds = new HashSet<Guid>(activeMembers.Select(m => m.Id));
+        tables.Clear();
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private void SelectNone()
+    {
+        if (IsLockedPastSession) return;
+
+        presentIds.Clear();
+        tables.Clear();
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private async Task GenerateTables()
+    {
+        if (IsLockedPastSession) return;
+
+        if (tables.Count > 0 && existingSessionIsFinalized)
+        {
+            showRegenerateConfirm = true;
+            return;
+        }
+
+        await DoGenerateTables();
+    }
+
+    private async Task ConfirmRegenerate()
+    {
+        showRegenerateConfirm = false;
+        await DoGenerateTables();
+    }
+
+    private void CancelRegenerate()
+    {
+        showRegenerateConfirm = false;
+    }
+
+    private async Task DoGenerateTables()
+    {
+        tables = await TableAssignmentService.AssignTables(presentIds.ToList());
+        saved = false;
+    }
+
+    private async Task SaveSession()
+    {
+        if (IsLockedPastSession) return;
+
+        var session = new WeeklySession
+        {
+            Date = sessionDate,
+            PresentMemberIds = presentIds.ToList(),
+            AbsentMemberIds = activeMembers
+                .Where(m => !presentIds.Contains(m.Id))
+                .Select(m => m.Id)
+                .ToList(),
+            Tables = tables,
+            IsFinalized = true
+        };
+
+        var sessions = await SessionService.GetAllAsync();
+        var existing = sessions.FirstOrDefault(s => s.Date.Date == sessionDate.Date);
+        if (existing != null)
+            session.Id = existing.Id;
+
+        await SessionService.SaveAsync(session);
+        existingSessionIsFinalized = true;
+        saved = true;
+    }
+}
