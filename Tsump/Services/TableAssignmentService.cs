@@ -29,22 +29,55 @@ public class TableAssignmentService
         var threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds);
         var meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
 
+        // Hard constraint: players who were at a 3-player table in their last attended
+        // session cannot be assigned to a 3-player table again
+        var playedThreeLastTime = FindPlayersAtThreeTableLastSession(history, presentPlayerIds);
+
         // Priority 1: select who goes to 3-player tables
         // Sort by ratio: threePlayerCount / attendanceCount (lowest ratio first)
-        var sortedByThreeRatio = presentPlayerIds
+        // But exclude players who had a 3-player table last time (hard constraint)
+        var eligible = presentPlayerIds.Where(id => !playedThreeLastTime.Contains(id)).ToList();
+        var excluded = presentPlayerIds.Where(id => playedThreeLastTime.Contains(id)).ToList();
+
+        var sortedEligible = eligible
             .OrderBy(id =>
             {
                 var attended = attendance.GetValueOrDefault(id, 0);
                 var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
-                // Players who never attended yet get ratio 0 (should go to 3-player table)
                 return attended == 0 ? 0.0 : (double)threeCount / attended;
             })
             .ThenBy(_ => Random.Shared.Next())
             .ToList();
 
         var threePlayerSlots = threePlayerTables * 3;
-        var threePlayerPool = sortedByThreeRatio.Take(threePlayerSlots).ToList();
-        var fourPlayerPool = sortedByThreeRatio.Skip(threePlayerSlots).ToList();
+
+        List<Guid> threePlayerPool;
+        List<Guid> fourPlayerPool;
+
+        if (sortedEligible.Count >= threePlayerSlots)
+        {
+            // Enough eligible players — fill 3-player tables from eligible only
+            threePlayerPool = sortedEligible.Take(threePlayerSlots).ToList();
+            fourPlayerPool = sortedEligible.Skip(threePlayerSlots).Concat(excluded).ToList();
+        }
+        else
+        {
+            // Not enough eligible players — use all eligible, then fill remaining
+            // from excluded (sorted by ratio, so least-penalized go first)
+            var sortedExcluded = excluded
+                .OrderBy(id =>
+                {
+                    var attended = attendance.GetValueOrDefault(id, 0);
+                    var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
+                    return attended == 0 ? 0.0 : (double)threeCount / attended;
+                })
+                .ThenBy(_ => Random.Shared.Next())
+                .ToList();
+
+            var remaining = threePlayerSlots - sortedEligible.Count;
+            threePlayerPool = sortedEligible.Concat(sortedExcluded.Take(remaining)).ToList();
+            fourPlayerPool = sortedExcluded.Skip(remaining).ToList();
+        }
 
         // Priority 2: within each pool, form tables to minimize repeated meetings (by ratio)
         var tables = new List<TableAssignment>();
@@ -261,6 +294,42 @@ public class TableAssignmentService
                 threePlayerTables = 0;
                 break;
         }
+    }
+
+    /// <summary>
+    /// For each present player, finds their most recent attended session and checks
+    /// if they were at a 3-player table. Returns the set of players who were.
+    /// </summary>
+    private static HashSet<Guid> FindPlayersAtThreeTableLastSession(
+        List<WeeklySession> history, List<Guid> presentPlayerIds)
+    {
+        var result = new HashSet<Guid>();
+        var sessionsDescending = history
+            .Where(s => s.IsFinalized)
+            .OrderByDescending(s => s.Date)
+            .ToList();
+
+        foreach (var playerId in presentPlayerIds)
+        {
+            // Find the most recent session this player attended
+            foreach (var session in sessionsDescending)
+            {
+                if (!session.PresentMemberIds.Contains(playerId))
+                    continue;
+
+                // Found their last session — check if they were at a 3-player table
+                foreach (var table in session.Tables)
+                {
+                    if (table.PlayerCount == 3 && table.PlayerIds.Contains(playerId))
+                    {
+                        result.Add(playerId);
+                    }
+                }
+                break; // only check the most recent attended session
+            }
+        }
+
+        return result;
     }
 
     private static Dictionary<Guid, int> CountAttendance(
