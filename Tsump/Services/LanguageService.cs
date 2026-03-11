@@ -44,7 +44,7 @@ public class LanguageService
         ["WelcomeTo"] = "Welkom bij Tsumo!",
         ["ManageMembers"] = "Leden beheren",
         ["MembersDesc"] = "Leden toevoegen, bewerken en beheren.",
-        ["StartSession"] = "Zitting starten",
+        ["StartSession"] = "Zitting aanmaken",
         ["WeeklySessionDesc"] = "Aanwezigheid bijhouden en tafels indelen.",
         ["ViewHistory"] = "Geschiedenis bekijken",
         ["HistoryDesc"] = "Eerdere zittingen en spelerstatistieken bekijken.",
