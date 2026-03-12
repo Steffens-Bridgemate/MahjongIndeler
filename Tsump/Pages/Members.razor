@@ -32,6 +32,11 @@
                     <label class="form-label">@Lang.Get("Phone")</label>
                     <InputText class="form-control" @bind-Value="currentMember.Phone" />
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">@Lang.Get("ExtraThreePlayerTables")</label>
+                    <InputNumber class="form-control" style="max-width: 120px;" @bind-Value="currentMember.ExtraThreePlayerTableCount" />
+                    <small class="text-muted">@Lang.Get("ExtraThreePlayerTablesDesc")</small>
+                </div>
                 <div class="mb-3 form-check">
                     <InputCheckbox class="form-check-input" @bind-Value="currentMember.IsActive" />
                     <label class="form-check-label">@Lang.Get("Active")</label>
@@ -122,7 +127,8 @@ else
             Email = member.Email,
             Phone = member.Phone,
             JoinedDate = member.JoinedDate,
-            IsActive = member.IsActive
+            IsActive = member.IsActive,
+            ExtraThreePlayerTableCount = member.ExtraThreePlayerTableCount
         };
         isEditing = true;
         showForm = true;

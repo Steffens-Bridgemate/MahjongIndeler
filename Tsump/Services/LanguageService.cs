@@ -73,6 +73,8 @@ public class LanguageService
         ["Total"] = "Totaal",
         ["members"] = "leden",
         ["active"] = "actief",
+        ["ExtraThreePlayerTables"] = "Extra 3-spelertafels",
+        ["ExtraThreePlayerTablesDesc"] = "Aantal 3-spelertafels buiten de zittingsgeschiedenis om.",
 
         // Weekly Session page
         ["SessionDate"] = "Zittingsdatum",
@@ -204,6 +206,8 @@ public class LanguageService
         ["Total"] = "Total",
         ["members"] = "members",
         ["active"] = "active",
+        ["ExtraThreePlayerTables"] = "Extra 3-player tables",
+        ["ExtraThreePlayerTablesDesc"] = "Number of 3-player tables not covered in session history.",
 
         // Weekly Session page
         ["SessionDate"] = "Session Date",

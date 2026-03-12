@@ -10,10 +10,12 @@ namespace Tsump.Services;
 public class TableAssignmentService
 {
     private readonly SessionService _sessionService;
+    private readonly MemberService _memberService;
 
-    public TableAssignmentService(SessionService sessionService)
+    public TableAssignmentService(SessionService sessionService, MemberService memberService)
     {
         _sessionService = sessionService;
+        _memberService = memberService;
     }
 
     public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds)
@@ -25,8 +27,10 @@ public class TableAssignmentService
         CalculateTableCounts(playerCount, out var fourPlayerTables, out var threePlayerTables);
 
         var history = await _sessionService.GetAllAsync();
+        var members = await _memberService.GetAllAsync();
+        var extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
         var attendance = CountAttendance(history, presentPlayerIds);
-        var threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds);
+        var threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
         var meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
 
         // Hard constraint: players who were at a 3-player table in their last attended
@@ -353,11 +357,12 @@ public class TableAssignmentService
     }
 
     private static Dictionary<Guid, int> CountThreePlayerAssignments(
-        List<WeeklySession> history, List<Guid> relevantPlayerIds)
+        List<WeeklySession> history, List<Guid> relevantPlayerIds,
+        Dictionary<Guid, int>? extraCounts = null)
     {
         var counts = new Dictionary<Guid, int>();
         foreach (var id in relevantPlayerIds)
-            counts[id] = 0;
+            counts[id] = extraCounts?.GetValueOrDefault(id, 0) ?? 0;
 
         foreach (var session in history)
         {

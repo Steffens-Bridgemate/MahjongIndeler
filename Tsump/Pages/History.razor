@@ -170,7 +170,11 @@ else
         var stats = new Dictionary<Guid, PlayerStat>();
         foreach (var member in members)
         {
-            stats[member.Id] = new PlayerStat { Name = member.Name };
+            stats[member.Id] = new PlayerStat
+            {
+                Name = member.Name,
+                ThreePlayerCount = member.ExtraThreePlayerTableCount
+            };
         }
 
         foreach (var session in sessions)
