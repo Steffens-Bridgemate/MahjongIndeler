@@ -138,6 +138,23 @@ public class LanguageService
         ["AvgMeetings"] = "Gemiddeld aantal ontmoetingen per paar (van degenen die ontmoet hebben)",
         ["MinMeetings"] = "Min ontmoetingen",
         ["MaxMeetings"] = "Max ontmoetingen",
+
+        // Data Management page
+        ["DataManagement"] = "Gegevensbeheer",
+        ["ExportData"] = "Gegevens exporteren",
+        ["ExportDescription"] = "Exporteer alle leden en zittingen naar een JSON-bestand.",
+        ["ExportToFile"] = "Exporteren naar bestand",
+        ["ExportSuccess"] = "Gegevens succesvol geëxporteerd!",
+        ["ImportData"] = "Gegevens importeren",
+        ["ImportDescription"] = "Importeer leden en zittingen uit een eerder geëxporteerd JSON-bestand. Dit vervangt alle huidige gegevens.",
+        ["ImportFromFile"] = "Importeren uit bestand",
+        ["ImportConfirm"] = "Let op: importeren vervangt alle huidige gegevens (leden en zittingen). Weet je het zeker?",
+        ["YesImport"] = "Ja, importeren",
+        ["ImportSuccess"] = "Gegevens succesvol geïmporteerd!",
+        ["InvalidFileFormat"] = "Ongeldig bestandsformaat. Gebruik een eerder geëxporteerd Tsumo!-bestand.",
+        ["FileTooLarge"] = "Bestand is te groot (max 10 MB).",
+        ["CurrentDataSummary"] = "Huidige gegevens",
+        ["Sessions"] = "Zittingen",
     };
 
     // ── English ────────────────────────────────────────────
@@ -250,5 +267,22 @@ public class LanguageService
         ["AvgMeetings"] = "Average meetings per pair (of those who met)",
         ["MinMeetings"] = "Min meetings",
         ["MaxMeetings"] = "Max meetings",
+
+        // Data Management page
+        ["DataManagement"] = "Data Management",
+        ["ExportData"] = "Export Data",
+        ["ExportDescription"] = "Export all members and sessions to a JSON file.",
+        ["ExportToFile"] = "Export to file",
+        ["ExportSuccess"] = "Data exported successfully!",
+        ["ImportData"] = "Import Data",
+        ["ImportDescription"] = "Import members and sessions from a previously exported JSON file. This replaces all current data.",
+        ["ImportFromFile"] = "Import from file",
+        ["ImportConfirm"] = "Warning: importing will replace all current data (members and sessions). Are you sure?",
+        ["YesImport"] = "Yes, import",
+        ["ImportSuccess"] = "Data imported successfully!",
+        ["InvalidFileFormat"] = "Invalid file format. Please use a previously exported Tsumo! file.",
+        ["FileTooLarge"] = "File is too large (max 10 MB).",
+        ["CurrentDataSummary"] = "Current data",
+        ["Sessions"] = "Sessions",
     };
 }

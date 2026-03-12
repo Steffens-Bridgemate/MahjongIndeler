@@ -29,6 +29,19 @@
         <span class="dismiss">🗙</span>
     </div>
     <script src="lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.downloadFile = function (filename, contentBase64) {
+            var link = document.createElement('a');
+            link.download = filename;
+            link.href = "data:application/json;base64," + contentBase64;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+        window.triggerFileInput = function (inputId) {
+            document.getElementById(inputId).click();
+        };
+    </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

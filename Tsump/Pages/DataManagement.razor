@@ -1,0 +1,233 @@
+@page "/data"
+@using Tsump.Models
+@using Tsump.Services
+@using System.Text.Json
+@using System.Text
+@inject LocalStorageService Storage
+@inject MemberService MemberService
+@inject SessionService SessionService
+@inject LanguageService Lang
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@Lang.Get("DataManagement") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("DataManagement")</h1>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                @Lang.Get("ExportData")
+            </div>
+            <div class="card-body">
+                <p>@Lang.Get("ExportDescription")</p>
+                <button class="btn btn-primary" @onclick="ExportData">
+                    @Lang.Get("ExportToFile")
+                </button>
+                @if (exportDone)
+                {
+                    <div class="alert alert-success mt-2 mb-0">@Lang.Get("ExportSuccess")</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                @Lang.Get("ImportData")
+            </div>
+            <div class="card-body">
+                <p>@Lang.Get("ImportDescription")</p>
+
+                @if (showImportConfirm)
+                {
+                    <div class="alert alert-danger">
+                        @Lang.Get("ImportConfirm")
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-danger me-1" @onclick="ConfirmImport">@Lang.Get("YesImport")</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="CancelImport">@Lang.Get("Cancel")</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-warning" @onclick="TriggerFileInput">
+                        @Lang.Get("ImportFromFile")
+                    </button>
+                }
+
+                <InputFile id="importFileInput" style="display:none" OnChange="OnFileSelected" />
+
+                @if (importError != null)
+                {
+                    <div class="alert alert-danger mt-2 mb-0">@importError</div>
+                }
+                @if (importDone)
+                {
+                    <div class="alert alert-success mt-2 mb-0">@Lang.Get("ImportSuccess")</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        @Lang.Get("CurrentDataSummary")
+    </div>
+    <div class="card-body">
+        <ul class="list-unstyled mb-0">
+            <li><strong>@Lang.Get("Members"):</strong> @memberCount</li>
+            <li><strong>@Lang.Get("Sessions"):</strong> @sessionCount</li>
+        </ul>
+    </div>
+</div>
+
+@code {
+    private bool exportDone;
+    private bool importDone;
+    private bool showImportConfirm;
+    private string? importError;
+    private string? pendingImportJson;
+    private int memberCount;
+    private int sessionCount;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshCounts();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshCounts()
+    {
+        var members = await MemberService.GetAllAsync();
+        var sessions = await SessionService.GetAllAsync();
+        memberCount = members.Count;
+        sessionCount = sessions.Count;
+    }
+
+    private async Task ExportData()
+    {
+        exportDone = false;
+        importDone = false;
+        importError = null;
+
+        var members = await MemberService.GetAllAsync();
+        var sessions = await SessionService.GetAllAsync();
+
+        var exportData = new
+        {
+            ExportDate = DateTime.Now.ToString("o"),
+            AppName = "Tsumo!",
+            Members = members,
+            Sessions = sessions
+        };
+
+        var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
+        var bytes = Encoding.UTF8.GetBytes(json);
+        var base64 = Convert.ToBase64String(bytes);
+
+        var filename = $"tsumo-export-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
+        await JS.InvokeVoidAsync("downloadFile", filename, base64);
+        exportDone = true;
+    }
+
+    private async Task TriggerFileInput()
+    {
+        exportDone = false;
+        importDone = false;
+        importError = null;
+        await JS.InvokeVoidAsync("triggerFileInput", "importFileInput");
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        importError = null;
+        importDone = false;
+
+        try
+        {
+            var file = e.File;
+            if (file.Size > 10 * 1024 * 1024)
+            {
+                importError = Lang.Get("FileTooLarge");
+                return;
+            }
+
+            using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            using var reader = new System.IO.StreamReader(stream);
+            pendingImportJson = await reader.ReadToEndAsync();
+
+            // Validate JSON structure before asking for confirmation
+            var doc = JsonDocument.Parse(pendingImportJson);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("Members", out _) || !root.TryGetProperty("Sessions", out _))
+            {
+                importError = Lang.Get("InvalidFileFormat");
+                pendingImportJson = null;
+                return;
+            }
+
+            showImportConfirm = true;
+        }
+        catch (JsonException)
+        {
+            importError = Lang.Get("InvalidFileFormat");
+            pendingImportJson = null;
+        }
+        catch (Exception ex)
+        {
+            importError = ex.Message;
+            pendingImportJson = null;
+        }
+    }
+
+    private async Task ConfirmImport()
+    {
+        showImportConfirm = false;
+
+        if (pendingImportJson == null)
+        {
+            importError = Lang.Get("InvalidFileFormat");
+            return;
+        }
+
+        try
+        {
+            var doc = JsonDocument.Parse(pendingImportJson);
+            var root = doc.RootElement;
+
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            var members = JsonSerializer.Deserialize<List<Member>>(root.GetProperty("Members").GetRawText(), options);
+            var sessions = JsonSerializer.Deserialize<List<WeeklySession>>(root.GetProperty("Sessions").GetRawText(), options);
+
+            if (members != null)
+                await Storage.SetAsync("tsump_members", members);
+            if (sessions != null)
+                await Storage.SetAsync("tsump_sessions", sessions);
+
+            await RefreshCounts();
+            importDone = true;
+            pendingImportJson = null;
+        }
+        catch (Exception ex)
+        {
+            importError = ex.Message;
+        }
+    }
+
+    private void CancelImport()
+    {
+        showImportConfirm = false;
+        pendingImportJson = null;
+    }
+}

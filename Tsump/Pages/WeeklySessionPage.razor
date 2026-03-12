@@ -21,6 +21,7 @@
     <div class="col-auto">
         <label class="form-label"><strong>@Lang.Get("StartTime")</strong></label>
         <input type="time" class="form-control" style="max-width: 150px;"
+               step="300"
                value="@(sessionStartTime?.ToString(@"hh\:mm") ?? "")"
                disabled="@IsLockedPastSession"
                @onchange="OnTimeChanged" />
