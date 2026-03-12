@@ -118,6 +118,23 @@ else
             <button class="btn btn-success" @onclick="SaveSession" disabled="@(tables.Count == 0)">
                 @Lang.Get("SaveSession")
             </button>
+            @if (currentSession != null)
+            {
+                @if (showDeleteConfirm)
+                {
+                    <span class="alert alert-danger d-inline-block ms-2 mb-0 py-1">
+                        @Lang.Get("DeleteSessionConfirm")
+                        <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteSession">@Lang.Get("YesDelete")</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteSession">@Lang.Get("Cancel")</button>
+                    </span>
+                }
+                else
+                {
+                    <button class="btn btn-outline-danger ms-2" @onclick="RequestDeleteSession">
+                        @Lang.Get("DeleteSession")
+                    </button>
+                }
+            }
             @if (presentIds.Count < 3)
             {
                 <span class="text-warning ms-2">@Lang.Get("NeedAtLeast3")</span>
@@ -125,9 +142,48 @@ else
         </div>
     }
 
+    @if (IsLockedPastSession && currentSession != null)
+    {
+        <div class="mb-3">
+            @if (showDeleteConfirm)
+            {
+                <div class="alert alert-danger d-inline-block">
+                    @Lang.Get("DeleteSessionConfirm")
+                    <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteSession">@Lang.Get("YesDelete")</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteSession">@Lang.Get("Cancel")</button>
+                </div>
+            }
+            else
+            {
+                <button class="btn btn-outline-danger" @onclick="RequestDeleteSession">
+                    @Lang.Get("DeleteSession")
+                </button>
+            }
+        </div>
+    }
+
     @if (tables.Count > 0)
     {
         <h4>@Lang.Get("TableAssignments")</h4>
+
+        @if (!IsLockedPastSession && selectedPlayerIds.Count > 0)
+        {
+            <div class="mb-3">
+                <span class="text-muted me-2">
+                    @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetPlayerName(id)))
+                </span>
+                @if (selectedPlayerIds.Count == 2)
+                {
+                    <button class="btn btn-sm btn-warning me-1" @onclick="SwapSelectedPlayers">
+                        @Lang.Get("SwapPlayers")
+                    </button>
+                }
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSelection">
+                    @Lang.Get("ClearSelection")
+                </button>
+            </div>
+        }
+
         <div class="row">
             @foreach (var table in tables)
             {
@@ -139,8 +195,18 @@ else
                         <ul class="list-group list-group-flush">
                             @foreach (var playerId in table.PlayerIds)
                             {
-                                var player = members.FirstOrDefault(m => m.Id == playerId);
-                                <li class="list-group-item">@(player?.Name ?? Lang.Get("Unknown"))</li>
+                                var pid = playerId;
+                                var player = members.FirstOrDefault(m => m.Id == pid);
+                                var isSelected = selectedPlayerIds.Contains(pid);
+                                <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "")"
+                                    style="cursor: @(IsLockedPastSession ? "default" : "grab")"
+                                    draggable="@(!IsLockedPastSession)"
+                                    @ondragstart="() => OnDragStart(pid)"
+                                    @ondragover:preventDefault
+                                    @ondrop="() => OnDrop(pid)"
+                                    @onclick="() => OnPlayerClick(pid)">
+                                    <span>@(player?.Name ?? Lang.Get("Unknown"))</span>
+                                </li>
                             }
                         </ul>
                     </div>
@@ -172,9 +238,13 @@ else
     private bool saved;
     private string searchText = string.Empty;
     private bool showRegenerateConfirm;
+    private bool showDeleteConfirm;
 
     private List<WeeklySession> sessionsOnDate = new();
     private WeeklySession? currentSession;
+
+    private List<Guid> selectedPlayerIds = new();
+    private Guid? draggedPlayerId;
 
     private bool IsLockedPastSession =>
         sessionDate.Date < DateTime.Today && currentSession is { IsFinalized: true };
@@ -342,6 +412,98 @@ else
     {
         tables = await TableAssignmentService.AssignTables(presentIds.ToList());
         saved = false;
+    }
+
+    private string GetPlayerName(Guid id)
+    {
+        return members?.FirstOrDefault(m => m.Id == id)?.Name ?? Lang.Get("Unknown");
+    }
+
+    private void OnPlayerClick(Guid playerId)
+    {
+        if (IsLockedPastSession) return;
+
+        if (selectedPlayerIds.Contains(playerId))
+        {
+            selectedPlayerIds.Remove(playerId);
+        }
+        else if (selectedPlayerIds.Count < 2)
+        {
+            selectedPlayerIds.Add(playerId);
+            if (selectedPlayerIds.Count == 2)
+                return; // wait for swap button click
+        }
+        else
+        {
+            // Already 2 selected — replace the second one
+            selectedPlayerIds[1] = playerId;
+        }
+    }
+
+    private void SwapSelectedPlayers()
+    {
+        if (selectedPlayerIds.Count != 2) return;
+        SwapPlayers(selectedPlayerIds[0], selectedPlayerIds[1]);
+        selectedPlayerIds.Clear();
+    }
+
+    private void ClearSelection()
+    {
+        selectedPlayerIds.Clear();
+    }
+
+    private void OnDragStart(Guid playerId)
+    {
+        if (IsLockedPastSession) return;
+        draggedPlayerId = playerId;
+    }
+
+    private void OnDrop(Guid targetPlayerId)
+    {
+        if (IsLockedPastSession || draggedPlayerId == null || draggedPlayerId == targetPlayerId) return;
+        SwapPlayers(draggedPlayerId.Value, targetPlayerId);
+        draggedPlayerId = null;
+        selectedPlayerIds.Clear();
+    }
+
+    private void SwapPlayers(Guid playerA, Guid playerB)
+    {
+        TableAssignment? tableA = null, tableB = null;
+        int indexA = -1, indexB = -1;
+
+        foreach (var table in tables)
+        {
+            var idxA = table.PlayerIds.IndexOf(playerA);
+            if (idxA >= 0) { tableA = table; indexA = idxA; }
+
+            var idxB = table.PlayerIds.IndexOf(playerB);
+            if (idxB >= 0) { tableB = table; indexB = idxB; }
+        }
+
+        if (tableA == null || tableB == null) return;
+
+        tableA.PlayerIds[indexA] = playerB;
+        tableB.PlayerIds[indexB] = playerA;
+        saved = false;
+    }
+
+    private void RequestDeleteSession()
+    {
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDeleteSession()
+    {
+        showDeleteConfirm = false;
+    }
+
+    private async Task ConfirmDeleteSession()
+    {
+        if (currentSession == null) return;
+
+        await SessionService.DeleteAsync(currentSession.Id);
+        showDeleteConfirm = false;
+        await LoadSessionsForDate();
     }
 
     private async Task SaveSession()
