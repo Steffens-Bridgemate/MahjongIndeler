@@ -5,6 +5,7 @@
 @inject SessionService SessionService
 @inject TableAssignmentService TableAssignmentService
 @inject LanguageService Lang
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>@Lang.Get("WeeklySession") - Tsumo!</PageTitle>
@@ -165,7 +166,12 @@ else
 
     @if (tables.Count > 0)
     {
-        <h4>@Lang.Get("TableAssignments")</h4>
+        <div class="d-flex align-items-center mb-2">
+            <h4 class="mb-0">@Lang.Get("TableAssignments")</h4>
+            <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyTablesToClipboard">
+                @(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+            </button>
+        </div>
 
         @if (!IsLockedPastSession && selectedPlayerIds.Count > 0)
         {
@@ -246,6 +252,7 @@ else
 
     private List<Guid> selectedPlayerIds = new();
     private Guid? draggedPlayerId;
+    private bool copiedToClipboard;
 
     private bool IsLockedPastSession =>
         sessionDate.Date < DateTime.Today && currentSession is { IsFinalized: true };
@@ -413,6 +420,71 @@ else
     {
         tables = await TableAssignmentService.AssignTables(presentIds.ToList());
         saved = false;
+    }
+
+    private async Task CopyTablesToClipboard()
+    {
+        if (tables.Count == 0 || members == null) return;
+
+        // Build HTML version
+        var html = new System.Text.StringBuilder();
+        html.Append("<table style=\"border-collapse:separate;border-spacing:12px 0;\"><tr>");
+
+        for (int i = 0; i < tables.Count; i++)
+        {
+            if (i > 0 && i % 2 == 0)
+                html.Append("</tr><tr style=\"height:8px;\"><td></td></tr><tr>");
+
+            var table = tables[i];
+            var is3 = table.PlayerCount == 3;
+            var headerBg = is3 ? "#ffc107" : "#198754";
+            var headerColor = is3 ? "#000" : "#fff";
+            var borderColor = is3 ? "#ffc107" : "#198754";
+
+            html.Append($"<td style=\"vertical-align:top;width:200px;padding:0 4px;\">");
+            html.Append($"<div style=\"border:1px solid {borderColor};border-radius:4px;overflow:hidden;font-family:Verdana,sans-serif;font-size:13px;\">");
+            html.Append($"<div style=\"background:{headerBg};color:{headerColor};padding:6px 10px;font-weight:bold;\">");
+            html.Append($"{Lang.Get("Table")} {table.TableNumber} ({table.PlayerCount} {Lang.Get("players")})");
+            html.Append("</div>");
+
+            foreach (var playerId in table.PlayerIds)
+            {
+                var name = GetPlayerName(playerId);
+                html.Append($"<div style=\"padding:4px 10px;border-top:1px solid #dee2e6;\">{name}</div>");
+            }
+
+            html.Append("</div></td>");
+        }
+
+        html.Append("</tr></table>");
+
+        // Build plain text version (single column, works in proportional fonts like WhatsApp)
+        var text = new System.Text.StringBuilder();
+
+        for (int i = 0; i < tables.Count; i++)
+        {
+            var table = tables[i];
+            text.AppendLine($"*{Lang.Get("Table")} {table.TableNumber}* ({table.PlayerCount} {Lang.Get("players")})");
+
+            foreach (var playerId in table.PlayerIds)
+            {
+                text.AppendLine($"  {GetPlayerName(playerId)}");
+            }
+
+            if (i + 1 < tables.Count)
+                text.AppendLine();
+        }
+
+        await JS.InvokeVoidAsync("copyToClipboard", html.ToString(), text.ToString().TrimEnd());
+        copiedToClipboard = true;
+        _ = ResetCopiedFlag();
+    }
+
+    private async Task ResetCopiedFlag()
+    {
+        await Task.Delay(2000);
+        copiedToClipboard = false;
+        StateHasChanged();
     }
 
     private string GetPlayerName(Guid id)

@@ -41,6 +41,12 @@
         window.triggerFileInput = function (inputId) {
             document.getElementById(inputId).click();
         };
+        window.copyToClipboard = function (html, plainText) {
+            var htmlBlob = new Blob([html], { type: 'text/html' });
+            var textBlob = new Blob([plainText], { type: 'text/plain' });
+            var item = new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob });
+            return navigator.clipboard.write([item]);
+        };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
