@@ -58,7 +58,7 @@
                     </button>
                 }
 
-                <InputFile id="importFileInput" style="display:none" OnChange="OnFileSelected" />
+                <InputFile id="importFileInput" style="display:none" accept=".json,application/json" OnChange="OnFileSelected" />
 
                 @if (importError != null)
                 {
