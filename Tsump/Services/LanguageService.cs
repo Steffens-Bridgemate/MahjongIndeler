@@ -76,6 +76,10 @@ public class LanguageService
 
         // Weekly Session page
         ["SessionDate"] = "Zittingsdatum",
+        ["StartTime"] = "Starttijd",
+        ["SessionsOnDate"] = "Zittingen op deze datum",
+        ["NewSession"] = "Nieuwe zitting",
+        ["NoTime"] = "Geen tijd",
         ["Attendance"] = "Aanwezigheid",
         ["present"] = "aanwezig",
         ["of"] = "van",
@@ -179,6 +183,10 @@ public class LanguageService
 
         // Weekly Session page
         ["SessionDate"] = "Session Date",
+        ["StartTime"] = "Start Time",
+        ["SessionsOnDate"] = "Sessions on this date",
+        ["NewSession"] = "New Session",
+        ["NoTime"] = "No time",
         ["Attendance"] = "Attendance",
         ["present"] = "present",
         ["of"] = "of",

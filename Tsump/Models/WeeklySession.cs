@@ -4,6 +4,7 @@ public class WeeklySession
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public DateTime Date { get; set; }
+    public TimeSpan? StartTime { get; set; }
     public List<Guid> PresentMemberIds { get; set; } = new();
     public List<Guid> AbsentMemberIds { get; set; } = new();
     public List<TableAssignment> Tables { get; set; } = new();

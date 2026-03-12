@@ -21,16 +21,18 @@ else if (sessions.Count == 0)
 else
 {
     <div class="accordion" id="historyAccordion">
-        @foreach (var session in sessions.OrderByDescending(s => s.Date))
+        @foreach (var session in sessions.OrderByDescending(s => s.Date).ThenByDescending(s => s.StartTime ?? TimeSpan.Zero))
         {
             var collapseId = $"collapse-{session.Id:N}";
             var headingId = $"heading-{session.Id:N}";
             var tableWord = session.Tables.Count == 1 ? Lang.Get("table") : Lang.Get("tables");
+            var sessionNumber = GetSessionNumber(session);
+            var timeStr = session.StartTime.HasValue ? session.StartTime.Value.ToString(@"hh\:mm") : "";
             <div class="accordion-item">
                 <h2 class="accordion-header" id="@headingId">
                     <button class="accordion-button collapsed" type="button"
                             data-bs-toggle="collapse" data-bs-target="#@collapseId">
-                        @session.Date.ToString("dddd, MMMM d, yyyy") &mdash;
+                        @session.Date.ToString("dddd, MMMM d, yyyy")@(sessionNumber.HasValue ? $" #{sessionNumber}" : "")@(timeStr != "" ? $" ({timeStr})" : "") &mdash;
                         @session.PresentMemberIds.Count @Lang.Get("present"),
                         @session.Tables.Count @tableWord
                     </button>
@@ -138,6 +140,15 @@ else
     private string GetMemberName(Guid id)
     {
         return members.FirstOrDefault(m => m.Id == id)?.Name ?? Lang.Get("Unknown");
+    }
+
+    private int? GetSessionNumber(WeeklySession session)
+    {
+        if (sessions == null) return null;
+        var sameDateSessions = sessions.Where(s => s.Date.Date == session.Date.Date).ToList();
+        if (sameDateSessions.Count <= 1) return null;
+        var ordered = sameDateSessions.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        return ordered.IndexOf(session) + 1;
     }
 
     private void CalculateStats()

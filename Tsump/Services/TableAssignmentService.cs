@@ -307,6 +307,7 @@ public class TableAssignmentService
         var sessionsDescending = history
             .Where(s => s.IsFinalized)
             .OrderByDescending(s => s.Date)
+            .ThenByDescending(s => s.StartTime ?? TimeSpan.Zero)
             .ToList();
 
         foreach (var playerId in presentPlayerIds)

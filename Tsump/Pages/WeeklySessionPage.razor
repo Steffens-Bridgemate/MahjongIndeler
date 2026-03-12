@@ -11,12 +11,43 @@
 
 <h1>@Lang.Get("WeeklySession")</h1>
 
-<div class="mb-3">
-    <label class="form-label"><strong>@Lang.Get("SessionDate")</strong></label>
-    <input type="date" class="form-control" style="max-width: 250px;"
-           value="@sessionDate.ToString("yyyy-MM-dd")"
-           @onchange="OnDateChanged" />
+<div class="row mb-3">
+    <div class="col-auto">
+        <label class="form-label"><strong>@Lang.Get("SessionDate")</strong></label>
+        <input type="date" class="form-control" style="max-width: 250px;"
+               value="@sessionDate.ToString("yyyy-MM-dd")"
+               @onchange="OnDateChanged" />
+    </div>
+    <div class="col-auto">
+        <label class="form-label"><strong>@Lang.Get("StartTime")</strong></label>
+        <input type="time" class="form-control" style="max-width: 150px;"
+               value="@(sessionStartTime?.ToString(@"hh\:mm") ?? "")"
+               disabled="@IsLockedPastSession"
+               @onchange="OnTimeChanged" />
+    </div>
 </div>
+
+@if (sessionsOnDate.Count > 0)
+{
+    <div class="mb-3">
+        <label class="form-label"><strong>@Lang.Get("SessionsOnDate")</strong></label>
+        <div class="btn-group d-block" role="group">
+            @foreach (var s in sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero))
+            {
+                var isActive = currentSession?.Id == s.Id;
+                var sessionLabel = GetSessionLabel(s);
+                <button class="btn btn-sm me-1 mb-1 @(isActive ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => SelectSession(s)">
+                    @sessionLabel
+                </button>
+            }
+            <button class="btn btn-sm btn-outline-success me-1 mb-1" @onclick="StartNewSession"
+                    disabled="@(currentSession != null && !currentSession.IsFinalized)">
+                + @Lang.Get("NewSession")
+            </button>
+        </div>
+    </div>
+}
 
 @if (IsLockedPastSession)
 {
@@ -137,13 +168,16 @@ else
     private HashSet<Guid> presentIds = new();
     private List<TableAssignment> tables = new();
     private DateTime sessionDate = DateTime.Today;
+    private TimeSpan? sessionStartTime;
     private bool saved;
     private string searchText = string.Empty;
-    private bool existingSessionIsFinalized;
     private bool showRegenerateConfirm;
 
+    private List<WeeklySession> sessionsOnDate = new();
+    private WeeklySession? currentSession;
+
     private bool IsLockedPastSession =>
-        sessionDate.Date < DateTime.Today && existingSessionIsFinalized;
+        sessionDate.Date < DateTime.Today && currentSession is { IsFinalized: true };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -162,29 +196,69 @@ else
         {
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
-            await LoadExistingSession();
+            await LoadSessionsForDate();
             StateHasChanged();
         }
     }
 
-    private async Task LoadExistingSession()
+    private async Task LoadSessionsForDate()
     {
-        var sessions = await SessionService.GetAllAsync();
-        var existing = sessions.FirstOrDefault(s => s.Date.Date == sessionDate.Date);
-        if (existing != null)
+        var allSessions = await SessionService.GetAllAsync();
+        sessionsOnDate = allSessions.Where(s => s.Date.Date == sessionDate.Date).ToList();
+
+        if (sessionsOnDate.Count > 0)
         {
-            presentIds = new HashSet<Guid>(existing.PresentMemberIds);
-            tables = existing.Tables;
-            existingSessionIsFinalized = existing.IsFinalized;
+            // Select the first session (by time) by default
+            var first = sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).First();
+            LoadFromSession(first);
         }
         else
         {
+            currentSession = null;
+            sessionStartTime = null;
             presentIds.Clear();
             tables.Clear();
-            existingSessionIsFinalized = false;
         }
         saved = false;
         showRegenerateConfirm = false;
+    }
+
+    private void LoadFromSession(WeeklySession session)
+    {
+        currentSession = session;
+        sessionStartTime = session.StartTime;
+        presentIds = new HashSet<Guid>(session.PresentMemberIds);
+        tables = session.Tables;
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private void SelectSession(WeeklySession session)
+    {
+        LoadFromSession(session);
+    }
+
+    private void StartNewSession()
+    {
+        currentSession = null;
+        sessionStartTime = null;
+        presentIds.Clear();
+        tables.Clear();
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private string GetSessionLabel(WeeklySession session)
+    {
+        var ordered = sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        var index = ordered.IndexOf(session) + 1;
+        var timeStr = session.StartTime.HasValue
+            ? session.StartTime.Value.ToString(@"hh\:mm")
+            : Lang.Get("NoTime");
+
+        if (sessionsOnDate.Count > 1)
+            return $"#{index} — {timeStr}";
+        return timeStr;
     }
 
     private async Task OnDateChanged(ChangeEventArgs e)
@@ -192,8 +266,19 @@ else
         if (DateTime.TryParse(e.Value?.ToString(), out var date))
         {
             sessionDate = date;
-            await LoadExistingSession();
+            await LoadSessionsForDate();
         }
+    }
+
+    private void OnTimeChanged(ChangeEventArgs e)
+    {
+        if (IsLockedPastSession) return;
+
+        var val = e.Value?.ToString();
+        if (TimeSpan.TryParse(val, out var time))
+            sessionStartTime = time;
+        else
+            sessionStartTime = null;
     }
 
     private void ToggleAttendance(Guid memberId, bool isPresent)
@@ -233,7 +318,7 @@ else
     {
         if (IsLockedPastSession) return;
 
-        if (tables.Count > 0 && existingSessionIsFinalized)
+        if (tables.Count > 0 && currentSession is { IsFinalized: true })
         {
             showRegenerateConfirm = true;
             return;
@@ -266,6 +351,7 @@ else
         var session = new WeeklySession
         {
             Date = sessionDate,
+            StartTime = sessionStartTime,
             PresentMemberIds = presentIds.ToList(),
             AbsentMemberIds = activeMembers
                 .Where(m => !presentIds.Contains(m.Id))
@@ -275,13 +361,16 @@ else
             IsFinalized = true
         };
 
-        var sessions = await SessionService.GetAllAsync();
-        var existing = sessions.FirstOrDefault(s => s.Date.Date == sessionDate.Date);
-        if (existing != null)
-            session.Id = existing.Id;
+        if (currentSession != null)
+            session.Id = currentSession.Id;
 
         await SessionService.SaveAsync(session);
-        existingSessionIsFinalized = true;
+        currentSession = session;
+
+        // Refresh the session list for this date
+        var allSessions = await SessionService.GetAllAsync();
+        sessionsOnDate = allSessions.Where(s => s.Date.Date == sessionDate.Date).ToList();
+
         saved = true;
     }
 }
