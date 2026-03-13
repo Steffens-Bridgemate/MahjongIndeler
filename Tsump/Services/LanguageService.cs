@@ -159,6 +159,20 @@ public class LanguageService
         ["FileTooLarge"] = "Bestand is te groot (max 10 MB).",
         ["CurrentDataSummary"] = "Huidige gegevens",
         ["Sessions"] = "Zittingen",
+
+        // Settings page
+        ["Settings"] = "Instellingen",
+        ["PlayingDays"] = "Speeldagen",
+        ["PlayingDaysDesc"] = "Selecteer de dagen waarop de club speelt en stel de starttijden in.",
+        ["AddTime"] = "Tijd toevoegen",
+        ["SettingsSaved"] = "Instellingen opgeslagen!",
+        ["Monday"] = "Maandag",
+        ["Tuesday"] = "Dinsdag",
+        ["Wednesday"] = "Woensdag",
+        ["Thursday"] = "Donderdag",
+        ["Friday"] = "Vrijdag",
+        ["Saturday"] = "Zaterdag",
+        ["Sunday"] = "Zondag",
     };
 
     // ── English ────────────────────────────────────────────
@@ -292,5 +306,19 @@ public class LanguageService
         ["FileTooLarge"] = "File is too large (max 10 MB).",
         ["CurrentDataSummary"] = "Current data",
         ["Sessions"] = "Sessions",
+
+        // Settings page
+        ["Settings"] = "Settings",
+        ["PlayingDays"] = "Playing Days",
+        ["PlayingDaysDesc"] = "Select the days the club plays and set the starting times.",
+        ["AddTime"] = "Add time",
+        ["SettingsSaved"] = "Settings saved!",
+        ["Monday"] = "Monday",
+        ["Tuesday"] = "Tuesday",
+        ["Wednesday"] = "Wednesday",
+        ["Thursday"] = "Thursday",
+        ["Friday"] = "Friday",
+        ["Saturday"] = "Saturday",
+        ["Sunday"] = "Sunday",
     };
 }

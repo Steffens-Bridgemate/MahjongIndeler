@@ -12,6 +12,7 @@ builder.Services.AddScoped<LocalStorageService>();
 builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<TableAssignmentService>();
+builder.Services.AddScoped<SettingsService>();
 builder.Services.AddSingleton<LanguageService>();
 
 await builder.Build().RunAsync();

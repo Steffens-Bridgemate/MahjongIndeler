@@ -5,6 +5,7 @@
 @inject SessionService SessionService
 @inject TableAssignmentService TableAssignmentService
 @inject LanguageService Lang
+@inject SettingsService SettingsService
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -21,11 +22,31 @@
     </div>
     <div class="col-auto">
         <label class="form-label"><strong>@Lang.Get("StartTime")</strong></label>
-        <input type="time" class="form-control" style="max-width: 150px;"
-               step="300"
-               value="@(sessionStartTime?.ToString(@"hh\:mm") ?? "")"
-               disabled="@IsLockedPastSession"
-               @onchange="OnTimeChanged" />
+        <div class="d-flex align-items-center gap-1">
+            <select class="form-select" style="max-width: 75px;"
+                    value="@(sessionStartTime.HasValue ? sessionStartTime.Value.Hours : -1)"
+                    disabled="@IsLockedPastSession"
+                    @onchange="OnHourChanged">
+                <option value="-1">--</option>
+                @for (int h = 0; h < 24; h++)
+                {
+                    var hh = h;
+                    <option value="@hh">@hh.ToString("D2")</option>
+                }
+            </select>
+            <span>:</span>
+            <select class="form-select" style="max-width: 75px;"
+                    value="@(sessionStartTime.HasValue ? sessionStartTime.Value.Minutes : -1)"
+                    disabled="@IsLockedPastSession"
+                    @onchange="OnMinuteChanged">
+                <option value="-1">--</option>
+                @for (int m = 0; m < 60; m += 5)
+                {
+                    var mm = m;
+                    <option value="@mm">@mm.ToString("D2")</option>
+                }
+            </select>
+        </div>
     </div>
 </div>
 
@@ -274,6 +295,15 @@ else
         {
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
+
+            // Auto-set date/time to next scheduled slot if no session exists for today
+            var nextSlot = await SettingsService.GetNextScheduledSlotAsync();
+            if (nextSlot != null)
+            {
+                sessionDate = nextSlot.Value.Date;
+                sessionStartTime = nextSlot.Value.Time;
+            }
+
             await LoadSessionsForDate();
             StateHasChanged();
         }
@@ -293,7 +323,14 @@ else
         else
         {
             currentSession = null;
-            sessionStartTime = null;
+            // Preserve sessionStartTime if it was pre-set from the schedule
+            if (sessionStartTime == null)
+            {
+                var settings = await SettingsService.GetAsync();
+                var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
+                if (entry != null && entry.StartTimes.Count > 0)
+                    sessionStartTime = entry.StartTimes.OrderBy(t => t).First();
+            }
             presentIds.Clear();
             tables.Clear();
         }
@@ -316,14 +353,27 @@ else
         LoadFromSession(session);
     }
 
-    private void StartNewSession()
+    private async Task StartNewSession()
     {
         currentSession = null;
-        sessionStartTime = null;
         presentIds.Clear();
         tables.Clear();
         saved = false;
         showRegenerateConfirm = false;
+
+        // Set start time to next available time on this date from the schedule
+        var settings = await SettingsService.GetAsync();
+        var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
+        if (entry != null && entry.StartTimes.Count > 0)
+        {
+            var usedTimes = sessionsOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
+            var nextTime = entry.StartTimes.OrderBy(t => t).FirstOrDefault(t => !usedTimes.Contains(t));
+            sessionStartTime = nextTime != default ? nextTime : null;
+        }
+        else
+        {
+            sessionStartTime = null;
+        }
     }
 
     private string GetSessionLabel(WeeklySession session)
@@ -348,15 +398,32 @@ else
         }
     }
 
-    private void OnTimeChanged(ChangeEventArgs e)
+    private void OnHourChanged(ChangeEventArgs e)
     {
         if (IsLockedPastSession) return;
-
-        var val = e.Value?.ToString();
-        if (TimeSpan.TryParse(val, out var time))
-            sessionStartTime = time;
+        if (int.TryParse(e.Value?.ToString(), out var h) && h >= 0)
+        {
+            var currentMinute = sessionStartTime?.Minutes ?? 0;
+            sessionStartTime = new TimeSpan(h, currentMinute, 0);
+        }
         else
+        {
             sessionStartTime = null;
+        }
+    }
+
+    private void OnMinuteChanged(ChangeEventArgs e)
+    {
+        if (IsLockedPastSession) return;
+        if (int.TryParse(e.Value?.ToString(), out var m) && m >= 0)
+        {
+            var currentHour = sessionStartTime?.Hours ?? 0;
+            sessionStartTime = new TimeSpan(currentHour, m, 0);
+        }
+        else
+        {
+            sessionStartTime = null;
+        }
     }
 
     private void ToggleAttendance(Guid memberId, bool isPresent)

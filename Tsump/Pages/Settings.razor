@@ -1,0 +1,179 @@
+@page "/settings"
+@using Tsump.Models
+@using Tsump.Services
+@inject SettingsService SettingsService
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>@Lang.Get("Settings") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("Settings")</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">@Lang.Get("PlayingDays")</h5>
+        <p class="text-muted">@Lang.Get("PlayingDaysDesc")</p>
+
+        <div class="row mb-3">
+            @foreach (var day in allDays)
+            {
+                var isChecked = schedule.ContainsKey(day);
+                <div class="col-auto">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox"
+                               checked="@isChecked"
+                               @onchange="e => ToggleDay(day, (bool)(e.Value ?? false))" />
+                        <label class="form-check-label">@Lang.Get(day.ToString())</label>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @foreach (var day in allDays.Where(d => schedule.ContainsKey(d)))
+        {
+            <div class="card mb-3">
+                <div class="card-body py-2">
+                    <h6 class="mb-2">@Lang.Get(day.ToString())</h6>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        @foreach (var time in schedule[day].OrderBy(t => t))
+                        {
+                            var t = time;
+                            <span class="badge bg-primary d-flex align-items-center" style="font-size: 0.95em;">
+                                @t.ToString(@"hh\:mm")
+                                <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6em;"
+                                        @onclick="() => RemoveTime(day, t)"></button>
+                            </span>
+                        }
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <select class="form-select" style="max-width: 75px;"
+                                value="@(newHours.GetValueOrDefault(day, -1))"
+                                @onchange="e => OnNewHourChanged(day, e)">
+                            <option value="-1">--</option>
+                            @for (int h = 0; h < 24; h++)
+                            {
+                                var hh = h;
+                                <option value="@hh">@hh.ToString("D2")</option>
+                            }
+                        </select>
+                        <span>:</span>
+                        <select class="form-select" style="max-width: 75px;"
+                                value="@(newMinutes.GetValueOrDefault(day, -1))"
+                                @onchange="e => OnNewMinuteChanged(day, e)">
+                            <option value="-1">--</option>
+                            @for (int m = 0; m < 60; m += 5)
+                            {
+                                var mm = m;
+                                <option value="@mm">@mm.ToString("D2")</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => AddTime(day)">
+                            + @Lang.Get("AddTime")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (saved)
+        {
+            <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
+        }
+
+        <button class="btn btn-success" @onclick="Save">@Lang.Get("Save")</button>
+    </div>
+</div>
+
+@code {
+    private Dictionary<DayOfWeek, List<TimeSpan>> schedule = new();
+    private Dictionary<DayOfWeek, int> newHours = new();
+    private Dictionary<DayOfWeek, int> newMinutes = new();
+    private bool saved;
+
+    private static readonly DayOfWeek[] allDays = new[]
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+    };
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var settings = await SettingsService.GetAsync();
+            foreach (var entry in settings.Schedule)
+            {
+                schedule[entry.Day] = new List<TimeSpan>(entry.StartTimes);
+            }
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleDay(DayOfWeek day, bool enabled)
+    {
+        if (enabled)
+        {
+            if (!schedule.ContainsKey(day))
+                schedule[day] = new List<TimeSpan>();
+        }
+        else
+        {
+            schedule.Remove(day);
+        }
+        saved = false;
+    }
+
+    private void OnNewHourChanged(DayOfWeek day, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var h))
+            newHours[day] = h;
+    }
+
+    private void OnNewMinuteChanged(DayOfWeek day, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var m))
+            newMinutes[day] = m;
+    }
+
+    private void AddTime(DayOfWeek day)
+    {
+        if (!newHours.TryGetValue(day, out var h) || h < 0) return;
+        if (!newMinutes.TryGetValue(day, out var m) || m < 0) return;
+
+        var time = new TimeSpan(h, m, 0);
+        if (!schedule.ContainsKey(day))
+            schedule[day] = new List<TimeSpan>();
+        if (!schedule[day].Contains(time))
+            schedule[day].Add(time);
+        newHours[day] = -1;
+        newMinutes[day] = -1;
+        saved = false;
+    }
+
+    private void RemoveTime(DayOfWeek day, TimeSpan time)
+    {
+        if (schedule.ContainsKey(day))
+            schedule[day].Remove(time);
+        saved = false;
+    }
+
+    private async Task Save()
+    {
+        var settings = new ClubSettings
+        {
+            Schedule = schedule
+                .Where(kv => kv.Value.Count > 0)
+                .Select(kv => new ScheduleEntry
+                {
+                    Day = kv.Key,
+                    StartTimes = kv.Value.OrderBy(t => t).ToList()
+                })
+                .ToList()
+        };
+        await SettingsService.SaveAsync(settings);
+        saved = true;
+    }
+}
