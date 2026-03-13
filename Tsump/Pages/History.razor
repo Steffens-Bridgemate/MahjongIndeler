@@ -32,7 +32,7 @@ else
                 <h2 class="accordion-header" id="@headingId">
                     <button class="accordion-button collapsed" type="button"
                             data-bs-toggle="collapse" data-bs-target="#@collapseId">
-                        @session.Date.ToString("dddd, MMMM d, yyyy")@(sessionNumber.HasValue ? $" #{sessionNumber}" : "")@(timeStr != "" ? $" ({timeStr})" : "") &mdash;
+                        @Lang.FormatDate(session.Date)@(sessionNumber.HasValue ? $" #{sessionNumber}" : "")@(timeStr != "" ? $" ({timeStr})" : "") &mdash;
                         @session.PresentMemberIds.Count @Lang.Get("present"),
                         @session.Tables.Count @tableWord
                         @if (session.ExcludeFromOptimization)

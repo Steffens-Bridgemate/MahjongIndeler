@@ -28,6 +28,13 @@ public class LanguageService
         return key;
     }
 
+    public string FormatDate(DateTime date)
+    {
+        var day = Get(date.DayOfWeek.ToString());
+        var month = Get($"Month{date.Month}");
+        return $"{day} {date.Day} {month} {date.Year}";
+    }
+
     // ── Dutch ──────────────────────────────────────────────
     private static readonly Dictionary<string, string> Dutch = new()
     {
@@ -202,6 +209,19 @@ public class LanguageService
         ["Friday"] = "Vrijdag",
         ["Saturday"] = "Zaterdag",
         ["Sunday"] = "Zondag",
+
+        ["Month1"] = "januari",
+        ["Month2"] = "februari",
+        ["Month3"] = "maart",
+        ["Month4"] = "april",
+        ["Month5"] = "mei",
+        ["Month6"] = "juni",
+        ["Month7"] = "juli",
+        ["Month8"] = "augustus",
+        ["Month9"] = "september",
+        ["Month10"] = "oktober",
+        ["Month11"] = "november",
+        ["Month12"] = "december",
     };
 
     // ── English ────────────────────────────────────────────
@@ -378,5 +398,18 @@ public class LanguageService
         ["Friday"] = "Friday",
         ["Saturday"] = "Saturday",
         ["Sunday"] = "Sunday",
+
+        ["Month1"] = "January",
+        ["Month2"] = "February",
+        ["Month3"] = "March",
+        ["Month4"] = "April",
+        ["Month5"] = "May",
+        ["Month6"] = "June",
+        ["Month7"] = "July",
+        ["Month8"] = "August",
+        ["Month9"] = "September",
+        ["Month10"] = "October",
+        ["Month11"] = "November",
+        ["Month12"] = "December",
     };
 }
