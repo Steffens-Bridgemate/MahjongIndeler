@@ -9,6 +9,7 @@ public class WeeklySession
     public List<Guid> AbsentMemberIds { get; set; } = new();
     public List<TableAssignment> Tables { get; set; } = new();
     public bool IsFinalized { get; set; }
+    public bool ExcludeFromOptimization { get; set; }
 }
 
 public class TableAssignment

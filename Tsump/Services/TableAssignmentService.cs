@@ -26,7 +26,8 @@ public class TableAssignmentService
 
         CalculateTableCounts(playerCount, out var fourPlayerTables, out var threePlayerTables);
 
-        var history = await _sessionService.GetAllAsync();
+        var allHistory = await _sessionService.GetAllAsync();
+        var history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
         var members = await _memberService.GetAllAsync();
         var extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
         var attendance = CountAttendance(history, presentPlayerIds);

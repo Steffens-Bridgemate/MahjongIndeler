@@ -50,6 +50,15 @@
             </select>
         </div>
     </div>
+    <div class="col-auto d-flex align-items-end">
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox"
+                   checked="@excludeFromOptimization"
+                   disabled="@IsLockedPastSession"
+                   @onchange="e => excludeFromOptimization = (bool)(e.Value ?? false)" />
+            <label class="form-check-label">@Lang.Get("ExcludeFromOptimization")</label>
+        </div>
+    </div>
 </div>
 
 @if (sessionsOnDate.Count > 0)
@@ -281,6 +290,7 @@ else
     private string searchText = string.Empty;
     private bool showRegenerateConfirm;
     private bool showDeleteConfirm;
+    private bool excludeFromOptimization;
 
     private List<WeeklySession> sessionsOnDate = new();
     private WeeklySession? currentSession;
@@ -344,6 +354,7 @@ else
         else
         {
             currentSession = null;
+            excludeFromOptimization = false;
             // Preserve sessionStartTime if it was pre-set from the schedule
             if (sessionStartTime == null)
             {
@@ -365,6 +376,7 @@ else
         sessionStartTime = session.StartTime;
         presentIds = new HashSet<Guid>(session.PresentMemberIds);
         tables = session.Tables;
+        excludeFromOptimization = session.ExcludeFromOptimization;
         saved = false;
         showRegenerateConfirm = false;
     }
@@ -387,6 +399,7 @@ else
 
         currentSession = null;
         tables.Clear();
+        excludeFromOptimization = false;
         saved = false;
         showRegenerateConfirm = false;
 
@@ -689,7 +702,8 @@ else
                 .Select(m => m.Id)
                 .ToList(),
             Tables = tables,
-            IsFinalized = true
+            IsFinalized = true,
+            ExcludeFromOptimization = excludeFromOptimization
         };
 
         if (currentSession != null)

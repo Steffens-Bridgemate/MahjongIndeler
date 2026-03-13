@@ -35,6 +35,10 @@ else
                         @session.Date.ToString("dddd, MMMM d, yyyy")@(sessionNumber.HasValue ? $" #{sessionNumber}" : "")@(timeStr != "" ? $" ({timeStr})" : "") &mdash;
                         @session.PresentMemberIds.Count @Lang.Get("present"),
                         @session.Tables.Count @tableWord
+                        @if (session.ExcludeFromOptimization)
+                        {
+                            <span class="badge bg-secondary ms-2">@Lang.Get("ExcludedFromOptimization")</span>
+                        }
                     </button>
                 </h2>
                 <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#historyAccordion">
@@ -177,7 +181,7 @@ else
             };
         }
 
-        foreach (var session in sessions)
+        foreach (var session in sessions.Where(s => !s.ExcludeFromOptimization))
         {
             foreach (var pid in session.PresentMemberIds)
             {

@@ -192,6 +192,9 @@ public class LanguageService
         ["BackToWorkflowImportHint"] = "Importeer eerst een bestand.",
         ["BackToWorkflowExportHint"] = "Exporteer eerst de gegevens.",
 
+        ["ExcludeFromOptimization"] = "Uitsluiten van indelingsoptimalisatie",
+        ["ExcludedFromOptimization"] = "Uitgesloten",
+
         ["Monday"] = "Maandag",
         ["Tuesday"] = "Dinsdag",
         ["Wednesday"] = "Woensdag",
@@ -364,6 +367,9 @@ public class LanguageService
         ["BackToWorkflowHint"] = "Save the session first.",
         ["BackToWorkflowImportHint"] = "Import a file first.",
         ["BackToWorkflowExportHint"] = "Export the data first.",
+
+        ["ExcludeFromOptimization"] = "Exclude from meeting optimization",
+        ["ExcludedFromOptimization"] = "Excluded",
 
         ["Monday"] = "Monday",
         ["Tuesday"] = "Tuesday",

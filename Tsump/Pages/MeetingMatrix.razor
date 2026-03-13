@@ -167,7 +167,7 @@ else
         if (firstRender)
         {
             members = await MemberService.GetAllAsync();
-            var sessions = await SessionService.GetAllAsync();
+            var sessions = (await SessionService.GetAllAsync()).Where(s => !s.ExcludeFromOptimization).ToList();
             BuildMatrix(sessions);
             StateHasChanged();
         }
