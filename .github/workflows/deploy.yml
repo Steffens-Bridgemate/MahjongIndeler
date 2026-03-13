@@ -29,8 +29,8 @@ jobs:
           CURRENT=$(grep -oP '"\K[0-9]+\.[0-9]+' "$FILE")
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
           MINOR=$(echo "$CURRENT" | cut -d. -f2)
-          NEW_MINOR=$((MINOR + 1))
-          NEW_VERSION="$MAJOR.$NEW_MINOR"
+          MINOR_NUM=$((10#$MINOR + 1))
+          NEW_VERSION=$(printf "%d.%02d" "$MAJOR" "$MINOR_NUM")
           sed -i "s|\"$CURRENT\"|\"$NEW_VERSION\"|" "$FILE"
           echo "Bumped version from $CURRENT to $NEW_VERSION"
 
