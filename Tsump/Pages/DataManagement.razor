@@ -287,6 +287,6 @@
             state[workflowStepIndex.Value] = true;
             await Storage.SetAsync("tsump_workflow", state);
         }
-        Nav.NavigateTo("/workflow");
+        Nav.NavigateTo("workflow");
     }
 }
