@@ -355,8 +355,16 @@ else
 
     private async Task StartNewSession()
     {
+        // Copy attendance from the last session on this date
+        var lastSession = sessionsOnDate
+            .OrderByDescending(s => s.StartTime ?? TimeSpan.Zero)
+            .FirstOrDefault();
+        if (lastSession != null)
+            presentIds = new HashSet<Guid>(lastSession.PresentMemberIds);
+        else
+            presentIds.Clear();
+
         currentSession = null;
-        presentIds.Clear();
         tables.Clear();
         saved = false;
         showRegenerateConfirm = false;
