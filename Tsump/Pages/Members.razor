@@ -22,7 +22,7 @@
                 <DataAnnotationsValidator />
                 <div class="mb-3">
                     <label class="form-label">@Lang.Get("Name")</label>
-                    <InputText class="form-control" @bind-Value="currentMember.Name" />
+                    <input class="form-control" value="@currentMember.Name" @oninput="OnNameInput" />
                 </div>
                 <div class="mb-3">
                     <label class="form-label">@Lang.Get("Email")</label>
@@ -98,6 +98,7 @@ else
     private Member currentMember = new();
     private bool showForm;
     private bool isEditing;
+    private bool userLoweredFirst;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -116,6 +117,7 @@ else
         currentMember = new Member();
         isEditing = false;
         showForm = true;
+        userLoweredFirst = false;
     }
 
     private void EditMember(Member member)
@@ -132,6 +134,7 @@ else
         };
         isEditing = true;
         showForm = true;
+        userLoweredFirst = member.Name.Length > 0 && char.IsLower(member.Name[0]);
     }
 
     private async Task SaveMember()
@@ -146,6 +149,28 @@ else
 
         members = await MemberService.GetAllAsync();
         showForm = false;
+    }
+
+    private void OnNameInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+
+        if (value.Length == 1 && !userLoweredFirst)
+        {
+            // Auto-capitalize the first letter on initial typing
+            value = value.ToUpper();
+        }
+        else if (value.Length >= 1 && char.IsLower(value[0]))
+        {
+            // User explicitly typed or changed first char to lowercase
+            userLoweredFirst = true;
+        }
+        else if (value.Length >= 1 && char.IsUpper(value[0]))
+        {
+            userLoweredFirst = false;
+        }
+
+        currentMember.Name = value;
     }
 
     private void CancelForm()
