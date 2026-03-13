@@ -1,0 +1,137 @@
+@page "/workflow"
+@using Tsump.Services
+@inject LocalStorageService Storage
+@inject LanguageService Lang
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@Lang.Get("Workflow") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("Workflow")</h1>
+<p class="text-muted">@Lang.Get("WorkflowDesc")</p>
+
+@if (stepsLoaded)
+{
+    var allDone = steps.All(s => s.Done);
+    <div class="mb-3 p-2 rounded @(allDone ? "bg-primary-subtle border border-primary" : "bg-light")">
+        <button class="btn @(allDone ? "btn-primary" : "btn-outline-secondary") btn-sm" disabled="@(!allDone)" @onclick="ResetWorkflow">
+            @Lang.Get("ResetWorkflow")
+        </button>
+        @if (!allDone)
+        {
+            <small class="text-muted ms-2">@Lang.Get("ResetWorkflowHint")</small>
+        }
+    </div>
+
+    <div class="list-group">
+        @for (int i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+            var index = i;
+            var isEnabled = index == 0 || steps[index - 1].Done;
+            var statusClass = step.Done ? "list-group-item-success" : isEnabled ? "" : "list-group-item-light text-muted";
+
+            <div class="list-group-item @statusClass">
+                <div class="d-flex align-items-start">
+                    <div class="form-check me-3 mt-1">
+                        <input class="form-check-input" type="checkbox"
+                               checked="@step.Done"
+                               disabled="@(!isEnabled)"
+                               @onchange="e => ToggleStep(index, (bool)(e.Value ?? false))" />
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold mb-1">@Lang.Get(step.TitleKey)</div>
+                        <div class="small @(isEnabled ? "text-muted" : "")">@Lang.Get(step.DescKey)</div>
+                        @if (step.TargetPage != null && isEnabled && !step.Done)
+                        {
+                            <button class="btn btn-sm btn-primary mt-2"
+                                    @onclick="() => NavigateToStep(index)">
+                                @Lang.Get(step.ButtonKey!)
+                            </button>
+                        }
+                    </div>
+                    @if (step.Done)
+                    {
+                        <span class="text-success fs-4 ms-2">&#10003;</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private const string StorageKey = "tsump_workflow";
+    private bool stepsLoaded;
+
+    private List<WorkflowStep> steps = new()
+    {
+        new() { TitleKey = "WfStep1Title", DescKey = "WfStep1Desc" },
+        new() { TitleKey = "WfStep2Title", DescKey = "WfStep2Desc", TargetPage = "/data", ButtonKey = "WfStep2Button" },
+        new() { TitleKey = "WfStep3Title", DescKey = "WfStep3Desc", TargetPage = "/session", ButtonKey = "WfStep3Button" },
+        new() { TitleKey = "WfStep4Title", DescKey = "WfStep4Desc", TargetPage = "/data", ButtonKey = "WfStep4Button" },
+        new() { TitleKey = "WfStep5Title", DescKey = "WfStep5Desc" },
+    };
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var saved = await Storage.GetAsync<Dictionary<int, bool>>(StorageKey);
+            if (saved != null)
+            {
+                foreach (var kv in saved)
+                {
+                    if (kv.Key >= 0 && kv.Key < steps.Count)
+                        steps[kv.Key].Done = kv.Value;
+                }
+            }
+            stepsLoaded = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleStep(int index, bool value)
+    {
+        steps[index].Done = value;
+        // Uncheck subsequent steps when unchecking a step
+        if (!value)
+        {
+            for (int i = index + 1; i < steps.Count; i++)
+                steps[i].Done = false;
+        }
+        await SaveState();
+    }
+
+    private async Task SaveState()
+    {
+        var state = new Dictionary<int, bool>();
+        for (int i = 0; i < steps.Count; i++)
+            state[i] = steps[i].Done;
+        await Storage.SetAsync(StorageKey, state);
+    }
+
+    private void NavigateToStep(int index)
+    {
+        Nav.NavigateTo($"{steps[index].TargetPage}?fromWorkflow={index}");
+    }
+
+    private async Task ResetWorkflow()
+    {
+        foreach (var step in steps)
+            step.Done = false;
+        await SaveState();
+    }
+
+    private class WorkflowStep
+    {
+        public string TitleKey { get; set; } = "";
+        public string DescKey { get; set; } = "";
+        public string? TargetPage { get; set; }
+        public string? ButtonKey { get; set; }
+        public bool Done { get; set; }
+    }
+}

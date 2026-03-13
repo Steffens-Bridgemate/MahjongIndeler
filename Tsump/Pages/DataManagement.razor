@@ -6,8 +6,10 @@
 @inject LocalStorageService Storage
 @inject MemberService MemberService
 @inject SessionService SessionService
+@inject SettingsService SettingsService
 @inject LanguageService Lang
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 @implements IDisposable
 
 <PageTitle>@Lang.Get("DataManagement") - Tsumo!</PageTitle>
@@ -28,6 +30,18 @@
                 @if (exportDone)
                 {
                     <div class="alert alert-success mt-2 mb-0">@Lang.Get("ExportSuccess")</div>
+                }
+                @if (workflowStepIndex == 3)
+                {
+                    <div class="mt-3 p-2 rounded @(exportDone ? "bg-primary-subtle border border-primary" : "bg-light")">
+                        <button class="btn @(exportDone ? "btn-primary" : "btn-outline-secondary") btn-sm" disabled="@(!exportDone)" @onclick="BackToWorkflow">
+                            &larr; @Lang.Get("BackToWorkflow")
+                        </button>
+                        @if (!exportDone)
+                        {
+                            <small class="text-muted ms-2">@Lang.Get("BackToWorkflowExportHint")</small>
+                        }
+                    </div>
                 }
             </div>
         </div>
@@ -68,6 +82,18 @@
                 {
                     <div class="alert alert-success mt-2 mb-0">@Lang.Get("ImportSuccess")</div>
                 }
+                @if (workflowStepIndex == 1)
+                {
+                    <div class="mt-3 p-2 rounded @(importDone ? "bg-primary-subtle border border-primary" : "bg-light")">
+                        <button class="btn @(importDone ? "btn-primary" : "btn-outline-secondary") btn-sm" disabled="@(!importDone)" @onclick="BackToWorkflow">
+                            &larr; @Lang.Get("BackToWorkflow")
+                        </button>
+                        @if (!importDone)
+                        {
+                            <small class="text-muted ms-2">@Lang.Get("BackToWorkflowImportHint")</small>
+                        }
+                    </div>
+                }
             </div>
         </div>
     </div>
@@ -93,8 +119,16 @@
     private string? pendingImportJson;
     private int memberCount;
     private int sessionCount;
+    private int? workflowStepIndex;
 
-    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    protected override void OnInitialized()
+    {
+        Lang.OnLanguageChanged += StateHasChanged;
+        var uri = new Uri(Nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (int.TryParse(query["fromWorkflow"], out var idx))
+            workflowStepIndex = idx;
+    }
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -122,13 +156,15 @@
 
         var members = await MemberService.GetAllAsync();
         var sessions = await SessionService.GetAllAsync();
+        var settings = await SettingsService.GetAsync();
 
         var exportData = new
         {
             ExportDate = DateTime.Now.ToString("o"),
             AppName = "Tsumo!",
             Members = members,
-            Sessions = sessions
+            Sessions = sessions,
+            Settings = settings
         };
 
         var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
@@ -215,6 +251,18 @@
             if (sessions != null)
                 await Storage.SetAsync("tsump_sessions", sessions);
 
+            if (root.TryGetProperty("Settings", out var settingsEl))
+            {
+                var settings = JsonSerializer.Deserialize<ClubSettings>(settingsEl.GetRawText(), options);
+                if (settings != null)
+                    await SettingsService.SaveAsync(settings);
+            }
+
+            // Reset workflow after import, but preserve step 1 (manual copy step)
+            var wfState = await Storage.GetAsync<Dictionary<int, bool>>("tsump_workflow") ?? new();
+            var step1Done = wfState.GetValueOrDefault(0, false);
+            await Storage.SetAsync("tsump_workflow", new Dictionary<int, bool> { [0] = step1Done });
+
             await RefreshCounts();
             importDone = true;
             pendingImportJson = null;
@@ -229,5 +277,16 @@
     {
         showImportConfirm = false;
         pendingImportJson = null;
+    }
+
+    private async Task BackToWorkflow()
+    {
+        if (workflowStepIndex.HasValue)
+        {
+            var state = await Storage.GetAsync<Dictionary<int, bool>>("tsump_workflow") ?? new();
+            state[workflowStepIndex.Value] = true;
+            await Storage.SetAsync("tsump_workflow", state);
+        }
+        Nav.NavigateTo("/workflow");
     }
 }

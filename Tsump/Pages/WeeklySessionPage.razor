@@ -7,6 +7,8 @@
 @inject LanguageService Lang
 @inject SettingsService SettingsService
 @inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject LocalStorageService Storage
 @implements IDisposable
 
 <PageTitle>@Lang.Get("WeeklySession") - Tsumo!</PageTitle>
@@ -141,6 +143,17 @@ else
             <button class="btn btn-success" @onclick="SaveSession" disabled="@(tables.Count == 0)">
                 @Lang.Get("SaveSession")
             </button>
+            @if (workflowStepIndex.HasValue)
+            {
+                <button class="btn @(saved ? "btn-primary" : "btn-outline-secondary") ms-2"
+                        disabled="@(!saved)" @onclick="BackToWorkflow">
+                    &larr; @Lang.Get("BackToWorkflow")
+                </button>
+                @if (!saved)
+                {
+                    <small class="text-muted ms-2">@Lang.Get("BackToWorkflowHint")</small>
+                }
+            }
             @if (currentSession != null)
             {
                 @if (showDeleteConfirm)
@@ -254,6 +267,7 @@ else
     {
         <div class="alert alert-success mt-3">@Lang.Get("SessionSaved")</div>
     }
+
 }
 
 @code {
@@ -274,6 +288,7 @@ else
     private List<Guid> selectedPlayerIds = new();
     private Guid? draggedPlayerId;
     private bool copiedToClipboard;
+    private int? workflowStepIndex;
 
     private bool IsLockedPastSession =>
         sessionDate.Date < DateTime.Today && currentSession is { IsFinalized: true };
@@ -293,6 +308,12 @@ else
     {
         if (firstRender)
         {
+            // Check if navigated from workflow
+            var uri = new Uri(Nav.Uri);
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            if (int.TryParse(query["fromWorkflow"], out var idx))
+                workflowStepIndex = idx;
+
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
 
@@ -682,5 +703,17 @@ else
         sessionsOnDate = allSessions.Where(s => s.Date.Date == sessionDate.Date).ToList();
 
         saved = true;
+    }
+
+    private async Task BackToWorkflow()
+    {
+        if (workflowStepIndex.HasValue)
+        {
+            // Mark the workflow step as done
+            var state = await Storage.GetAsync<Dictionary<int, bool>>("tsump_workflow") ?? new();
+            state[workflowStepIndex.Value] = true;
+            await Storage.SetAsync("tsump_workflow", state);
+        }
+        Nav.NavigateTo("/workflow");
     }
 }
