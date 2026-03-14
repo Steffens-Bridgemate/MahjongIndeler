@@ -59,9 +59,10 @@ else
                 <table class="table table-sm">
                     <thead>
                         <tr>
-                            <th style="width: 60px;">@Lang.Get("ParticipantNumber")</th>
-                            <th>@Lang.Get("ParticipantName")</th>
-                            <th style="width: 80px;"></th>
+                            <th style="width: 50px;">@Lang.Get("ParticipantNumber")</th>
+                            <th style="min-width: 14em;">@Lang.Get("ParticipantName")</th>
+                            <th>@Lang.Get("LeagueId")</th>
+                            <th style="width: 40px;"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -87,8 +88,23 @@ else
                                     }
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveParticipant(participant.Id)">
-                                        @Lang.Get("Remove")
+                                    @if (editingNames)
+                                    {
+                                        <input class="form-control form-control-sm"
+                                               value="@participant.LeagueId"
+                                               @oninput="e => participant.LeagueId = e.Value?.ToString() ?? string.Empty"
+                                               @onkeydown="e => OnEditParticipantKeyDown(participant, e)"
+                                               @onkeydown:preventDefault="@false"
+                                               placeholder="@Lang.Get("LeagueId")" />
+                                    }
+                                    else
+                                    {
+                                        @participant.LeagueId
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm text-danger p-0" style="font-size: 1.5em; font-weight: bold; line-height: 1;" title="@Lang.Get("Remove")" @onclick="() => RemoveParticipant(participant.Id)">
+                                        &#x1F5D1;
                                     </button>
                                 </td>
                             </tr>

@@ -16,6 +16,7 @@ public class TournamentParticipant
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public int Number { get; set; }
+    public string LeagueId { get; set; } = string.Empty;
 }
 
 public class TournamentSession
