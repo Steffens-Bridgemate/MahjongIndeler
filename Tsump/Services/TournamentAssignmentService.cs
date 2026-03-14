@@ -158,7 +158,86 @@ public class TournamentAssignmentService
             });
         }
 
+        BalanceThreePlayerDistribution(sessions);
+
         return sessions;
+    }
+
+    /// <summary>
+    /// Post-processing: balance 3-player table assignments across participants.
+    /// Swaps players between 3-player and 4-player tables in the same session
+    /// until the max difference in 3-player count is at most 1.
+    /// </summary>
+    private static void BalanceThreePlayerDistribution(List<TournamentSession> sessions)
+    {
+        // Collect all real player IDs
+        var allPlayerIds = sessions
+            .SelectMany(s => s.Tables.SelectMany(t => t.PlayerIds))
+            .Distinct()
+            .ToList();
+
+        if (allPlayerIds.Count == 0) return;
+
+        for (int iteration = 0; iteration < 1000; iteration++)
+        {
+            // Count 3-player table assignments per player
+            var threePlayerCount = new Dictionary<Guid, int>();
+            foreach (var id in allPlayerIds)
+                threePlayerCount[id] = 0;
+
+            foreach (var session in sessions)
+                foreach (var table in session.Tables)
+                    if (table.PlayerCount == 3)
+                        foreach (var id in table.PlayerIds)
+                            threePlayerCount[id]++;
+
+            var minCount = threePlayerCount.Values.Min();
+            var maxCount = threePlayerCount.Values.Max();
+
+            if (maxCount - minCount <= 1)
+                break;
+
+            // Find an over-assigned player and an under-assigned player
+            var overPlayer = threePlayerCount
+                .Where(kv => kv.Value == maxCount)
+                .Select(kv => kv.Key)
+                .First();
+            var underPlayer = threePlayerCount
+                .Where(kv => kv.Value == minCount)
+                .Select(kv => kv.Key)
+                .First();
+
+            // Find a session where overPlayer is at a 3-player table
+            // and underPlayer is at a 4-player table, then swap them
+            var swapped = false;
+            foreach (var session in sessions)
+            {
+                TableAssignment? threeTable = null;
+                TableAssignment? fourTable = null;
+
+                foreach (var table in session.Tables)
+                {
+                    if (table.PlayerCount == 3 && table.PlayerIds.Contains(overPlayer))
+                        threeTable = table;
+                    if (table.PlayerCount == 4 && table.PlayerIds.Contains(underPlayer))
+                        fourTable = table;
+                }
+
+                if (threeTable != null && fourTable != null)
+                {
+                    // Swap: move overPlayer to 4-player table, underPlayer to 3-player table
+                    var overIdx = threeTable.PlayerIds.IndexOf(overPlayer);
+                    var underIdx = fourTable.PlayerIds.IndexOf(underPlayer);
+                    threeTable.PlayerIds[overIdx] = underPlayer;
+                    fourTable.PlayerIds[underIdx] = overPlayer;
+                    swapped = true;
+                    break;
+                }
+            }
+
+            if (!swapped)
+                break;
+        }
     }
 
     /// <summary>
