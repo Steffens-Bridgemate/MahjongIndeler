@@ -417,9 +417,19 @@ else
         var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
         if (entry != null && entry.StartTimes.Count > 0)
         {
-            var usedTimes = sessionsOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
-            var nextTime = entry.StartTimes.OrderBy(t => t).FirstOrDefault(t => !usedTimes.Contains(t));
-            sessionStartTime = nextTime != default ? nextTime : null;
+            HashSet<TimeSpan> usedTimes = sessionsOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
+            TimeSpan nextTime = entry.StartTimes.OrderBy(t => t).FirstOrDefault(t => !usedTimes.Contains(t));
+            if (nextTime == default)
+            {
+                if (usedTimes.Any())
+                    sessionStartTime = usedTimes.Max().Add(TimeSpan.FromHours(1));
+                else
+                    sessionStartTime = null;
+            }
+            else
+            {
+                sessionStartTime =nextTime;
+            }
         }
         else
         {
