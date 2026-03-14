@@ -26,7 +26,7 @@
         <label class="form-label"><strong>@Lang.Get("StartTime")</strong></label>
         <div class="d-flex align-items-center gap-1">
             <select class="form-select" style="max-width: 75px;"
-                    value="@(sessionStartTime.HasValue ? sessionStartTime.Value.Hours : -1)"
+                    value="@(hanchanStartTime.HasValue ? hanchanStartTime.Value.Hours : -1)"
                     disabled="@IsLockedPastSession"
                     @onchange="OnHourChanged">
                 <option value="-1">--</option>
@@ -38,7 +38,7 @@
             </select>
             <span>:</span>
             <select class="form-select" style="max-width: 75px;"
-                    value="@(sessionStartTime.HasValue ? sessionStartTime.Value.Minutes : -1)"
+                    value="@(hanchanStartTime.HasValue ? hanchanStartTime.Value.Minutes : -1)"
                     disabled="@IsLockedPastSession"
                     @onchange="OnMinuteChanged">
                 <option value="-1">--</option>
@@ -61,22 +61,22 @@
     </div>
 </div>
 
-@if (sessionsOnDate.Count > 0)
+@if (hanchansOnDate.Count > 0)
 {
     <div class="mb-3">
         <label class="form-label"><strong>@Lang.Get("SessionsOnDate")</strong></label>
         <div class="btn-group d-block" role="group">
-            @foreach (var s in sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero))
+            @foreach (var s in hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero))
             {
-                var isActive = currentSession?.Id == s.Id;
+                var isActive = currentHanchan?.Id == s.Id;
                 var sessionLabel = GetSessionLabel(s);
                 <button class="btn btn-sm me-1 mb-1 @(isActive ? "btn-primary" : "btn-outline-primary")"
-                        @onclick="() => SelectSession(s)">
+                        @onclick="() => SelectHanchan(s)">
                     @sessionLabel
                 </button>
             }
-            <button class="btn btn-sm btn-outline-success me-1 mb-1" @onclick="StartNewSession"
-                    disabled="@(currentSession != null && !currentSession.IsFinalized)">
+            <button class="btn btn-sm btn-outline-success me-1 mb-1" @onclick="StartNewHanchan"
+                    disabled="@(currentHanchan != null && !currentHanchan.IsFinalized)">
                 + @Lang.Get("NewSession")
             </button>
         </div>
@@ -155,8 +155,8 @@ else
                     @Lang.Get("GenerateTableAssignments")
                 </button>
             }
-            <button class="btn btn-success" @onclick="SaveSession" disabled="@(tables.Count == 0)">
-                @Lang.Get("SaveSession")
+            <button class="btn btn-success" @onclick="SaveHanchan" disabled="@(tables.Count == 0)">
+                @Lang.Get("SaveHanchan")
             </button>
             @if (workflowStepIndex.HasValue)
             {
@@ -169,20 +169,20 @@ else
                     <small class="text-muted ms-2">@Lang.Get("BackToWorkflowHint")</small>
                 }
             }
-            @if (currentSession != null)
+            @if (currentHanchan != null)
             {
                 @if (showDeleteConfirm)
                 {
                     <span class="alert alert-danger d-inline-block ms-2 mb-0 py-1">
-                        @Lang.Get("DeleteSessionConfirm")
-                        <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteSession">@Lang.Get("YesDelete")</button>
-                        <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteSession">@Lang.Get("Cancel")</button>
+                        @Lang.Get("DeleteHanchanConfirm")
+                        <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteHanchan">@Lang.Get("YesDelete")</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteHanchan">@Lang.Get("Cancel")</button>
                     </span>
                 }
                 else
                 {
-                    <button class="btn btn-outline-danger ms-2" @onclick="RequestDeleteSession">
-                        @Lang.Get("DeleteSession")
+                    <button class="btn btn-outline-danger ms-2" @onclick="RequestDeleteHanchan">
+                        @Lang.Get("DeleteHanchan")
                     </button>
                 }
             }
@@ -193,20 +193,20 @@ else
         </div>
     }
 
-    @if (IsLockedPastSession && currentSession != null)
+    @if (IsLockedPastSession && currentHanchan != null)
     {
         <div class="mb-3">
             @if (showDeleteConfirm)
             {
                 <div class="alert alert-danger d-inline-block">
-                    @Lang.Get("DeleteSessionConfirm")
-                    <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteSession">@Lang.Get("YesDelete")</button>
-                    <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteSession">@Lang.Get("Cancel")</button>
+                    @Lang.Get("DeleteHanchanConfirm")
+                    <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteHanchan">@Lang.Get("YesDelete")</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteHanchan">@Lang.Get("Cancel")</button>
                 </div>
             }
             else
             {
-                <button class="btn btn-outline-danger" @onclick="RequestDeleteSession">
+                <button class="btn btn-outline-danger" @onclick="RequestDeleteHanchan">
                     @Lang.Get("DeleteSession")
                 </button>
             }
@@ -291,7 +291,7 @@ else
     private HashSet<Guid> presentIds = new();
     private List<TableAssignment> tables = new();
     private DateTime sessionDate = DateTime.Today;
-    private TimeSpan? sessionStartTime;
+    private TimeSpan? hanchanStartTime;
     private bool saved;
     private string searchText = string.Empty;
     private bool showRegenerateConfirm;
@@ -299,8 +299,8 @@ else
     private bool excludeFromOptimization;
     private bool attendanceExpanded = true;
 
-    private List<WeeklySession> sessionsOnDate = new();
-    private WeeklySession? currentSession;
+    private List<WeeklySession> hanchansOnDate = new();
+    private WeeklySession? currentHanchan;
 
     private List<Guid> selectedPlayerIds = new();
     private Guid? draggedPlayerId;
@@ -308,7 +308,7 @@ else
     private int? workflowStepIndex;
 
     private bool IsLockedPastSession =>
-        sessionDate.Date < DateTime.Today && currentSession is { IsFinalized: true };
+        sessionDate.Date < DateTime.Today && currentHanchan is { IsFinalized: true };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -339,7 +339,7 @@ else
             if (nextSlot != null)
             {
                 sessionDate = nextSlot.Value.Date;
-                sessionStartTime = nextSlot.Value.Time;
+                hanchanStartTime = nextSlot.Value.Time;
             }
 
             await LoadSessionsForDate();
@@ -350,25 +350,25 @@ else
     private async Task LoadSessionsForDate()
     {
         var allSessions = await SessionService.GetAllAsync();
-        sessionsOnDate = allSessions.Where(s => s.Date.Date == sessionDate.Date).ToList();
+        hanchansOnDate = allSessions.Where(s => s.Date.Date == sessionDate.Date).ToList();
 
-        if (sessionsOnDate.Count > 0)
+        if (hanchansOnDate.Count > 0)
         {
             // Select the first session (by time) by default
-            var first = sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).First();
-            LoadFromSession(first);
+            var first = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).First();
+            LoadFromHanchan(first);
         }
         else
         {
-            currentSession = null;
+            currentHanchan = null;
             excludeFromOptimization = false;
             // Preserve sessionStartTime if it was pre-set from the schedule
-            if (sessionStartTime == null)
+            if (hanchanStartTime == null)
             {
                 var settings = await SettingsService.GetAsync();
                 var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
                 if (entry != null && entry.StartTimes.Count > 0)
-                    sessionStartTime = entry.StartTimes.OrderBy(t => t).First();
+                    hanchanStartTime = entry.StartTimes.OrderBy(t => t).First();
             }
             presentIds.Clear();
             tables.Clear();
@@ -377,36 +377,36 @@ else
         showRegenerateConfirm = false;
     }
 
-    private void LoadFromSession(WeeklySession session)
+    private void LoadFromHanchan(WeeklySession hanchan)
     {
-        currentSession = session;
-        sessionStartTime = session.StartTime;
-        presentIds = new HashSet<Guid>(session.PresentMemberIds);
-        tables = session.Tables;
-        excludeFromOptimization = session.ExcludeFromOptimization;
-        attendanceExpanded = !session.IsFinalized;
+        currentHanchan = hanchan;
+        hanchanStartTime = hanchan.StartTime;
+        presentIds = new HashSet<Guid>(hanchan.PresentMemberIds);
+        tables = hanchan.Tables;
+        excludeFromOptimization = hanchan.ExcludeFromOptimization;
+        attendanceExpanded = !hanchan.IsFinalized;
         saved = false;
         showRegenerateConfirm = false;
     }
 
-    private void SelectSession(WeeklySession session)
+    private void SelectHanchan(WeeklySession hanchan)
     {
-        LoadFromSession(session);
+        LoadFromHanchan(hanchan);
     }
 
-    private async Task StartNewSession()
+    private async Task StartNewHanchan()
     {
-        // Copy attendance from the last session on this date
-        var lastSession = sessionsOnDate
+        // Copy attendance from the last hanchan on this date
+        var lastHanchan = hanchansOnDate
             .OrderByDescending(s => s.StartTime ?? TimeSpan.Zero)
             .FirstOrDefault();
-        if (lastSession != null)
-            presentIds = new HashSet<Guid>(lastSession.PresentMemberIds);
+        if (lastHanchan != null)
+            presentIds = new HashSet<Guid>(lastHanchan.PresentMemberIds);
         else
             presentIds.Clear();
 
-        currentSession = null;
-        tables.Clear();
+        currentHanchan = null;
+        tables = new();
         excludeFromOptimization = false;
         attendanceExpanded = true;
         saved = false;
@@ -417,35 +417,35 @@ else
         var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
         if (entry != null && entry.StartTimes.Count > 0)
         {
-            HashSet<TimeSpan> usedTimes = sessionsOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
+            HashSet<TimeSpan> usedTimes = hanchansOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
             TimeSpan nextTime = entry.StartTimes.OrderBy(t => t).FirstOrDefault(t => !usedTimes.Contains(t));
             if (nextTime == default)
             {
                 if (usedTimes.Any())
-                    sessionStartTime = usedTimes.Max().Add(TimeSpan.FromHours(1));
+                    hanchanStartTime = usedTimes.Max().Add(TimeSpan.FromHours(1));
                 else
-                    sessionStartTime = null;
+                    hanchanStartTime = null;
             }
             else
             {
-                sessionStartTime =nextTime;
+                hanchanStartTime =nextTime;
             }
         }
         else
         {
-            sessionStartTime = null;
+            hanchanStartTime = null;
         }
     }
 
     private string GetSessionLabel(WeeklySession session)
     {
-        var ordered = sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        var ordered = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
         var index = ordered.IndexOf(session) + 1;
         var timeStr = session.StartTime.HasValue
             ? session.StartTime.Value.ToString(@"hh\:mm")
             : Lang.Get("NoTime");
 
-        if (sessionsOnDate.Count > 1)
+        if (hanchansOnDate.Count > 1)
             return $"#{index} — {timeStr}";
         return timeStr;
     }
@@ -464,12 +464,12 @@ else
         if (IsLockedPastSession) return;
         if (int.TryParse(e.Value?.ToString(), out var h) && h >= 0)
         {
-            var currentMinute = sessionStartTime?.Minutes ?? 0;
-            sessionStartTime = new TimeSpan(h, currentMinute, 0);
+            var currentMinute = hanchanStartTime?.Minutes ?? 0;
+            hanchanStartTime = new TimeSpan(h, currentMinute, 0);
         }
         else
         {
-            sessionStartTime = null;
+            hanchanStartTime = null;
         }
     }
 
@@ -478,12 +478,12 @@ else
         if (IsLockedPastSession) return;
         if (int.TryParse(e.Value?.ToString(), out var m) && m >= 0)
         {
-            var currentHour = sessionStartTime?.Hours ?? 0;
-            sessionStartTime = new TimeSpan(currentHour, m, 0);
+            var currentHour = hanchanStartTime?.Hours ?? 0;
+            hanchanStartTime = new TimeSpan(currentHour, m, 0);
         }
         else
         {
-            sessionStartTime = null;
+            hanchanStartTime = null;
         }
     }
 
@@ -524,7 +524,7 @@ else
     {
         if (IsLockedPastSession) return;
 
-        if (tables.Count > 0 && currentSession is { IsFinalized: true })
+        if (tables.Count > 0 && currentHanchan is { IsFinalized: true })
         {
             showRegenerateConfirm = true;
             return;
@@ -555,11 +555,11 @@ else
         if (tables.Count == 0 || members == null) return;
 
         // Build session header
-        var sessionNumber = sessionsOnDate.Count > 1
-            ? sessionsOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList().IndexOf(
-                sessionsOnDate.FirstOrDefault(s => s.Id == currentSession?.Id) ?? sessionsOnDate.First()) + 1
+        var sessionNumber = hanchansOnDate.Count > 1
+            ? hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList().IndexOf(
+                hanchansOnDate.FirstOrDefault(s => s.Id == currentHanchan?.Id) ?? hanchansOnDate.First()) + 1
             : (int?)null;
-        var timeStr = sessionStartTime.HasValue ? sessionStartTime.Value.ToString(@"hh\:mm") : "";
+        var timeStr = hanchanStartTime.HasValue ? hanchanStartTime.Value.ToString(@"hh\:mm") : "";
         var headerText = Lang.FormatDate(sessionDate);
         if (sessionNumber.HasValue)
             headerText += $" #{sessionNumber}";
@@ -703,33 +703,33 @@ else
         saved = false;
     }
 
-    private void RequestDeleteSession()
+    private void RequestDeleteHanchan()
     {
         showDeleteConfirm = true;
     }
 
-    private void CancelDeleteSession()
+    private void CancelDeleteHanchan()
     {
         showDeleteConfirm = false;
     }
 
-    private async Task ConfirmDeleteSession()
+    private async Task ConfirmDeleteHanchan()
     {
-        if (currentSession == null) return;
+        if (currentHanchan == null) return;
 
-        await SessionService.DeleteAsync(currentSession.Id);
+        await SessionService.DeleteAsync(currentHanchan.Id);
         showDeleteConfirm = false;
         await LoadSessionsForDate();
     }
 
-    private async Task SaveSession()
+    private async Task SaveHanchan()
     {
         if (IsLockedPastSession) return;
 
-        var session = new WeeklySession
+        var hanchan = new WeeklySession
         {
             Date = sessionDate,
-            StartTime = sessionStartTime,
+            StartTime = hanchanStartTime,
             PresentMemberIds = presentIds.ToList(),
             AbsentMemberIds = activeMembers
                 .Where(m => !presentIds.Contains(m.Id))
@@ -740,15 +740,15 @@ else
             ExcludeFromOptimization = excludeFromOptimization
         };
 
-        if (currentSession != null)
-            session.Id = currentSession.Id;
+        if (currentHanchan != null)
+            hanchan.Id = currentHanchan.Id;
 
-        await SessionService.SaveAsync(session);
-        currentSession = session;
+        await SessionService.SaveAsync(hanchan);
+        currentHanchan = hanchan;
 
         // Refresh the session list for this date
-        var allSessions = await SessionService.GetAllAsync();
-        sessionsOnDate = allSessions.Where(s => s.Date.Date == sessionDate.Date).ToList();
+        var allHanchans = await SessionService.GetAllAsync();
+        hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
 
         saved = true;
         attendanceExpanded = false;
