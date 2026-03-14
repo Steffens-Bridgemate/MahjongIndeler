@@ -34,6 +34,19 @@ else
         @if (participantsExpanded)
         {
             <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap justify-content-end">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="TriggerCsvImport">
+                        @Lang.Get("ImportCsv")
+                    </button>
+                    <InputFile id="csvImportInput" style="display:none" accept=".csv,text/csv" OnChange="OnCsvFileSelected" />
+                    @if (tournament.Participants.Count > 0)
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv">
+                            @Lang.Get("ExportCsv")
+                        </button>
+                    }
+                </div>
+
                 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
                     <label class="form-label mb-0">@Lang.Get("GeneratePlayers")</label>
                     <input type="number" class="form-control" style="max-width: 80px;" min="13"
@@ -55,6 +68,11 @@ else
                         </button>
                     }
                 </div>
+
+                @if (csvImportError != null)
+                {
+                    <div class="alert alert-danger py-1 mb-2">@csvImportError</div>
+                }
 
                 <table class="table table-sm">
                     <thead>
@@ -341,6 +359,7 @@ else
     private int generatePlayerCount = 20;
     private bool editingNames;
     private bool showRegenerateConfirm;
+    private string? csvImportError;
     private bool copiedToClipboard;
     private bool saved;
     private bool userLoweredFirst;
@@ -442,6 +461,82 @@ else
 
         editingNames = true;
         await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task ExportCsv()
+    {
+        if (tournament == null || tournament.Participants.Count == 0) return;
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+        {
+            sb.AppendLine($"{p.Number};{p.Name};{p.LeagueId}");
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        var filename = $"{tournament.Name}_participants.csv";
+        await JS.InvokeVoidAsync("downloadFile", filename, base64);
+    }
+
+    private async Task TriggerCsvImport()
+    {
+        csvImportError = null;
+        await JS.InvokeVoidAsync("triggerFileInput", "csvImportInput");
+    }
+
+    private async Task OnCsvFileSelected(InputFileChangeEventArgs e)
+    {
+        csvImportError = null;
+        if (tournament == null) return;
+
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 1024 * 1024);
+            using var reader = new System.IO.StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+
+            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var participants = new List<TournamentParticipant>();
+
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+                if (string.IsNullOrEmpty(line)) continue;
+
+                // Detect separator: use semicolon if present, otherwise comma
+                var separator = line.Contains(';') ? ';' : ',';
+                var parts = line.Split(separator);
+
+                if (parts.Length < 1) continue;
+
+                if (!int.TryParse(parts[0].Trim(), out var number))
+                    continue; // skip header or invalid rows
+
+                var name = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                var leagueId = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+
+                participants.Add(new TournamentParticipant
+                {
+                    Number = number,
+                    Name = name,
+                    LeagueId = leagueId
+                });
+            }
+
+            if (participants.Count == 0)
+            {
+                csvImportError = Lang.Get("InvalidFileFormat");
+                return;
+            }
+
+            tournament.Participants = participants;
+            await TournamentService.SaveAsync(tournament);
+        }
+        catch
+        {
+            csvImportError = Lang.Get("InvalidFileFormat");
+        }
     }
 
     private async Task ToggleEditNames()
