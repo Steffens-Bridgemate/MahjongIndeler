@@ -28,7 +28,7 @@
                 <input type="date" class="form-control" @bind="newDate" />
             </div>
             <div class="mb-3">
-                <label class="form-label">@Lang.Get("NumberOfSessions")</label>
+                <label class="form-label">@Lang.Get("NumberOfHanchans")</label>
                 <select class="form-select" style="max-width: 120px;" @bind="newSessionCount">
                     @for (int i = 3; i <= 8; i++)
                     {
@@ -62,7 +62,7 @@ else
                         <p class="card-text text-muted">
                             @Lang.FormatDate(t.Date) &middot;
                             @t.Participants.Count @Lang.Get("ParticipantCount") &middot;
-                            @t.SessionCount @Lang.Get("SessionsCount")
+                            @t.SessionCount @Lang.Get("HanchansCount")
                             @if (t.IsGenerated)
                             {
                                 <span class="badge bg-success ms-2">&#10003;</span>

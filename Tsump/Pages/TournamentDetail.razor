@@ -23,7 +23,7 @@
 else
 {
     <h1>@tournament.Name</h1>
-    <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("SessionsCount")</p>
+    <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
 
     @* --- Participants section --- *@
     <div class="card mb-4">
@@ -84,7 +84,7 @@ else
         {
             <button class="btn btn-primary me-2" @onclick="GenerateSessions"
                     disabled="@(tournament.Participants.Count < 13)">
-                @(tournament.IsGenerated ? Lang.Get("RegenerateAllSessions") : Lang.Get("GenerateAllSessions"))
+                @(tournament.IsGenerated ? Lang.Get("RegenerateAllHanchans") : Lang.Get("GenerateAllHanchans"))
             </button>
         }
         @if (tournament.Participants.Count < 13)
@@ -99,7 +99,7 @@ else
         <div class="d-flex align-items-center mb-3">
             <h4 class="mb-0">@Lang.Get("TableAssignments")</h4>
             <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyAllToClipboard">
-                @(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyAllSessions"))
+                @(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyAllHanchans"))
             </button>
         </div>
 
@@ -123,7 +123,7 @@ else
 
         @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
         {
-            <h5 class="mt-4">@Lang.Get("Session") @session.SessionNumber</h5>
+            <h5 class="mt-4">@Lang.Get("Hanchan") @session.SessionNumber</h5>
             <div class="row">
                 @foreach (var table in session.Tables)
                 {
@@ -536,10 +536,10 @@ else
 
         foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
         {
-            html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin:12px 0 4px;\">{Lang.Get("Session")} {session.SessionNumber}</div>");
+            html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin:12px 0 4px;\">{Lang.Get("Hanchan")} {session.SessionNumber}</div>");
             html.Append("<table style=\"border-collapse:separate;border-spacing:12px 0;\"><tr>");
 
-            text.AppendLine($"*{Lang.Get("Session")} {session.SessionNumber}*");
+            text.AppendLine($"*{Lang.Get("Hanchan")} {session.SessionNumber}*");
 
             for (int i = 0; i < session.Tables.Count; i++)
             {
