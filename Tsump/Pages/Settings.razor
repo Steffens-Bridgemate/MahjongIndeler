@@ -106,7 +106,8 @@
             var settings = await SettingsService.GetAsync();
             foreach (var entry in settings.Schedule)
             {
-                schedule[entry.Day] = new List<TimeSpan>(entry.StartTimes);
+                schedule[entry.Day] = new List<TimeSpan>(entry.
+                    StartTimes);
             }
             StateHasChanged();
         }

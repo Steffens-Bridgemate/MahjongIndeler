@@ -24,27 +24,28 @@ public class TableAssignmentService
         if (playerCount < 3)
             return new List<TableAssignment>();
 
-        CalculateTableCounts(playerCount, out var fourPlayerTables, out var threePlayerTables);
+        (int fourPlayerTables, int threePlayerTables) tableNumbers = CalculateNumberofFourAndThreePLayerTables(playerCount);
+        var threePlayerTables=tableNumbers.threePlayerTables;
 
-        var allHistory = await _sessionService.GetAllAsync();
-        var history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
-        var members = await _memberService.GetAllAsync();
-        var extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
-        var attendance = CountAttendance(history, presentPlayerIds);
-        var threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
-        var meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
+        List <WeeklySession> allHistory = await _sessionService.GetAllAsync();
+        List<WeeklySession> history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
+        List<Member> members = await _memberService.GetAllAsync();
+        Dictionary<Guid, int> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
+        Dictionary<Guid, int> attendance = CountAttendance(history, presentPlayerIds);
+        Dictionary<Guid, int> threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
+        Dictionary<string, int> meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
 
         // Hard constraint: players who were at a 3-player table in their last attended
         // session cannot be assigned to a 3-player table again
-        var playedThreeLastTime = FindPlayersAtThreeTableLastSession(history, presentPlayerIds);
+        HashSet<Guid> playedThreeLastTime = FindPlayersAtThreeTableLastSession(history, presentPlayerIds);
 
         // Priority 1: select who goes to 3-player tables
         // Sort by ratio: threePlayerCount / attendanceCount (lowest ratio first)
         // But exclude players who had a 3-player table last time (hard constraint)
-        var eligible = presentPlayerIds.Where(id => !playedThreeLastTime.Contains(id)).ToList();
-        var excluded = presentPlayerIds.Where(id => playedThreeLastTime.Contains(id)).ToList();
+        List<Guid> eligible = presentPlayerIds.Where(id => !playedThreeLastTime.Contains(id)).ToList();
+        List<Guid> excluded = presentPlayerIds.Where(id => playedThreeLastTime.Contains(id)).ToList();
 
-        var sortedEligible = eligible
+        List<Guid> sortedEligible = eligible
             .OrderBy(id =>
             {
                 var attended = attendance.GetValueOrDefault(id, 0);
@@ -78,7 +79,7 @@ public class TableAssignmentService
                 })
                 .ThenBy(_ => Random.Shared.Next())
                 .ToList();
-
+  
             var remaining = threePlayerSlots - sortedEligible.Count;
             threePlayerPool = sortedEligible.Concat(sortedExcluded.Take(remaining)).ToList();
             fourPlayerPool = sortedExcluded.Skip(remaining).ToList();
@@ -88,13 +89,13 @@ public class TableAssignmentService
         var tables = new List<TableAssignment>();
         var tableNumber = 1;
 
-        var threePlayerAssignments = FormTablesGreedy(threePlayerPool, 3, meetingCounts, attendance);
+        List<List<Guid>> threePlayerAssignments = FormTablesGreedy(threePlayerPool, 3, meetingCounts, attendance);
         foreach (var group in threePlayerAssignments)
         {
             tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
         }
 
-        var fourPlayerAssignments = FormTablesGreedy(fourPlayerPool, 4, meetingCounts, attendance);
+        List<List<Guid>> fourPlayerAssignments = FormTablesGreedy(fourPlayerPool, 4, meetingCounts, attendance);
         foreach (var group in fourPlayerAssignments)
         {
             tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
@@ -109,32 +110,32 @@ public class TableAssignmentService
     /// players who attend less often are not unfairly penalized for having met someone.
     /// </summary>
     private static List<List<Guid>> FormTablesGreedy(
-        List<Guid> players, int tableSize,
+        List<Guid> playerGuids, int tableSize,
         Dictionary<string, int> meetingCounts,
         Dictionary<Guid, int> attendance)
     {
-        if (players.Count == 0)
+        if (playerGuids.Count == 0)
             return new List<List<Guid>>();
 
-        var tableCount = players.Count / tableSize;
-        if (tableCount == 0)
+        var numberOfTables = playerGuids.Count / tableSize;
+        if (numberOfTables == 0)
             return new List<List<Guid>>();
 
-        var bestAssignment = (List<List<Guid>>?)null;
+        List<List<Guid>>? bestAssignment = null;
         var bestScore = double.MaxValue;
-        var attempts = Math.Min(20, Math.Max(5, players.Count));
+        var attempts = Math.Min(20, Math.Max(5, playerGuids.Count));
 
         for (int attempt = 0; attempt < attempts; attempt++)
         {
-            var remaining = new List<Guid>(players);
+            var remaining = new List<Guid>(playerGuids);
             Shuffle(remaining);
 
             var tables = new List<List<Guid>>();
-            for (int t = 0; t < tableCount; t++)
+            for (int t = 0; t < numberOfTables; t++)
                 tables.Add(new List<Guid>());
 
             // Seed each table with one player
-            for (int t = 0; t < tableCount; t++)
+            for (int t = 0; t < numberOfTables; t++)
             {
                 tables[t].Add(remaining[0]);
                 remaining.RemoveAt(0);
@@ -143,7 +144,7 @@ public class TableAssignmentService
             // Fill tables round-robin, picking the best fit each time
             for (int seat = 1; seat < tableSize; seat++)
             {
-                for (int t = 0; t < tableCount; t++)
+                for (int t = 0; t < numberOfTables; t++)
                 {
                     if (remaining.Count == 0)
                         break;
@@ -252,9 +253,12 @@ public class TableAssignmentService
             : $"{b}_{a}";
     }
 
-    private static void CalculateTableCounts(int playerCount, out int fourPlayerTables, out int threePlayerTables)
+    private static (int fourPlayerTables, int threePlayerTables) CalculateNumberofFourAndThreePLayerTables(int playerCount)
     {
+        int fourPlayerTables;
+        int threePlayerTables;
         var remainder = playerCount % 4;
+       
         switch (remainder)
         {
             case 0:
@@ -299,6 +303,7 @@ public class TableAssignmentService
                 threePlayerTables = 0;
                 break;
         }
+        return(fourPlayerTables,threePlayerTables);
     }
 
     /// <summary>
