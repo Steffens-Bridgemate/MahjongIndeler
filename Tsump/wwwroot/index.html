@@ -41,6 +41,10 @@
         window.triggerFileInput = function (inputId) {
             document.getElementById(inputId).click();
         };
+        window.focusElement = function (id) {
+            var el = document.getElementById(id);
+            if (el) el.focus();
+        };
         window.copyToClipboard = function (html, plainText) {
             var htmlBlob = new Blob([html], { type: 'text/html' });
             var textBlob = new Blob([plainText], { type: 'text/plain' });

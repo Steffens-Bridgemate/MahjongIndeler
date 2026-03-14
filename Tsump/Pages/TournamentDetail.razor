@@ -34,6 +34,28 @@ else
         @if (participantsExpanded)
         {
             <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                    <label class="form-label mb-0">@Lang.Get("GeneratePlayers")</label>
+                    <input type="number" class="form-control" style="max-width: 80px;" min="13"
+                           @bind="generatePlayerCount" />
+                    <button class="btn btn-outline-primary btn-sm" @onclick="GeneratePlayers"
+                            disabled="@(generatePlayerCount < 13)">
+                        @Lang.Get("Generate")
+                    </button>
+                    @if (generatePlayerCount < 13)
+                    {
+                        <small class="text-warning">@Lang.Get("NeedAtLeast13")</small>
+                    }
+
+                    @if (tournament.Participants.Count > 0)
+                    {
+                        <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary") ms-auto"
+                                @onclick="ToggleEditNames">
+                            @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
+                        </button>
+                    }
+                </div>
+
                 <table class="table table-sm">
                     <thead>
                         <tr>
@@ -45,11 +67,27 @@ else
                     <tbody>
                         @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
                         {
+                            var participant = p;
                             <tr>
-                                <td>@p.Number</td>
-                                <td>@p.Name</td>
+                                <td>@participant.Number</td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveParticipant(p.Id)">
+                                    @if (editingNames)
+                                    {
+                                        <input id="participant-name-@participant.Number"
+                                               class="form-control form-control-sm"
+                                               value="@participant.Name"
+                                               @oninput="e => OnEditParticipantName(participant, e)"
+                                               @onkeydown="e => OnEditParticipantKeyDown(participant, e)"
+                                               @onkeydown:preventDefault="@false"
+                                               placeholder="@Lang.Get("ParticipantName")" />
+                                    }
+                                    else
+                                    {
+                                        @participant.Name
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveParticipant(participant.Id)">
                                         @Lang.Get("Remove")
                                     </button>
                                 </td>
@@ -284,6 +322,8 @@ else
     private Tournament? tournament;
     private bool participantsExpanded = true;
     private string newParticipantName = string.Empty;
+    private int generatePlayerCount = 20;
+    private bool editingNames;
     private bool showRegenerateConfirm;
     private bool copiedToClipboard;
     private bool saved;
@@ -368,6 +408,62 @@ else
         await TournamentService.SaveAsync(tournament);
         newParticipantName = string.Empty;
         userLoweredFirst = false;
+    }
+
+    private async Task GeneratePlayers()
+    {
+        if (tournament == null || generatePlayerCount < 13) return;
+
+        tournament.Participants.Clear();
+        for (int i = 1; i <= generatePlayerCount; i++)
+        {
+            tournament.Participants.Add(new TournamentParticipant
+            {
+                Name = string.Empty,
+                Number = i
+            });
+        }
+
+        editingNames = true;
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task ToggleEditNames()
+    {
+        if (editingNames && tournament != null)
+            await TournamentService.SaveAsync(tournament);
+        editingNames = !editingNames;
+    }
+
+    private void OnEditParticipantName(TournamentParticipant participant, ChangeEventArgs e)
+    {
+        participant.Name = e.Value?.ToString() ?? "";
+    }
+
+    private async Task OnEditParticipantKeyDown(TournamentParticipant participant, KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && tournament != null)
+        {
+            await TournamentService.SaveAsync(tournament);
+
+            var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
+            var currentIndex = sorted.FindIndex(p => p.Id == participant.Id);
+
+            // Find next empty participant after current, then wrap around
+            TournamentParticipant? next = null;
+            for (int i = 1; i < sorted.Count; i++)
+            {
+                var candidate = sorted[(currentIndex + i) % sorted.Count];
+                if (string.IsNullOrWhiteSpace(candidate.Name))
+                {
+                    next = candidate;
+                    break;
+                }
+            }
+
+            if (next != null)
+                await JS.InvokeVoidAsync("focusElement", $"participant-name-{next.Number}");
+        }
     }
 
     private async Task RemoveParticipant(Guid participantId)
