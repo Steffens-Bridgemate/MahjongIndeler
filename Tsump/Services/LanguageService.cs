@@ -57,7 +57,7 @@ public class LanguageService
         ["HistoryDesc"] = "Eerdere zittingen en spelerstatistieken bekijken.",
         ["ViewMatrix"] = "Matrix bekijken",
         ["MeetingMatrixDesc"] = "Bekijk hoe vaak spelers tegen elkaar gespeeld hebben.",
-        ["WorkflowHomeDesc"] = "Volg het stappenplan om een hanchan voor te bereiden en af te ronden.",
+        ["WorkflowHomeDesc"] = "Volg het stappenplan om een zitting voor te bereiden en af te ronden.",
         ["StartWorkflow"] = "Start stappenplan",
 
         // Members page
