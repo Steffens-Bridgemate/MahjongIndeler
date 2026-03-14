@@ -226,6 +226,32 @@ else
             </div>
         }
 
+        @* --- Guidesheets --- *@
+        <div class="card mt-4 mb-4">
+            <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => guidesheetsExpanded = !guidesheetsExpanded">
+                <h5 class="mb-0 flex-grow-1">@Lang.Get("Guidesheets")</h5>
+                <span class="ms-2">@(guidesheetsExpanded ? "\u25B2" : "\u25BC")</span>
+            </div>
+            @if (guidesheetsExpanded)
+            {
+                <div class="card-body">
+                    <p class="text-muted">@Lang.Get("GuidesheetsDesc")</p>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="includeNames" @bind="guidesheetIncludeNames" />
+                        <label class="form-check-label" for="includeNames">@Lang.Get("IncludeNames")</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm" @onclick="OpenGuidesheets">
+                            @Lang.Get("PrintGuidesheets")
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="DownloadGuidesheets">
+                            @Lang.Get("DownloadGuidesheets")
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+
         @* --- 3-player distribution --- *@
         <div class="card mt-4 mb-4">
             <div class="card-header">
@@ -364,6 +390,8 @@ else
     private bool saved;
     private bool userLoweredFirst;
     private bool matrixExpanded;
+    private bool guidesheetsExpanded;
+    private bool guidesheetIncludeNames = true;
 
     // Meeting matrix data
     private List<TournamentParticipant> sortedParticipants = new();
@@ -801,6 +829,112 @@ else
         await Task.Delay(2000);
         saved = false;
         StateHasChanged();
+    }
+
+    private string BuildGuidesheetHtml()
+    {
+        if (tournament == null) return "";
+
+        var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
+        var sessionCount = tournament.Sessions.Count;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
+        sb.Append($"<title>{Lang.Get("Guidesheets")} — {tournament.Name}</title>");
+        sb.Append("<style>");
+        sb.Append("* { box-sizing: border-box; margin: 0; padding: 0; }");
+        sb.Append("body { font-family: Verdana, Arial, sans-serif; font-size: 11px; }");
+        sb.Append(".page { display: flex; flex-wrap: wrap; gap: 12px; padding: 10px; }");
+        sb.Append(".sheet { width: calc(50% - 6px); border: 1px solid #000; padding: 8px; page-break-inside: avoid; break-inside: avoid; }");
+        sb.Append(".sheet h3 { font-size: 13px; margin-bottom: 6px; }");
+        sb.Append("table { width: 100%; border-collapse: collapse; table-layout: fixed; }");
+        sb.Append("th, td { border: 1px solid #000; padding: 3px 5px; text-align: left; }");
+        sb.Append("th { background: #e9e9e9; }");
+        sb.Append("td.hanchan-num { text-align: center; width: 20px; }");
+        sb.Append("td.table-num { text-align: center; font-weight: bold; width: 40px; }");
+        sb.Append("td.opponents { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }");
+        sb.Append("@media print { ");
+        sb.Append("  body { margin: 0; } ");
+        sb.Append("  .page { gap: 8px; padding: 5mm; } ");
+        sb.Append("  .sheet { width: calc(50% - 4px); } ");
+        sb.Append("  .no-print { display: none; } ");
+        sb.Append("}");
+        sb.Append("</style></head><body>");
+
+        sb.Append("<div class=\"no-print\" style=\"padding:10px;margin-bottom:10px;background:#f0f0f0;\">");
+        sb.Append($"<strong>{tournament.Name}</strong> — {Lang.FormatDate(tournament.Date)} &middot; ");
+        sb.Append("<button onclick=\"window.print()\" style=\"padding:4px 12px;cursor:pointer;\">Print</button>");
+        sb.Append("</div>");
+
+        sb.Append("<div class=\"page\">");
+
+        foreach (var participant in sorted)
+        {
+            sb.Append("<div class=\"sheet\">");
+
+            // Header: player number (+ optional name)
+            var header = guidesheetIncludeNames && !string.IsNullOrWhiteSpace(participant.Name)
+                ? $"{participant.Number}. {participant.Name}"
+                : $"{Lang.Get("Player")} {participant.Number}";
+            sb.Append($"<h3>{header}</h3>");
+
+            // Table with hanchan rows
+            sb.Append("<table>");
+            sb.Append("<col style=\"width:60px;\"><col style=\"width:40px;\"><col>");
+            sb.Append("<tr>");
+            sb.Append($"<th>{Lang.Get("Hanchan")}</th>");
+            sb.Append($"<th>{Lang.Get("Table")}</th>");
+            sb.Append($"<th>{Lang.Get("Opponents")}</th>");
+            sb.Append("</tr>");
+
+            foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
+            {
+                var table = session.Tables.FirstOrDefault(t => t.PlayerIds.Contains(participant.Id));
+                if (table == null) continue;
+
+                var opponents = table.PlayerIds
+                    .Where(id => id != participant.Id)
+                    .Select(id =>
+                    {
+                        var p = tournament.Participants.FirstOrDefault(x => x.Id == id);
+                        if (p == null) return "?";
+                        if (guidesheetIncludeNames && !string.IsNullOrWhiteSpace(p.Name))
+                        {
+                            var firstName = p.Name.Split(' ')[0];
+                            return $"{p.Number}.{firstName}";
+                        }
+                        return p.Number.ToString();
+                    });
+
+                var opponentText = string.Join(", ", opponents);
+                sb.Append("<tr>");
+                sb.Append($"<td class=\"hanchan-num\">{session.SessionNumber}</td>");
+                sb.Append($"<td class=\"table-num\">{table.TableNumber}</td>");
+                sb.Append($"<td class=\"opponents\" title=\"{opponentText}\">{opponentText}</td>");
+                sb.Append("</tr>");
+            }
+
+            sb.Append("</table>");
+            sb.Append("</div>");
+        }
+
+        sb.Append("</div>");
+        sb.Append("</body></html>");
+
+        return sb.ToString();
+    }
+
+    private async Task OpenGuidesheets()
+    {
+        var html = BuildGuidesheetHtml();
+        await JS.InvokeVoidAsync("openHtmlInNewTab", html);
+    }
+
+    private async Task DownloadGuidesheets()
+    {
+        var html = BuildGuidesheetHtml();
+        var filename = $"{tournament?.Name ?? "guidesheets"}_guidesheets.html";
+        await JS.InvokeVoidAsync("downloadHtmlFile", filename, html);
     }
 
     private void BuildTournamentMatrix()
