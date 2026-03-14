@@ -176,6 +176,10 @@ public class LanguageService
         ["PlayingDaysDesc"] = "Selecteer de dagen waarop de club speelt en stel de starttijden in.",
         ["AddTime"] = "Tijd toevoegen",
         ["SettingsSaved"] = "Instellingen opgeslagen!",
+        ["DeleteAllData"] = "Alle gegevens verwijderen",
+        ["DeleteAllDataDesc"] = "Verwijder alle leden, zittingen, toernooien en instellingen permanent.",
+        ["DeleteAllDataEnterCode"] = "Voer ter bevestiging de volgende code in:",
+        ["DeleteAllDataSuccess"] = "Alle gegevens zijn verwijderd!",
 
         // Workflow page
         ["Workflow"] = "Stappenplan",
@@ -397,6 +401,10 @@ public class LanguageService
         ["PlayingDaysDesc"] = "Select the days the club plays and set the starting times.",
         ["AddTime"] = "Add time",
         ["SettingsSaved"] = "Settings saved!",
+        ["DeleteAllData"] = "Delete all data",
+        ["DeleteAllDataDesc"] = "Permanently delete all members, sessions, tournaments, and settings.",
+        ["DeleteAllDataEnterCode"] = "Enter the following code to confirm:",
+        ["DeleteAllDataSuccess"] = "All data has been deleted!",
 
         // Workflow page
         ["Workflow"] = "Workflow",
