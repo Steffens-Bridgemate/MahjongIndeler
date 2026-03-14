@@ -1,0 +1,641 @@
+@page "/tournament/{Id:guid}"
+@using Tsump.Models
+@using Tsump.Services
+@inject TournamentService TournamentService
+@inject TournamentAssignmentService AssignmentService
+@inject LanguageService Lang
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@Lang.Get("Tournament") - Tsumo!</PageTitle>
+
+<div class="mb-3">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
+        &larr; @Lang.Get("BackToTournaments")
+    </button>
+</div>
+
+@if (tournament == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else
+{
+    <h1>@tournament.Name</h1>
+    <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("SessionsCount")</p>
+
+    @* --- Participants section --- *@
+    <div class="card mb-4">
+        <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => participantsExpanded = !participantsExpanded">
+            <h5 class="mb-0 flex-grow-1">@Lang.Get("Participants") (@tournament.Participants.Count)</h5>
+            <span class="ms-2">@(participantsExpanded ? "\u25B2" : "\u25BC")</span>
+        </div>
+        @if (participantsExpanded)
+        {
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">@Lang.Get("ParticipantNumber")</th>
+                            <th>@Lang.Get("ParticipantName")</th>
+                            <th style="width: 80px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+                        {
+                            <tr>
+                                <td>@p.Number</td>
+                                <td>@p.Name</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveParticipant(p.Id)">
+                                        @Lang.Get("Remove")
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <input class="form-control" style="max-width: 250px;" placeholder="@Lang.Get("ParticipantName")"
+                           value="@newParticipantName" @oninput="OnParticipantNameInput" @onkeydown="OnParticipantKeyDown" />
+                    <button class="btn btn-success btn-sm" @onclick="AddParticipant"
+                            disabled="@(string.IsNullOrWhiteSpace(newParticipantName))">
+                        @Lang.Get("AddParticipant")
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* --- Generate button --- *@
+    <div class="mb-3">
+        @if (showRegenerateConfirm)
+        {
+            <div class="alert alert-warning d-inline-block me-2">
+                @Lang.Get("RegenerateConfirmTournament")
+                <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
+                <button class="btn btn-sm btn-secondary" @onclick="() => showRegenerateConfirm = false">@Lang.Get("Cancel")</button>
+            </div>
+        }
+        else
+        {
+            <button class="btn btn-primary me-2" @onclick="GenerateSessions"
+                    disabled="@(tournament.Participants.Count < 13)">
+                @(tournament.IsGenerated ? Lang.Get("RegenerateAllSessions") : Lang.Get("GenerateAllSessions"))
+            </button>
+        }
+        @if (tournament.Participants.Count < 13)
+        {
+            <span class="text-warning">@Lang.Get("NeedAtLeast13")</span>
+        }
+    </div>
+
+    @* --- Sessions display --- *@
+    @if (tournament.Sessions.Count > 0)
+    {
+        <div class="d-flex align-items-center mb-3">
+            <h4 class="mb-0">@Lang.Get("TableAssignments")</h4>
+            <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyAllToClipboard">
+                @(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyAllSessions"))
+            </button>
+        </div>
+
+        @if (selectedPlayerIds.Count > 0)
+        {
+            <div class="mb-3">
+                <span class="text-muted me-2">
+                    @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetParticipantDisplay(id)))
+                </span>
+                @if (selectedPlayerIds.Count == 2)
+                {
+                    <button class="btn btn-sm btn-warning me-1" @onclick="SwapSelectedPlayers">
+                        @Lang.Get("SwapPlayers")
+                    </button>
+                }
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => selectedPlayerIds.Clear()">
+                    @Lang.Get("ClearSelection")
+                </button>
+            </div>
+        }
+
+        @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
+        {
+            <h5 class="mt-4">@Lang.Get("Session") @session.SessionNumber</h5>
+            <div class="row">
+                @foreach (var table in session.Tables)
+                {
+                    <div class="col-md-4 mb-3">
+                        <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
+                            <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
+                                @Lang.Get("Table") @table.TableNumber (@table.PlayerCount @Lang.Get("players"))
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                @foreach (var playerId in table.PlayerIds)
+                                {
+                                    var pid = playerId;
+                                    var isSelected = selectedPlayerIds.Contains(pid) && selectedSessionNumber == session.SessionNumber;
+                                    <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "")"
+                                        style="cursor: grab"
+                                        draggable="true"
+                                        @ondragstart="() => OnDragStart(pid, session.SessionNumber)"
+                                        @ondragover:preventDefault
+                                        @ondrop="() => OnDrop(pid, session.SessionNumber)"
+                                        @onclick="() => OnPlayerClick(pid, session.SessionNumber)">
+                                        <span>@GetParticipantDisplay(pid)</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @* --- 3-player distribution --- *@
+        <div class="card mt-4 mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">@Lang.Get("ThreePlayerDistribution")</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>@Lang.Get("ParticipantNumber")</th>
+                            <th>@Lang.Get("ParticipantName")</th>
+                            <th>@Lang.Get("TimesAt3Table")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+                        {
+                            var count = CountThreePlayerTables(p.Id);
+                            <tr>
+                                <td>@p.Number</td>
+                                <td>@p.Name</td>
+                                <td>@count</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @* --- Meeting matrix --- *@
+        <div class="card mb-4">
+            <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => matrixExpanded = !matrixExpanded">
+                <h5 class="mb-0 flex-grow-1">@Lang.Get("MeetingMatrixTitle")</h5>
+                <span class="ms-2">@(matrixExpanded ? "\u25B2" : "\u25BC")</span>
+            </div>
+            @if (matrixExpanded)
+            {
+                <div class="card-body">
+                    <p class="text-muted">@Lang.Get("MeetingMatrixSubtitle")</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm meeting-matrix">
+                            <thead>
+                                <tr>
+                                    <th class="sticky-col"></th>
+                                    @foreach (var p in sortedParticipants)
+                                    {
+                                        <th class="text-center rotate-header">
+                                            <div><span>@p.Number. @p.Name</span></div>
+                                        </th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in sortedParticipants)
+                                {
+                                    <tr>
+                                        <td class="sticky-col fw-bold text-nowrap">@row.Number. @row.Name</td>
+                                        @foreach (var col in sortedParticipants)
+                                        {
+                                            @if (row.Id == col.Id)
+                                            {
+                                                <td class="text-center bg-dark text-white">&mdash;</td>
+                                            }
+                                            else
+                                            {
+                                                var key = TableAssignmentService.MakeKey(row.Id, col.Id);
+                                                var count = tournamentMatrix.GetValueOrDefault(key, 0);
+                                                <td class="text-center @GetCellClass(count)">@count</td>
+                                            }
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-3">
+                        <h5>@Lang.Get("Legend")</h5>
+                        <span class="badge bg-light text-dark border me-2">@Lang.Get("NeverMet")</span>
+                        <span class="badge matrix-low me-2">@Lang.Get("Meetings1_2")</span>
+                        <span class="badge matrix-mid me-2">@Lang.Get("Meetings3_5")</span>
+                        <span class="badge matrix-high me-2">@Lang.Get("Meetings6Plus")</span>
+                    </div>
+
+                    <div class="mt-3">
+                        <h5>@Lang.Get("Summary")</h5>
+                        <ul>
+                            <li>@Lang.Get("TotalPairs"): @matrixTotalPairs</li>
+                            <li>@Lang.Get("PairsMet"): @matrixMetPairs</li>
+                            <li>@Lang.Get("PairsNeverMet"): @(matrixTotalPairs - matrixMetPairs)</li>
+                            @if (matrixMetPairs > 0)
+                            {
+                                <li>@Lang.Get("AvgMeetings"): @matrixAvg.ToString("F1")</li>
+                                <li>@Lang.Get("MinMeetings"): @matrixMin / @Lang.Get("MaxMeetings"): @matrixMax</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (saved)
+    {
+        <div class="alert alert-success mt-3">@Lang.Get("TournamentSaved")</div>
+    }
+}
+
+<style>
+    .meeting-matrix { font-size: 0.8rem; }
+    .meeting-matrix th.rotate-header { height: 120px; white-space: nowrap; vertical-align: bottom; padding: 0 4px; }
+    .meeting-matrix th.rotate-header > div { transform: rotate(-60deg); transform-origin: left bottom; width: 1.5em; }
+    .meeting-matrix th.rotate-header > div > span { display: inline-block; padding-bottom: 4px; }
+    .meeting-matrix td, .meeting-matrix th { padding: 2px 4px; min-width: 28px; }
+    .sticky-col { position: sticky; left: 0; background: white; z-index: 1; }
+    .matrix-low { background-color: #d4edda; color: #155724; }
+    .matrix-mid { background-color: #fff3cd; color: #856404; }
+    .matrix-high { background-color: #f8d7da; color: #721c24; }
+    .cell-zero { background-color: #f8f9fa; color: #adb5bd; }
+    .cell-low { background-color: #d4edda; }
+    .cell-mid { background-color: #fff3cd; }
+    .cell-high { background-color: #f8d7da; }
+</style>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Tournament? tournament;
+    private bool participantsExpanded = true;
+    private string newParticipantName = string.Empty;
+    private bool showRegenerateConfirm;
+    private bool copiedToClipboard;
+    private bool saved;
+    private bool userLoweredFirst;
+    private bool matrixExpanded;
+
+    // Meeting matrix data
+    private List<TournamentParticipant> sortedParticipants = new();
+    private Dictionary<string, int> tournamentMatrix = new();
+    private int matrixTotalPairs;
+    private int matrixMetPairs;
+    private double matrixAvg;
+    private int matrixMin;
+    private int matrixMax;
+
+    private List<Guid> selectedPlayerIds = new();
+    private int? selectedSessionNumber;
+    private Guid? draggedPlayerId;
+    private int? draggedSessionNumber;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    private void GoToList() => Nav.NavigateTo("tournaments");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            tournament = await TournamentService.GetByIdAsync(Id);
+            if (tournament != null)
+            {
+                participantsExpanded = !tournament.IsGenerated;
+                if (tournament.IsGenerated)
+                    BuildTournamentMatrix();
+            }
+            StateHasChanged();
+        }
+    }
+
+    private void OnParticipantNameInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+
+        if (value.Length == 1 && !userLoweredFirst)
+        {
+            value = value.ToUpper();
+        }
+        else if (value.Length >= 1 && char.IsLower(value[0]))
+        {
+            userLoweredFirst = true;
+        }
+        else if (value.Length >= 1 && char.IsUpper(value[0]))
+        {
+            userLoweredFirst = false;
+        }
+
+        newParticipantName = value;
+    }
+
+    private async Task OnParticipantKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newParticipantName))
+            await AddParticipant();
+    }
+
+    private async Task AddParticipant()
+    {
+        if (tournament == null || string.IsNullOrWhiteSpace(newParticipantName))
+            return;
+
+        var nextNumber = tournament.Participants.Count > 0
+            ? tournament.Participants.Max(p => p.Number) + 1
+            : 1;
+
+        tournament.Participants.Add(new TournamentParticipant
+        {
+            Name = newParticipantName.Trim(),
+            Number = nextNumber
+        });
+
+        await TournamentService.SaveAsync(tournament);
+        newParticipantName = string.Empty;
+        userLoweredFirst = false;
+    }
+
+    private async Task RemoveParticipant(Guid participantId)
+    {
+        if (tournament == null) return;
+
+        tournament.Participants.RemoveAll(p => p.Id == participantId);
+
+        // Renumber participants
+        var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
+        for (int i = 0; i < sorted.Count; i++)
+            sorted[i].Number = i + 1;
+
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private void GenerateSessions()
+    {
+        if (tournament == null) return;
+
+        if (tournament.IsGenerated)
+        {
+            showRegenerateConfirm = true;
+            return;
+        }
+
+        DoGenerate();
+    }
+
+    private void ConfirmRegenerate()
+    {
+        showRegenerateConfirm = false;
+        DoGenerate();
+    }
+
+    private async void DoGenerate()
+    {
+        if (tournament == null) return;
+
+        tournament.Sessions = AssignmentService.GenerateAllSessions(
+            tournament.Participants, tournament.SessionCount);
+        tournament.IsGenerated = true;
+        participantsExpanded = false;
+        BuildTournamentMatrix();
+
+        await TournamentService.SaveAsync(tournament);
+        saved = true;
+        _ = ResetSavedFlag();
+        StateHasChanged();
+    }
+
+    private int CountThreePlayerTables(Guid participantId)
+    {
+        if (tournament == null) return 0;
+        int count = 0;
+        foreach (var session in tournament.Sessions)
+        {
+            foreach (var table in session.Tables)
+            {
+                if (table.PlayerCount == 3 && table.PlayerIds.Contains(participantId))
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    private string GetParticipantDisplay(Guid id)
+    {
+        var p = tournament?.Participants.FirstOrDefault(x => x.Id == id);
+        return p != null ? $"{p.Number}. {p.Name}" : Lang.Get("Unknown");
+    }
+
+    private string GetParticipantName(Guid id)
+    {
+        return tournament?.Participants.FirstOrDefault(x => x.Id == id)?.Name ?? Lang.Get("Unknown");
+    }
+
+    private void OnPlayerClick(Guid playerId, int sessionNumber)
+    {
+        if (selectedSessionNumber != sessionNumber)
+        {
+            selectedPlayerIds.Clear();
+            selectedSessionNumber = sessionNumber;
+        }
+
+        if (selectedPlayerIds.Contains(playerId))
+        {
+            selectedPlayerIds.Remove(playerId);
+        }
+        else if (selectedPlayerIds.Count < 2)
+        {
+            selectedPlayerIds.Add(playerId);
+        }
+        else
+        {
+            selectedPlayerIds[1] = playerId;
+        }
+    }
+
+    private async Task SwapSelectedPlayers()
+    {
+        if (selectedPlayerIds.Count != 2 || tournament == null || !selectedSessionNumber.HasValue)
+            return;
+
+        var session = tournament.Sessions.FirstOrDefault(s => s.SessionNumber == selectedSessionNumber.Value);
+        if (session == null) return;
+
+        SwapInSession(session, selectedPlayerIds[0], selectedPlayerIds[1]);
+        selectedPlayerIds.Clear();
+
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private void OnDragStart(Guid playerId, int sessionNumber)
+    {
+        draggedPlayerId = playerId;
+        draggedSessionNumber = sessionNumber;
+    }
+
+    private async Task OnDrop(Guid targetPlayerId, int sessionNumber)
+    {
+        if (draggedPlayerId == null || draggedSessionNumber != sessionNumber ||
+            draggedPlayerId == targetPlayerId || tournament == null)
+            return;
+
+        var session = tournament.Sessions.FirstOrDefault(s => s.SessionNumber == sessionNumber);
+        if (session == null) return;
+
+        SwapInSession(session, draggedPlayerId.Value, targetPlayerId);
+        draggedPlayerId = null;
+        selectedPlayerIds.Clear();
+
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private void SwapInSession(TournamentSession session, Guid playerA, Guid playerB)
+    {
+        TableAssignment? tableA = null, tableB = null;
+        int indexA = -1, indexB = -1;
+
+        foreach (var table in session.Tables)
+        {
+            var idxA = table.PlayerIds.IndexOf(playerA);
+            if (idxA >= 0) { tableA = table; indexA = idxA; }
+
+            var idxB = table.PlayerIds.IndexOf(playerB);
+            if (idxB >= 0) { tableB = table; indexB = idxB; }
+        }
+
+        if (tableA == null || tableB == null) return;
+
+        tableA.PlayerIds[indexA] = playerB;
+        tableB.PlayerIds[indexB] = playerA;
+    }
+
+    private async Task CopyAllToClipboard()
+    {
+        if (tournament == null || tournament.Sessions.Count == 0) return;
+
+        var html = new System.Text.StringBuilder();
+        var text = new System.Text.StringBuilder();
+
+        html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin-bottom:8px;\">{tournament.Name} — {Lang.FormatDate(tournament.Date)}</div>");
+        text.AppendLine($"*{tournament.Name} — {Lang.FormatDate(tournament.Date)}*");
+        text.AppendLine();
+
+        foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
+        {
+            html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin:12px 0 4px;\">{Lang.Get("Session")} {session.SessionNumber}</div>");
+            html.Append("<table style=\"border-collapse:separate;border-spacing:12px 0;\"><tr>");
+
+            text.AppendLine($"*{Lang.Get("Session")} {session.SessionNumber}*");
+
+            for (int i = 0; i < session.Tables.Count; i++)
+            {
+                if (i > 0 && i % 2 == 0)
+                    html.Append("</tr><tr style=\"height:8px;\"><td></td></tr><tr>");
+
+                var table = session.Tables[i];
+                var is3 = table.PlayerCount == 3;
+                var headerBg = is3 ? "#ffc107" : "#198754";
+                var headerColor = is3 ? "#000" : "#fff";
+                var borderColor = is3 ? "#ffc107" : "#198754";
+
+                html.Append($"<td style=\"vertical-align:top;width:200px;padding:0 4px;\">");
+                html.Append($"<div style=\"border:1px solid {borderColor};border-radius:4px;overflow:hidden;font-family:Verdana,sans-serif;font-size:13px;\">");
+                html.Append($"<div style=\"background:{headerBg};color:{headerColor};padding:6px 10px;font-weight:bold;\">");
+                html.Append($"{Lang.Get("Table")} {table.TableNumber} ({table.PlayerCount} {Lang.Get("players")})");
+                html.Append("</div>");
+
+                text.AppendLine($"*{Lang.Get("Table")} {table.TableNumber}* ({table.PlayerCount} {Lang.Get("players")})");
+
+                foreach (var playerId in table.PlayerIds)
+                {
+                    var display = GetParticipantDisplay(playerId);
+                    html.Append($"<div style=\"padding:4px 10px;border-top:1px solid #dee2e6;\">{display}</div>");
+                    text.AppendLine($"  {display}");
+                }
+
+                html.Append("</div></td>");
+
+                if (i + 1 < session.Tables.Count)
+                    text.AppendLine();
+            }
+
+            html.Append("</tr></table>");
+            text.AppendLine();
+        }
+
+        await JS.InvokeVoidAsync("copyToClipboard", html.ToString(), text.ToString().TrimEnd());
+        copiedToClipboard = true;
+        _ = ResetCopiedFlag();
+    }
+
+    private async Task ResetCopiedFlag()
+    {
+        await Task.Delay(2000);
+        copiedToClipboard = false;
+        StateHasChanged();
+    }
+
+    private async Task ResetSavedFlag()
+    {
+        await Task.Delay(2000);
+        saved = false;
+        StateHasChanged();
+    }
+
+    private void BuildTournamentMatrix()
+    {
+        if (tournament == null) return;
+
+        sortedParticipants = tournament.Participants.OrderBy(p => p.Number).ToList();
+        tournamentMatrix.Clear();
+
+        foreach (var session in tournament.Sessions)
+        {
+            foreach (var table in session.Tables)
+            {
+                for (int i = 0; i < table.PlayerIds.Count; i++)
+                {
+                    for (int j = i + 1; j < table.PlayerIds.Count; j++)
+                    {
+                        var key = TableAssignmentService.MakeKey(table.PlayerIds[i], table.PlayerIds[j]);
+                        tournamentMatrix[key] = tournamentMatrix.GetValueOrDefault(key, 0) + 1;
+                    }
+                }
+            }
+        }
+
+        var n = sortedParticipants.Count;
+        matrixTotalPairs = n * (n - 1) / 2;
+        matrixMetPairs = tournamentMatrix.Count(kv => kv.Value > 0);
+
+        if (matrixMetPairs > 0)
+        {
+            var values = tournamentMatrix.Values.Where(v => v > 0).ToList();
+            matrixAvg = values.Average();
+            matrixMin = values.Min();
+            matrixMax = values.Max();
+        }
+    }
+
+    private static string GetCellClass(int count) => count switch
+    {
+        0 => "cell-zero",
+        <= 2 => "cell-low",
+        <= 5 => "cell-mid",
+        _ => "cell-high"
+    };
+}

@@ -13,6 +13,8 @@ builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<TableAssignmentService>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddScoped<TournamentService>();
+builder.Services.AddScoped<TournamentAssignmentService>();
 builder.Services.AddSingleton<LanguageService>();
 
 await builder.Build().RunAsync();

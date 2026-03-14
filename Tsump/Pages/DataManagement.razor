@@ -7,6 +7,7 @@
 @inject MemberService MemberService
 @inject SessionService SessionService
 @inject SettingsService SettingsService
+@inject TournamentService TournamentService
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @inject NavigationManager Nav
@@ -107,6 +108,7 @@
         <ul class="list-unstyled mb-0">
             <li><strong>@Lang.Get("Members"):</strong> @memberCount</li>
             <li><strong>@Lang.Get("Sessions"):</strong> @sessionCount</li>
+            <li><strong>@Lang.Get("Tournaments"):</strong> @tournamentCount</li>
         </ul>
     </div>
 </div>
@@ -119,6 +121,7 @@
     private string? pendingImportJson;
     private int memberCount;
     private int sessionCount;
+    private int tournamentCount;
     private int? workflowStepIndex;
 
     protected override void OnInitialized()
@@ -144,8 +147,10 @@
     {
         var members = await MemberService.GetAllAsync();
         var sessions = await SessionService.GetAllAsync();
+        var tournaments = await TournamentService.GetAllAsync();
         memberCount = members.Count;
         sessionCount = sessions.Count;
+        tournamentCount = tournaments.Count;
     }
 
     private async Task ExportData()
@@ -157,6 +162,7 @@
         var members = await MemberService.GetAllAsync();
         var sessions = await SessionService.GetAllAsync();
         var settings = await SettingsService.GetAsync();
+        var tournaments = await TournamentService.GetAllAsync();
 
         var exportData = new
         {
@@ -164,7 +170,8 @@
             AppName = "Tsumo!",
             Members = members,
             Sessions = sessions,
-            Settings = settings
+            Settings = settings,
+            Tournaments = tournaments
         };
 
         var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
@@ -256,6 +263,13 @@
                 var settings = JsonSerializer.Deserialize<ClubSettings>(settingsEl.GetRawText(), options);
                 if (settings != null)
                     await SettingsService.SaveAsync(settings);
+            }
+
+            if (root.TryGetProperty("Tournaments", out var tournamentsEl))
+            {
+                var tournaments = JsonSerializer.Deserialize<List<Tournament>>(tournamentsEl.GetRawText(), options);
+                if (tournaments != null)
+                    await Storage.SetAsync("tsump_tournaments", tournaments);
             }
 
             // Reset workflow after import, but preserve step 1 (manual copy step)

@@ -246,14 +246,14 @@ public class TableAssignmentService
         }
     }
 
-    private static string MakeKey(Guid a, Guid b)
+    internal static string MakeKey(Guid a, Guid b)
     {
         return string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) < 0
             ? $"{a}_{b}"
             : $"{b}_{a}";
     }
 
-    private static (int fourPlayerTables, int threePlayerTables) CalculateNumberofFourAndThreePLayerTables(int playerCount)
+    internal static (int fourPlayerTables, int threePlayerTables) CalculateNumberofFourAndThreePLayerTables(int playerCount)
     {
         int fourPlayerTables;
         int threePlayerTables;
