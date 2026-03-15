@@ -26,7 +26,7 @@
         <label class="form-label"><strong>@Lang.Get("StartTime")</strong></label>
         <div class="d-flex align-items-center gap-1">
             <select class="form-select" style="max-width: 75px;"
-                    value="@(hanchanStartTime.HasValue ? hanchanStartTime.Value.Hours : -1)"
+                    value="@(hanchanStartTime.HasValue? hanchanStartTime.Value.Hours : -1)"
                     disabled="@IsLockedPastSession"
                     @onchange="OnHourChanged">
                 <option value="-1">--</option>
@@ -38,7 +38,7 @@
             </select>
             <span>:</span>
             <select class="form-select" style="max-width: 75px;"
-                    value="@(hanchanStartTime.HasValue ? hanchanStartTime.Value.Minutes : -1)"
+                    value="@(hanchanStartTime.HasValue? hanchanStartTime.Value.Minutes : -1)"
                     disabled="@IsLockedPastSession"
                     @onchange="OnMinuteChanged">
                 <option value="-1">--</option>
@@ -84,7 +84,7 @@
                 @if (showExportAll)
                 {
                     <button class="btn btn-sm btn-outline-secondary me-1 mb-1" @onclick="CopyAllHanchansToClipboard">
-                        @(copiedAllToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                        @(copiedAllToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
                     </button>
                     <button class="btn btn-sm btn-outline-secondary me-1 mb-1" @onclick="OpenAllHanchans">
                         @Lang.Get("OpenPrint")
@@ -241,7 +241,7 @@ else
             @if (showExportSingle)
             {
                 <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyTablesToClipboard">
-                    @(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                    @(copiedToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="OpenSingleHanchan">
                     @Lang.Get("OpenPrint")
@@ -453,24 +453,18 @@ else
         saved = false;
         showRegenerateConfirm = false;
 
-        // Set start time to next available time on this date from the schedule
-        var settings = await SettingsService.GetAsync();
-        var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
-        if (entry != null && entry.StartTimes.Count > 0)
+        // Set start time: next scheduled time > previous hanchan + 1h > default
+        ClubSettings? settings = await SettingsService.GetAsync();
+        ScheduleEntry? entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
+        HashSet<TimeSpan> usedTimes = hanchansOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
+        TimeSpan? nextTime = entry?.StartTimes.OrderBy(t => t).Cast<TimeSpan?>().FirstOrDefault(t => !usedTimes.Contains(t!.Value));
+        if (nextTime.HasValue)
         {
-            HashSet<TimeSpan> usedTimes = hanchansOnDate.Select(s => s.StartTime).Where(t => t.HasValue).Select(t => t!.Value).ToHashSet();
-            TimeSpan nextTime = entry.StartTimes.OrderBy(t => t).FirstOrDefault(t => !usedTimes.Contains(t));
-            if (nextTime == default)
-            {
-                if (usedTimes.Any())
-                    hanchanStartTime = usedTimes.Max().Add(TimeSpan.FromHours(1));
-                else
-                    hanchanStartTime = defaultStartTime;
-            }
-            else
-            {
-                hanchanStartTime =nextTime;
-            }
+            hanchanStartTime = nextTime.Value;
+        }
+        else if (usedTimes.Any())
+        {
+            hanchanStartTime = usedTimes.Max().Add(TimeSpan.FromHours(1));
         }
         else
         {
