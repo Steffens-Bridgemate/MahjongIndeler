@@ -91,7 +91,13 @@ else
 
         @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
         {
-            <h5 class="mt-4">@Lang.Get("Hanchan") @session.SessionNumber</h5>
+            var sn = session.SessionNumber;
+            <div class="d-flex align-items-center mt-4 mb-2">
+                <h5 class="mb-0">@Lang.Get("Hanchan") @sn</h5>
+                <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="() => CopySingleHanchanToClipboard(sn)">
+                    @(copiedSingleHanchan == sn ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                </button>
+            </div>
             <div class="row">
                 @foreach (var table in session.Tables)
                 {
@@ -252,6 +258,7 @@ else
     private Tournament? tournament;
     private bool showRegenerateConfirm;
     private bool copiedToClipboard;
+    private int? copiedSingleHanchan;
     private bool saved;
     private bool matrixExpanded;
 
@@ -481,6 +488,66 @@ else
     {
         await Task.Delay(2000);
         copiedToClipboard = false;
+        StateHasChanged();
+    }
+
+    private async Task CopySingleHanchanToClipboard(int sessionNumber)
+    {
+        if (tournament == null) return;
+
+        var session = tournament.Sessions.FirstOrDefault(s => s.SessionNumber == sessionNumber);
+        if (session == null) return;
+
+        var html = new System.Text.StringBuilder();
+        var text = new System.Text.StringBuilder();
+
+        var header = $"{tournament.Name} — {Lang.Get("Hanchan")} {sessionNumber}";
+        html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin-bottom:8px;\">{header}</div>");
+        html.Append("<table style=\"border-collapse:separate;border-spacing:12px 0;\"><tr>");
+        text.AppendLine($"*{header}*");
+        text.AppendLine();
+
+        for (int i = 0; i < session.Tables.Count; i++)
+        {
+            if (i > 0 && i % 2 == 0)
+                html.Append("</tr><tr style=\"height:8px;\"><td></td></tr><tr>");
+
+            var table = session.Tables[i];
+            var is3 = table.PlayerCount == 3;
+            var headerBg = is3 ? "#ffc107" : "#198754";
+            var headerColor = is3 ? "#000" : "#fff";
+            var borderColor = is3 ? "#ffc107" : "#198754";
+
+            html.Append($"<td style=\"vertical-align:top;width:200px;padding:0 4px;\">");
+            html.Append($"<div style=\"border:1px solid {borderColor};border-radius:4px;overflow:hidden;font-family:Verdana,sans-serif;font-size:13px;\">");
+            html.Append($"<div style=\"background:{headerBg};color:{headerColor};padding:6px 10px;font-weight:bold;\">");
+            html.Append($"{Lang.Get("Table")} {table.TableNumber} ({table.PlayerCount} {Lang.Get("players")})");
+            html.Append("</div>");
+
+            text.AppendLine($"*{Lang.Get("Table")} {table.TableNumber}* ({table.PlayerCount} {Lang.Get("players")})");
+
+            foreach (var playerId in table.PlayerIds)
+            {
+                var display = GetParticipantDisplay(playerId);
+                html.Append($"<div style=\"padding:4px 10px;border-top:1px solid #dee2e6;\">{display}</div>");
+                text.AppendLine($"  {display}");
+            }
+
+            html.Append("</div></td>");
+            if (i + 1 < session.Tables.Count) text.AppendLine();
+        }
+
+        html.Append("</tr></table>");
+
+        await JS.InvokeVoidAsync("copyToClipboard", html.ToString(), text.ToString().TrimEnd());
+        copiedSingleHanchan = sessionNumber;
+        _ = ResetCopiedSingleFlag();
+    }
+
+    private async Task ResetCopiedSingleFlag()
+    {
+        await Task.Delay(2000);
+        copiedSingleHanchan = null;
         StateHasChanged();
     }
 
