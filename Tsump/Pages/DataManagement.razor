@@ -100,7 +100,7 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card mb-4">
     <div class="card-header">
         @Lang.Get("CurrentDataSummary")
     </div>
@@ -110,6 +110,36 @@
             <li><strong>@Lang.Get("Sessions"):</strong> @sessionCount</li>
             <li><strong>@Lang.Get("Tournaments"):</strong> @tournamentCount</li>
         </ul>
+    </div>
+</div>
+
+<div class="card mb-4 border-danger">
+    <div class="card-body">
+        <h5 class="card-title text-danger">@Lang.Get("DeleteAllData")</h5>
+        <p class="text-muted">@Lang.Get("DeleteAllDataDesc")</p>
+
+        @if (!showDeleteConfirm)
+        {
+            <button class="btn btn-danger" @onclick="ShowDeleteConfirm">@Lang.Get("DeleteAllData")</button>
+        }
+        else
+        {
+            <div class="alert alert-danger">
+                <p class="mb-2">@Lang.Get("DeleteAllDataEnterCode") <strong>@confirmCode</strong></p>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control" style="max-width: 120px;"
+                           @bind="enteredCode" @bind:event="oninput"/>
+                    <button class="btn btn-danger" disabled="@(enteredCode != confirmCode.ToString())"
+                            @onclick="DeleteAllData">@Lang.Get("YesDelete")</button>
+                    <button class="btn btn-secondary" @onclick="CancelDelete">@Lang.Get("Cancel")</button>
+                </div>
+            </div>
+        }
+
+        @if (dataDeleted)
+        {
+            <div class="alert alert-success mt-2">@Lang.Get("DeleteAllDataSuccess")</div>
+        }
     </div>
 </div>
 
@@ -123,6 +153,10 @@
     private int sessionCount;
     private int tournamentCount;
     private int? workflowStepIndex;
+    private bool showDeleteConfirm;
+    private bool dataDeleted;
+    private int confirmCode;
+    private string enteredCode = "";
 
     protected override void OnInitialized()
     {
@@ -291,6 +325,32 @@
     {
         showImportConfirm = false;
         pendingImportJson = null;
+    }
+
+    private void ShowDeleteConfirm()
+    {
+        confirmCode = Random.Shared.Next(100, 1000);
+        enteredCode = "";
+        showDeleteConfirm = true;
+        dataDeleted = false;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        enteredCode = "";
+    }
+
+    private async Task DeleteAllData()
+    {
+        await Storage.RemoveAsync("tsump_members");
+        await Storage.RemoveAsync("tsump_sessions");
+        await Storage.RemoveAsync("tsump_tournaments");
+        await Storage.RemoveAsync("tsump_settings");
+        showDeleteConfirm = false;
+        enteredCode = "";
+        dataDeleted = true;
+        await RefreshCounts();
     }
 
     private async Task BackToWorkflow()
