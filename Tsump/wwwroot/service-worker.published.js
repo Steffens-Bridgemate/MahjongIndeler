@@ -25,15 +25,22 @@ async function onInstall(event) {
             console.warn('Service worker: Failed to cache', asset.url, e);
         }
     }
+
+    // Activate new version immediately instead of waiting for all tabs to close
+    self.skipWaiting();
 }
 
 async function onActivate(event) {
     console.info('Service worker: Activate');
 
+    // Delete old caches
     const cacheKeys = await caches.keys();
     await Promise.all(cacheKeys
         .filter(key => key.startsWith(cacheNamePrefix) && key !== cacheName)
         .map(key => caches.delete(key)));
+
+    // Take control of all open tabs immediately
+    self.clients.claim();
 }
 
 async function onFetch(event) {
