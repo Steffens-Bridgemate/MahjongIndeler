@@ -82,7 +82,7 @@ else
         var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
 
         var sb = new System.Text.StringBuilder();
-        sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
+        sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
         sb.Append($"<title>{Lang.Get("Guidesheets")} — {tournament.Name}</title>");
         sb.Append("<style>");
         sb.Append("* { box-sizing: border-box; margin: 0; padding: 0; }");
