@@ -1,0 +1,362 @@
+@page "/tournament/{Id:guid}/participants"
+@using Tsump.Models
+@using Tsump.Services
+@inject TournamentService TournamentService
+@inject LanguageService Lang
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@Lang.Get("TournamentParticipants") - Tsumo!</PageTitle>
+
+<div class="mb-3">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
+        &larr; @Lang.Get("BackToTournaments")
+    </button>
+</div>
+
+@if (tournament == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else
+{
+    <h1>@tournament.Name</h1>
+    <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
+
+    @* --- Sub-navigation --- *@
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link active" href="tournament/@Id/participants">@Lang.Get("TournamentParticipants")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="tournament/@Id">@Lang.Get("TournamentAssignments")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/guidesheets" : "#")">@Lang.Get("TournamentGuidesheets")</a>
+        </li>
+    </ul>
+
+    @* --- CSV import/export --- *@
+    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap justify-content-end">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="TriggerCsvImport">
+            @Lang.Get("ImportCsv")
+        </button>
+        <InputFile id="csvImportInput" style="display:none" accept=".csv,text/csv" OnChange="OnCsvFileSelected" />
+        @if (tournament.Participants.Count > 0)
+        {
+            <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv">
+                @Lang.Get("ExportCsv")
+            </button>
+        }
+    </div>
+
+    @* --- Generate / Edit buttons --- *@
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <label class="form-label mb-0">@Lang.Get("GeneratePlayers")</label>
+        <input type="number" class="form-control" style="max-width: 80px;" min="13"
+               @bind="generatePlayerCount" />
+        <button class="btn btn-outline-primary btn-sm" @onclick="GeneratePlayers"
+                disabled="@(generatePlayerCount < 13)">
+            @Lang.Get("Generate")
+        </button>
+        @if (generatePlayerCount < 13)
+        {
+            <small class="text-warning">@Lang.Get("NeedAtLeast13")</small>
+        }
+
+        @if (tournament.Participants.Count > 0)
+        {
+            <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary") ms-auto"
+                    @onclick="ToggleEditNames">
+                @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
+            </button>
+        }
+    </div>
+
+    @if (csvImportError != null)
+    {
+        <div class="alert alert-danger py-1 mb-2">@csvImportError</div>
+    }
+
+    @* --- Participants table --- *@
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th style="width: 50px;">@Lang.Get("ParticipantNumber")</th>
+                <th style="min-width: 14em;">@Lang.Get("ParticipantName")</th>
+                <th>@Lang.Get("LeagueId")</th>
+                <th style="width: 40px;"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+            {
+                var participant = p;
+                <tr>
+                    <td>@participant.Number</td>
+                    <td>
+                        @if (editingNames)
+                        {
+                            <input id="participant-name-@participant.Number"
+                                   class="form-control form-control-sm"
+                                   value="@participant.Name"
+                                   @oninput="e => OnEditParticipantName(participant, e)"
+                                   @onkeydown="e => OnEditParticipantKeyDown(participant, e)"
+                                   @onkeydown:preventDefault="@false"
+                                   placeholder="@Lang.Get("ParticipantName")" />
+                        }
+                        else
+                        {
+                            @participant.Name
+                        }
+                    </td>
+                    <td>
+                        @if (editingNames)
+                        {
+                            <input class="form-control form-control-sm"
+                                   value="@participant.LeagueId"
+                                   @oninput="e => participant.LeagueId = e.Value?.ToString() ?? string.Empty"
+                                   @onkeydown="e => OnEditParticipantKeyDown(participant, e)"
+                                   @onkeydown:preventDefault="@false"
+                                   placeholder="@Lang.Get("LeagueId")" />
+                        }
+                        else
+                        {
+                            @participant.LeagueId
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm text-danger p-0" style="font-size: 1.5em; font-weight: bold; line-height: 1;" title="@Lang.Get("Remove")" @onclick="() => RemoveParticipant(participant.Id)">
+                            &#x1F5D1;
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @* --- Add participant --- *@
+    <div class="d-flex align-items-center gap-2 mt-2">
+        <input class="form-control" style="max-width: 250px;" placeholder="@Lang.Get("ParticipantName")"
+               value="@newParticipantName" @oninput="OnParticipantNameInput" @onkeydown="OnParticipantKeyDown" />
+        <button class="btn btn-success btn-sm" @onclick="AddParticipant"
+                disabled="@(string.IsNullOrWhiteSpace(newParticipantName))">
+            @Lang.Get("AddParticipant")
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Tournament? tournament;
+    private string newParticipantName = string.Empty;
+    private int generatePlayerCount = 20;
+    private bool editingNames;
+    private string? csvImportError;
+    private bool userLoweredFirst;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    private void GoToList() => Nav.NavigateTo("tournaments");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            tournament = await TournamentService.GetByIdAsync(Id);
+            StateHasChanged();
+        }
+    }
+
+    private void OnParticipantNameInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+
+        if (value.Length == 1 && !userLoweredFirst)
+        {
+            value = value.ToUpper();
+        }
+        else if (value.Length >= 1 && char.IsLower(value[0]))
+        {
+            userLoweredFirst = true;
+        }
+        else if (value.Length >= 1 && char.IsUpper(value[0]))
+        {
+            userLoweredFirst = false;
+        }
+
+        newParticipantName = value;
+    }
+
+    private async Task OnParticipantKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newParticipantName))
+            await AddParticipant();
+    }
+
+    private async Task AddParticipant()
+    {
+        if (tournament == null || string.IsNullOrWhiteSpace(newParticipantName))
+            return;
+
+        var nextNumber = tournament.Participants.Count > 0
+            ? tournament.Participants.Max(p => p.Number) + 1
+            : 1;
+
+        tournament.Participants.Add(new TournamentParticipant
+        {
+            Name = newParticipantName.Trim(),
+            Number = nextNumber
+        });
+
+        await TournamentService.SaveAsync(tournament);
+        newParticipantName = string.Empty;
+        userLoweredFirst = false;
+    }
+
+    private async Task GeneratePlayers()
+    {
+        if (tournament == null || generatePlayerCount < 13) return;
+
+        tournament.Participants.Clear();
+        for (int i = 1; i <= generatePlayerCount; i++)
+        {
+            tournament.Participants.Add(new TournamentParticipant
+            {
+                Name = string.Empty,
+                Number = i
+            });
+        }
+
+        editingNames = true;
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task ExportCsv()
+    {
+        if (tournament == null || tournament.Participants.Count == 0) return;
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+        {
+            sb.AppendLine($"{p.Number};{p.Name};{p.LeagueId}");
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        var filename = $"{tournament.Name}_participants.csv";
+        await JS.InvokeVoidAsync("downloadFile", filename, base64);
+    }
+
+    private async Task TriggerCsvImport()
+    {
+        csvImportError = null;
+        await JS.InvokeVoidAsync("triggerFileInput", "csvImportInput");
+    }
+
+    private async Task OnCsvFileSelected(InputFileChangeEventArgs e)
+    {
+        csvImportError = null;
+        if (tournament == null) return;
+
+        try
+        {
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 1024 * 1024);
+            using var reader = new System.IO.StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+
+            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var participants = new List<TournamentParticipant>();
+
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+                if (string.IsNullOrEmpty(line)) continue;
+
+                var separator = line.Contains(';') ? ';' : ',';
+                var parts = line.Split(separator);
+
+                if (parts.Length < 1) continue;
+
+                if (!int.TryParse(parts[0].Trim(), out var number))
+                    continue;
+
+                var name = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                var leagueId = parts.Length > 2 ? parts[2].Trim() : string.Empty;
+
+                participants.Add(new TournamentParticipant
+                {
+                    Number = number,
+                    Name = name,
+                    LeagueId = leagueId
+                });
+            }
+
+            if (participants.Count == 0)
+            {
+                csvImportError = Lang.Get("InvalidFileFormat");
+                return;
+            }
+
+            tournament.Participants = participants;
+            await TournamentService.SaveAsync(tournament);
+        }
+        catch
+        {
+            csvImportError = Lang.Get("InvalidFileFormat");
+        }
+    }
+
+    private async Task ToggleEditNames()
+    {
+        if (editingNames && tournament != null)
+            await TournamentService.SaveAsync(tournament);
+        editingNames = !editingNames;
+    }
+
+    private void OnEditParticipantName(TournamentParticipant participant, ChangeEventArgs e)
+    {
+        participant.Name = e.Value?.ToString() ?? "";
+    }
+
+    private async Task OnEditParticipantKeyDown(TournamentParticipant participant, KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && tournament != null)
+        {
+            await TournamentService.SaveAsync(tournament);
+
+            var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
+            var currentIndex = sorted.FindIndex(p => p.Id == participant.Id);
+
+            TournamentParticipant? next = null;
+            for (int i = 1; i < sorted.Count; i++)
+            {
+                var candidate = sorted[(currentIndex + i) % sorted.Count];
+                if (string.IsNullOrWhiteSpace(candidate.Name))
+                {
+                    next = candidate;
+                    break;
+                }
+            }
+
+            if (next != null)
+                await JS.InvokeVoidAsync("focusElement", $"participant-name-{next.Number}");
+        }
+    }
+
+    private async Task RemoveParticipant(Guid participantId)
+    {
+        if (tournament == null) return;
+
+        tournament.Participants.RemoveAll(p => p.Id == participantId);
+
+        var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
+        for (int i = 0; i < sorted.Count; i++)
+            sorted[i].Number = i + 1;
+
+        await TournamentService.SaveAsync(tournament);
+    }
+}

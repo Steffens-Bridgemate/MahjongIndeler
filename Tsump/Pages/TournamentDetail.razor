@@ -8,7 +8,7 @@
 @inject NavigationManager Nav
 @implements IDisposable
 
-<PageTitle>@Lang.Get("Tournament") - Tsumo!</PageTitle>
+<PageTitle>@Lang.Get("TournamentAssignments") - Tsumo!</PageTitle>
 
 <div class="mb-3">
     <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
@@ -25,122 +25,18 @@ else
     <h1>@tournament.Name</h1>
     <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
 
-    @* --- Participants section --- *@
-    <div class="card mb-4">
-        <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => participantsExpanded = !participantsExpanded">
-            <h5 class="mb-0 flex-grow-1">@Lang.Get("Participants") (@tournament.Participants.Count)</h5>
-            <span class="ms-2">@(participantsExpanded ? "\u25B2" : "\u25BC")</span>
-        </div>
-        @if (participantsExpanded)
-        {
-            <div class="card-body">
-                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap justify-content-end">
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="TriggerCsvImport">
-                        @Lang.Get("ImportCsv")
-                    </button>
-                    <InputFile id="csvImportInput" style="display:none" accept=".csv,text/csv" OnChange="OnCsvFileSelected" />
-                    @if (tournament.Participants.Count > 0)
-                    {
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="ExportCsv">
-                            @Lang.Get("ExportCsv")
-                        </button>
-                    }
-                </div>
-
-                <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                    <label class="form-label mb-0">@Lang.Get("GeneratePlayers")</label>
-                    <input type="number" class="form-control" style="max-width: 80px;" min="13"
-                           @bind="generatePlayerCount" />
-                    <button class="btn btn-outline-primary btn-sm" @onclick="GeneratePlayers"
-                            disabled="@(generatePlayerCount < 13)">
-                        @Lang.Get("Generate")
-                    </button>
-                    @if (generatePlayerCount < 13)
-                    {
-                        <small class="text-warning">@Lang.Get("NeedAtLeast13")</small>
-                    }
-
-                    @if (tournament.Participants.Count > 0)
-                    {
-                        <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary") ms-auto"
-                                @onclick="ToggleEditNames">
-                            @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
-                        </button>
-                    }
-                </div>
-
-                @if (csvImportError != null)
-                {
-                    <div class="alert alert-danger py-1 mb-2">@csvImportError</div>
-                }
-
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">@Lang.Get("ParticipantNumber")</th>
-                            <th style="min-width: 14em;">@Lang.Get("ParticipantName")</th>
-                            <th>@Lang.Get("LeagueId")</th>
-                            <th style="width: 40px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
-                        {
-                            var participant = p;
-                            <tr>
-                                <td>@participant.Number</td>
-                                <td>
-                                    @if (editingNames)
-                                    {
-                                        <input id="participant-name-@participant.Number"
-                                               class="form-control form-control-sm"
-                                               value="@participant.Name"
-                                               @oninput="e => OnEditParticipantName(participant, e)"
-                                               @onkeydown="e => OnEditParticipantKeyDown(participant, e)"
-                                               @onkeydown:preventDefault="@false"
-                                               placeholder="@Lang.Get("ParticipantName")" />
-                                    }
-                                    else
-                                    {
-                                        @participant.Name
-                                    }
-                                </td>
-                                <td>
-                                    @if (editingNames)
-                                    {
-                                        <input class="form-control form-control-sm"
-                                               value="@participant.LeagueId"
-                                               @oninput="e => participant.LeagueId = e.Value?.ToString() ?? string.Empty"
-                                               @onkeydown="e => OnEditParticipantKeyDown(participant, e)"
-                                               @onkeydown:preventDefault="@false"
-                                               placeholder="@Lang.Get("LeagueId")" />
-                                    }
-                                    else
-                                    {
-                                        @participant.LeagueId
-                                    }
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm text-danger p-0" style="font-size: 1.5em; font-weight: bold; line-height: 1;" title="@Lang.Get("Remove")" @onclick="() => RemoveParticipant(participant.Id)">
-                                        &#x1F5D1;
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-
-                <div class="d-flex align-items-center gap-2 mt-2">
-                    <input class="form-control" style="max-width: 250px;" placeholder="@Lang.Get("ParticipantName")"
-                           value="@newParticipantName" @oninput="OnParticipantNameInput" @onkeydown="OnParticipantKeyDown" />
-                    <button class="btn btn-success btn-sm" @onclick="AddParticipant"
-                            disabled="@(string.IsNullOrWhiteSpace(newParticipantName))">
-                        @Lang.Get("AddParticipant")
-                    </button>
-                </div>
-            </div>
-        }
-    </div>
+    @* --- Sub-navigation --- *@
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link" href="tournament/@Id/participants">@Lang.Get("TournamentParticipants")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="tournament/@Id">@Lang.Get("TournamentAssignments")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/guidesheets" : "#")">@Lang.Get("TournamentGuidesheets")</a>
+        </li>
+    </ul>
 
     @* --- Generate button --- *@
     <div class="mb-3">
@@ -225,32 +121,6 @@ else
                 }
             </div>
         }
-
-        @* --- Guidesheets --- *@
-        <div class="card mt-4 mb-4">
-            <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => guidesheetsExpanded = !guidesheetsExpanded">
-                <h5 class="mb-0 flex-grow-1">@Lang.Get("Guidesheets")</h5>
-                <span class="ms-2">@(guidesheetsExpanded ? "\u25B2" : "\u25BC")</span>
-            </div>
-            @if (guidesheetsExpanded)
-            {
-                <div class="card-body">
-                    <p class="text-muted">@Lang.Get("GuidesheetsDesc")</p>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="includeNames" @bind="guidesheetIncludeNames" />
-                        <label class="form-check-label" for="includeNames">@Lang.Get("IncludeNames")</label>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-primary btn-sm" @onclick="OpenGuidesheets">
-                            @Lang.Get("PrintGuidesheets")
-                        </button>
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="DownloadGuidesheets">
-                            @Lang.Get("DownloadGuidesheets")
-                        </button>
-                    </div>
-                </div>
-            }
-        </div>
 
         @* --- 3-player distribution --- *@
         <div class="card mt-4 mb-4">
@@ -380,18 +250,10 @@ else
     [Parameter] public Guid Id { get; set; }
 
     private Tournament? tournament;
-    private bool participantsExpanded = true;
-    private string newParticipantName = string.Empty;
-    private int generatePlayerCount = 20;
-    private bool editingNames;
     private bool showRegenerateConfirm;
-    private string? csvImportError;
     private bool copiedToClipboard;
     private bool saved;
-    private bool userLoweredFirst;
     private bool matrixExpanded;
-    private bool guidesheetsExpanded;
-    private bool guidesheetIncludeNames = true;
 
     // Meeting matrix data
     private List<TournamentParticipant> sortedParticipants = new();
@@ -417,206 +279,10 @@ else
         if (firstRender)
         {
             tournament = await TournamentService.GetByIdAsync(Id);
-            if (tournament != null)
-            {
-                participantsExpanded = !tournament.IsGenerated;
-                if (tournament.IsGenerated)
-                    BuildTournamentMatrix();
-            }
+            if (tournament != null && tournament.IsGenerated)
+                BuildTournamentMatrix();
             StateHasChanged();
         }
-    }
-
-    private void OnParticipantNameInput(ChangeEventArgs e)
-    {
-        var value = e.Value?.ToString() ?? "";
-
-        if (value.Length == 1 && !userLoweredFirst)
-        {
-            value = value.ToUpper();
-        }
-        else if (value.Length >= 1 && char.IsLower(value[0]))
-        {
-            userLoweredFirst = true;
-        }
-        else if (value.Length >= 1 && char.IsUpper(value[0]))
-        {
-            userLoweredFirst = false;
-        }
-
-        newParticipantName = value;
-    }
-
-    private async Task OnParticipantKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newParticipantName))
-            await AddParticipant();
-    }
-
-    private async Task AddParticipant()
-    {
-        if (tournament == null || string.IsNullOrWhiteSpace(newParticipantName))
-            return;
-
-        var nextNumber = tournament.Participants.Count > 0
-            ? tournament.Participants.Max(p => p.Number) + 1
-            : 1;
-
-        tournament.Participants.Add(new TournamentParticipant
-        {
-            Name = newParticipantName.Trim(),
-            Number = nextNumber
-        });
-
-        await TournamentService.SaveAsync(tournament);
-        newParticipantName = string.Empty;
-        userLoweredFirst = false;
-    }
-
-    private async Task GeneratePlayers()
-    {
-        if (tournament == null || generatePlayerCount < 13) return;
-
-        tournament.Participants.Clear();
-        for (int i = 1; i <= generatePlayerCount; i++)
-        {
-            tournament.Participants.Add(new TournamentParticipant
-            {
-                Name = string.Empty,
-                Number = i
-            });
-        }
-
-        editingNames = true;
-        await TournamentService.SaveAsync(tournament);
-    }
-
-    private async Task ExportCsv()
-    {
-        if (tournament == null || tournament.Participants.Count == 0) return;
-
-        var sb = new System.Text.StringBuilder();
-        foreach (var p in tournament.Participants.OrderBy(x => x.Number))
-        {
-            sb.AppendLine($"{p.Number};{p.Name};{p.LeagueId}");
-        }
-
-        var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
-        var base64 = Convert.ToBase64String(bytes);
-        var filename = $"{tournament.Name}_participants.csv";
-        await JS.InvokeVoidAsync("downloadFile", filename, base64);
-    }
-
-    private async Task TriggerCsvImport()
-    {
-        csvImportError = null;
-        await JS.InvokeVoidAsync("triggerFileInput", "csvImportInput");
-    }
-
-    private async Task OnCsvFileSelected(InputFileChangeEventArgs e)
-    {
-        csvImportError = null;
-        if (tournament == null) return;
-
-        try
-        {
-            using var stream = e.File.OpenReadStream(maxAllowedSize: 1024 * 1024);
-            using var reader = new System.IO.StreamReader(stream);
-            var content = await reader.ReadToEndAsync();
-
-            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            var participants = new List<TournamentParticipant>();
-
-            foreach (var rawLine in lines)
-            {
-                var line = rawLine.Trim();
-                if (string.IsNullOrEmpty(line)) continue;
-
-                // Detect separator: use semicolon if present, otherwise comma
-                var separator = line.Contains(';') ? ';' : ',';
-                var parts = line.Split(separator);
-
-                if (parts.Length < 1) continue;
-
-                if (!int.TryParse(parts[0].Trim(), out var number))
-                    continue; // skip header or invalid rows
-
-                var name = parts.Length > 1 ? parts[1].Trim() : string.Empty;
-                var leagueId = parts.Length > 2 ? parts[2].Trim() : string.Empty;
-
-                participants.Add(new TournamentParticipant
-                {
-                    Number = number,
-                    Name = name,
-                    LeagueId = leagueId
-                });
-            }
-
-            if (participants.Count == 0)
-            {
-                csvImportError = Lang.Get("InvalidFileFormat");
-                return;
-            }
-
-            tournament.Participants = participants;
-            await TournamentService.SaveAsync(tournament);
-        }
-        catch
-        {
-            csvImportError = Lang.Get("InvalidFileFormat");
-        }
-    }
-
-    private async Task ToggleEditNames()
-    {
-        if (editingNames && tournament != null)
-            await TournamentService.SaveAsync(tournament);
-        editingNames = !editingNames;
-    }
-
-    private void OnEditParticipantName(TournamentParticipant participant, ChangeEventArgs e)
-    {
-        participant.Name = e.Value?.ToString() ?? "";
-    }
-
-    private async Task OnEditParticipantKeyDown(TournamentParticipant participant, KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && tournament != null)
-        {
-            await TournamentService.SaveAsync(tournament);
-
-            var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
-            var currentIndex = sorted.FindIndex(p => p.Id == participant.Id);
-
-            // Find next empty participant after current, then wrap around
-            TournamentParticipant? next = null;
-            for (int i = 1; i < sorted.Count; i++)
-            {
-                var candidate = sorted[(currentIndex + i) % sorted.Count];
-                if (string.IsNullOrWhiteSpace(candidate.Name))
-                {
-                    next = candidate;
-                    break;
-                }
-            }
-
-            if (next != null)
-                await JS.InvokeVoidAsync("focusElement", $"participant-name-{next.Number}");
-        }
-    }
-
-    private async Task RemoveParticipant(Guid participantId)
-    {
-        if (tournament == null) return;
-
-        tournament.Participants.RemoveAll(p => p.Id == participantId);
-
-        // Renumber participants
-        var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
-        for (int i = 0; i < sorted.Count; i++)
-            sorted[i].Number = i + 1;
-
-        await TournamentService.SaveAsync(tournament);
     }
 
     private void GenerateSessions()
@@ -645,7 +311,6 @@ else
         tournament.Sessions = AssignmentService.GenerateAllSessions(
             tournament.Participants, tournament.SessionCount);
         tournament.IsGenerated = true;
-        participantsExpanded = false;
         BuildTournamentMatrix();
 
         await TournamentService.SaveAsync(tournament);
@@ -673,11 +338,6 @@ else
     {
         var p = tournament?.Participants.FirstOrDefault(x => x.Id == id);
         return p != null ? $"{p.Number}. {p.Name}" : Lang.Get("Unknown");
-    }
-
-    private string GetParticipantName(Guid id)
-    {
-        return tournament?.Participants.FirstOrDefault(x => x.Id == id)?.Name ?? Lang.Get("Unknown");
     }
 
     private void OnPlayerClick(Guid playerId, int sessionNumber)
@@ -829,112 +489,6 @@ else
         await Task.Delay(2000);
         saved = false;
         StateHasChanged();
-    }
-
-    private string BuildGuidesheetHtml()
-    {
-        if (tournament == null) return "";
-
-        var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
-        var sessionCount = tournament.Sessions.Count;
-
-        var sb = new System.Text.StringBuilder();
-        sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">");
-        sb.Append($"<title>{Lang.Get("Guidesheets")} — {tournament.Name}</title>");
-        sb.Append("<style>");
-        sb.Append("* { box-sizing: border-box; margin: 0; padding: 0; }");
-        sb.Append("body { font-family: Verdana, Arial, sans-serif; font-size: 11px; }");
-        sb.Append(".page { display: flex; flex-wrap: wrap; gap: 12px; padding: 10px; }");
-        sb.Append(".sheet { width: calc(50% - 6px); border: 1px solid #000; padding: 8px; page-break-inside: avoid; break-inside: avoid; }");
-        sb.Append(".sheet h3 { font-size: 13px; margin-bottom: 6px; }");
-        sb.Append("table { width: 100%; border-collapse: collapse; table-layout: fixed; }");
-        sb.Append("th, td { border: 1px solid #000; padding: 3px 5px; text-align: left; }");
-        sb.Append("th { background: #e9e9e9; }");
-        sb.Append("td.hanchan-num { text-align: center; width: 20px; }");
-        sb.Append("td.table-num { text-align: center; font-weight: bold; width: 40px; }");
-        sb.Append("td.opponents { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }");
-        sb.Append("@media print { ");
-        sb.Append("  body { margin: 0; } ");
-        sb.Append("  .page { gap: 8px; padding: 5mm; } ");
-        sb.Append("  .sheet { width: calc(50% - 4px); } ");
-        sb.Append("  .no-print { display: none; } ");
-        sb.Append("}");
-        sb.Append("</style></head><body>");
-
-        sb.Append("<div class=\"no-print\" style=\"padding:10px;margin-bottom:10px;background:#f0f0f0;\">");
-        sb.Append($"<strong>{tournament.Name}</strong> — {Lang.FormatDate(tournament.Date)} &middot; ");
-        sb.Append("<button onclick=\"window.print()\" style=\"padding:4px 12px;cursor:pointer;\">Print</button>");
-        sb.Append("</div>");
-
-        sb.Append("<div class=\"page\">");
-
-        foreach (var participant in sorted)
-        {
-            sb.Append("<div class=\"sheet\">");
-
-            // Header: player number (+ optional name)
-            var header = guidesheetIncludeNames && !string.IsNullOrWhiteSpace(participant.Name)
-                ? $"{participant.Number}. {participant.Name}"
-                : $"{Lang.Get("Player")} {participant.Number}";
-            sb.Append($"<h3>{header}</h3>");
-
-            // Table with hanchan rows
-            sb.Append("<table>");
-            sb.Append("<col style=\"width:60px;\"><col style=\"width:40px;\"><col>");
-            sb.Append("<tr>");
-            sb.Append($"<th>{Lang.Get("Hanchan")}</th>");
-            sb.Append($"<th>{Lang.Get("Table")}</th>");
-            sb.Append($"<th>{Lang.Get("Opponents")}</th>");
-            sb.Append("</tr>");
-
-            foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
-            {
-                var table = session.Tables.FirstOrDefault(t => t.PlayerIds.Contains(participant.Id));
-                if (table == null) continue;
-
-                var opponents = table.PlayerIds
-                    .Where(id => id != participant.Id)
-                    .Select(id =>
-                    {
-                        var p = tournament.Participants.FirstOrDefault(x => x.Id == id);
-                        if (p == null) return "?";
-                        if (guidesheetIncludeNames && !string.IsNullOrWhiteSpace(p.Name))
-                        {
-                            var firstName = p.Name.Split(' ')[0];
-                            return $"{p.Number}.{firstName}";
-                        }
-                        return p.Number.ToString();
-                    });
-
-                var opponentText = string.Join(", ", opponents);
-                sb.Append("<tr>");
-                sb.Append($"<td class=\"hanchan-num\">{session.SessionNumber}</td>");
-                sb.Append($"<td class=\"table-num\">{table.TableNumber}</td>");
-                sb.Append($"<td class=\"opponents\" title=\"{opponentText}\">{opponentText}</td>");
-                sb.Append("</tr>");
-            }
-
-            sb.Append("</table>");
-            sb.Append("</div>");
-        }
-
-        sb.Append("</div>");
-        sb.Append("</body></html>");
-
-        return sb.ToString();
-    }
-
-    private async Task OpenGuidesheets()
-    {
-        var html = BuildGuidesheetHtml();
-        await JS.InvokeVoidAsync("openHtmlInNewTab", html);
-    }
-
-    private async Task DownloadGuidesheets()
-    {
-        var html = BuildGuidesheetHtml();
-        var filename = $"{tournament?.Name ?? "guidesheets"}_guidesheets.html";
-        await JS.InvokeVoidAsync("downloadHtmlFile", filename, html);
     }
 
     private void BuildTournamentMatrix()

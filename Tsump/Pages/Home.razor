@@ -1,6 +1,8 @@
 @page "/"
 @using Tsump.Services
 @inject LanguageService Lang
+@inject AppModeService Mode
+@inject NavigationManager Nav
 @implements IDisposable
 
 <PageTitle>Tsumo! - @Lang.Get("ClubManager")</PageTitle>
@@ -14,69 +16,123 @@
     </div>
     <p class="lead">@Lang.Get("ClubManager")</p>
 
-    <div class="row justify-content-center mt-3 mb-2">
-        <div class="col-md-8">
-            <div class="card border-primary">
+    @* --- Mode selection --- *@
+    <div class="row justify-content-center mt-3 mb-3">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 @(Mode.CurrentMode == AppMode.Weekly ? "border-primary border-2" : "")"
+                 style="cursor: pointer;" @onclick="() => SelectMode(AppMode.Weekly)">
                 <div class="card-body text-center">
-                    <h4 class="card-title">@Lang.Get("Workflow")</h4>
-                    <p class="card-text">@Lang.Get("WorkflowHomeDesc")</p>
-                    <a href="workflow" class="btn btn-primary btn-lg">@Lang.Get("StartWorkflow")</a>
+                    <h5 class="card-title">@Lang.Get("WeeklyMode")</h5>
+                    <p class="card-text">@Lang.Get("WeeklyModeDesc")</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 @(Mode.CurrentMode == AppMode.Tournament ? "border-primary border-2" : "")"
+                 style="cursor: pointer;" @onclick="() => SelectMode(AppMode.Tournament)">
+                <div class="card-body text-center">
+                    <h5 class="card-title">@Lang.Get("TournamentMode")</h5>
+                    <p class="card-text">@Lang.Get("TournamentModeDesc")</p>
                 </div>
             </div>
         </div>
     </div>
 
     <hr />
-    <div class="row justify-content-center mt-4">
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <h5 class="card-title">@Lang.Get("Members")</h5>
-                    <p class="card-text">@Lang.Get("MembersDesc")</p>
-                    <a href="members" class="btn btn-primary">@Lang.Get("ManageMembers")</a>
+
+    @if (Mode.CurrentMode == AppMode.Weekly)
+    {
+        <div class="row justify-content-center mt-3 mb-2">
+            <div class="col-md-8">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <h4 class="card-title">@Lang.Get("Workflow")</h4>
+                        <p class="card-text">@Lang.Get("WorkflowHomeDesc")</p>
+                        <a href="workflow" class="btn btn-primary btn-lg">@Lang.Get("StartWorkflow")</a>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <h5 class="card-title">@Lang.Get("WeeklySession")</h5>
-                    <p class="card-text">@Lang.Get("WeeklySessionDesc")</p>
-                    <a href="session" class="btn btn-primary">@Lang.Get("StartSession")</a>
+
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">@Lang.Get("Members")</h5>
+                        <p class="card-text">@Lang.Get("MembersDesc")</p>
+                        <a href="members" class="btn btn-primary">@Lang.Get("ManageMembers")</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">@Lang.Get("WeeklySession")</h5>
+                        <p class="card-text">@Lang.Get("WeeklySessionDesc")</p>
+                        <a href="session" class="btn btn-primary">@Lang.Get("StartSession")</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">@Lang.Get("History")</h5>
+                        <p class="card-text">@Lang.Get("HistoryDesc")</p>
+                        <a href="history" class="btn btn-primary">@Lang.Get("ViewHistory")</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">@Lang.Get("MeetingMatrix")</h5>
+                        <p class="card-text">@Lang.Get("MeetingMatrixDesc")</p>
+                        <a href="matrix" class="btn btn-primary">@Lang.Get("ViewMatrix")</a>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <h5 class="card-title">@Lang.Get("History")</h5>
-                    <p class="card-text">@Lang.Get("HistoryDesc")</p>
-                    <a href="history" class="btn btn-primary">@Lang.Get("ViewHistory")</a>
+    }
+    else
+    {
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">@Lang.Get("Tournaments")</h5>
+                        <p class="card-text">@Lang.Get("TournamentDesc")</p>
+                        <a href="tournaments" class="btn btn-primary">@Lang.Get("ManageTournaments")</a>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <h5 class="card-title">@Lang.Get("MeetingMatrix")</h5>
-                    <p class="card-text">@Lang.Get("MeetingMatrixDesc")</p>
-                    <a href="matrix" class="btn btn-primary">@Lang.Get("ViewMatrix")</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body text-center">
-                    <h5 class="card-title">@Lang.Get("Tournament")</h5>
-                    <p class="card-text">@Lang.Get("TournamentDesc")</p>
-                    <a href="tournaments" class="btn btn-primary">@Lang.Get("ManageTournaments")</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    }
 </div>
 
 @code {
-    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
-    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Mode.LoadAsync();
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Lang.OnLanguageChanged += StateHasChanged;
+        Mode.OnModeChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+        Mode.OnModeChanged -= StateHasChanged;
+    }
+
+    private async Task SelectMode(AppMode mode)
+    {
+        await Mode.SetModeAsync(mode);
+    }
 }

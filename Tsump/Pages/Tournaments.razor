@@ -132,12 +132,12 @@ else
         tournaments = await TournamentService.GetAllAsync();
         showForm = false;
 
-        Nav.NavigateTo($"tournament/{tournament.Id}");
+        Nav.NavigateTo($"tournament/{tournament.Id}/participants");
     }
 
     private void OpenTournament(Guid id)
     {
-        Nav.NavigateTo($"tournament/{id}");
+        Nav.NavigateTo($"tournament/{id}/participants");
     }
 
     private async Task ConfirmDelete(Guid id)

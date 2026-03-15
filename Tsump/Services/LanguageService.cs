@@ -38,6 +38,19 @@ public class LanguageService
     // ── Dutch ──────────────────────────────────────────────
     private static readonly Dictionary<string, string> Dutch = new()
     {
+        // Mode selection
+        ["SelectMode"] = "Kies modus",
+        ["WeeklyMode"] = "Clubavond",
+        ["TournamentMode"] = "Toernooi",
+        ["WeeklyModeDesc"] = "Wekelijkse zittingen, leden en geschiedenis beheren.",
+        ["TournamentModeDesc"] = "Toernooien met deelnemers, indelingen en gidsbriefjes.",
+        ["SwitchMode"] = "Wissel modus",
+
+        // Tournament sub-nav
+        ["TournamentParticipants"] = "Deelnemers",
+        ["TournamentAssignments"] = "Tafelindeling",
+        ["TournamentGuidesheets"] = "Gidsbriefjes",
+
         // Nav / Layout
         ["Home"] = "Home",
         ["Members"] = "Leden",
@@ -275,6 +288,19 @@ public class LanguageService
     // ── English ────────────────────────────────────────────
     private static readonly Dictionary<string, string> English = new()
     {
+        // Mode selection
+        ["SelectMode"] = "Select mode",
+        ["WeeklyMode"] = "Club night",
+        ["TournamentMode"] = "Tournament",
+        ["WeeklyModeDesc"] = "Manage weekly sessions, members, and history.",
+        ["TournamentModeDesc"] = "Tournaments with participants, assignments, and guidesheets.",
+        ["SwitchMode"] = "Switch mode",
+
+        // Tournament sub-nav
+        ["TournamentParticipants"] = "Participants",
+        ["TournamentAssignments"] = "Table Assignments",
+        ["TournamentGuidesheets"] = "Guidesheets",
+
         // Nav / Layout
         ["Home"] = "Home",
         ["Members"] = "Members",

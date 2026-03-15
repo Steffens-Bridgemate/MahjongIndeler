@@ -1,5 +1,6 @@
 @using Tsump.Services
 @inject LanguageService Lang
+@inject AppModeService Mode
 @implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-light">
@@ -18,36 +19,44 @@
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Home")
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="workflow">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("Workflow")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="members">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Members")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="session">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("WeeklySession")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="history">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("History")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="matrix">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("MeetingMatrix")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="tournaments">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("Tournament")
-            </NavLink>
-        </div>
+
+        @if (Mode.CurrentMode == AppMode.Weekly)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="workflow">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("Workflow")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="members">
+                    <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Members")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="session">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("WeeklySession")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="history">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("History")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="matrix">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("MeetingMatrix")
+                </NavLink>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="tournaments">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("Tournaments")
+                </NavLink>
+            </div>
+        }
+
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="data">
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Lang.Get("DataManagement")
@@ -66,9 +75,19 @@
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Mode.LoadAsync();
+            StateHasChanged();
+        }
+    }
+
     protected override void OnInitialized()
     {
         Lang.OnLanguageChanged += StateHasChanged;
+        Mode.OnModeChanged += StateHasChanged;
     }
 
     private void ToggleNavMenu()
@@ -79,5 +98,6 @@
     public void Dispose()
     {
         Lang.OnLanguageChanged -= StateHasChanged;
+        Mode.OnModeChanged -= StateHasChanged;
     }
 }
