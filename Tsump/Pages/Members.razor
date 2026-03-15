@@ -61,30 +61,39 @@ else
     <table class="table table-striped">
         <thead>
             <tr>
+                <th style="width: 50px;"></th>
                 <th>@Lang.Get("Name")</th>
                 <th>@Lang.Get("Email")</th>
                 <th>@Lang.Get("Phone")</th>
                 <th>@Lang.Get("Joined")</th>
-                <th>@Lang.Get("Status")</th>
-                <th>@Lang.Get("Actions")</th>
+                <th class="text-center">@Lang.Get("Active")</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var member in members.OrderBy(m => m.Name))
             {
                 <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-1 member-actions">
+                            <button class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center member-action-btn" title="@Lang.Get("Edit")" @onclick="() => EditMember(member)">&#9998;</button>
+                            <button class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center @(deleteConfirmId == member.Id ? "member-action-btn-confirm" : "member-action-btn")"
+                                    title="@(deleteConfirmId == member.Id ? Lang.Get("ConfirmDeletion") : Lang.Get("Remove"))"
+                                    @onclick="() => DeleteClicked(member.Id)">&#x1F5D1;</button>
+                        </div>
+                    </td>
                     <td>@member.Name</td>
                     <td>@member.Email</td>
                     <td>@member.Phone</td>
                     <td>@member.JoinedDate.ToShortDateString()</td>
-                    <td>
-                        <span class="badge @(member.IsActive ? "bg-success" : "bg-secondary")">
-                            @(member.IsActive ? Lang.Get("Active") : Lang.Get("Inactive"))
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditMember(member)">@Lang.Get("Edit")</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMember(member.Id)">@Lang.Get("Remove")</button>
+                    <td class="text-center">
+                        @if (member.IsActive)
+                        {
+                            <span class="badge bg-success" style="font-size: 1em;">&check;</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger" style="font-size: 1em;">&times;</span>
+                        }
                     </td>
                 </tr>
             }
@@ -93,12 +102,22 @@ else
     <p class="text-muted">@Lang.Get("Total"): @members.Count @Lang.Get("members") (@members.Count(m => m.IsActive) @Lang.Get("active"))</p>
 }
 
+<style>
+    .member-action-btn { width: 20px; height: 20px; }
+    .member-action-btn-confirm { width: 26px; height: 26px; }
+    .member-actions { flex-direction: column; }
+    @@media (min-width: 768px) {
+        .member-actions { flex-direction: row; }
+    }
+</style>
+
 @code {
     private List<Member>? members;
     private Member currentMember = new();
     private bool showForm;
     private bool isEditing;
     private bool userLoweredFirst;
+    private Guid? deleteConfirmId;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -118,6 +137,7 @@ else
         isEditing = false;
         showForm = true;
         userLoweredFirst = false;
+        deleteConfirmId = null;
     }
 
     private void EditMember(Member member)
@@ -135,6 +155,7 @@ else
         isEditing = true;
         showForm = true;
         userLoweredFirst = member.Name.Length > 0 && char.IsLower(member.Name[0]);
+        deleteConfirmId = null;
     }
 
     private async Task SaveMember()
@@ -149,6 +170,7 @@ else
 
         members = await MemberService.GetAllAsync();
         showForm = false;
+        deleteConfirmId = null;
     }
 
     private void OnNameInput(ChangeEventArgs e)
@@ -176,11 +198,20 @@ else
     private void CancelForm()
     {
         showForm = false;
+        deleteConfirmId = null;
     }
 
-    private async Task DeleteMember(Guid id)
+    private async Task DeleteClicked(Guid id)
     {
-        await MemberService.DeleteAsync(id);
-        members = await MemberService.GetAllAsync();
+        if (deleteConfirmId == id)
+        {
+            await MemberService.DeleteAsync(id);
+            members = await MemberService.GetAllAsync();
+            deleteConfirmId = null;
+        }
+        else
+        {
+            deleteConfirmId = id;
+        }
     }
 }
