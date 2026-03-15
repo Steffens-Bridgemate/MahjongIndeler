@@ -42,8 +42,8 @@ public class LanguageService
         ["SelectMode"] = "Kies modus",
         ["WeeklyMode"] = "Clubavond",
         ["TournamentMode"] = "Toernooi",
-        ["WeeklyModeDesc"] = "Wekelijkse zittingen, leden en geschiedenis beheren.",
-        ["TournamentModeDesc"] = "Toernooien met deelnemers, indelingen en gidsbriefjes.",
+        ["WeeklyModeDesc"] = "Wekelijkse zittingen voor leden en gasten.",
+        ["TournamentModeDesc"] = "Toernooien met eenmalige inschrijving.",
         ["SwitchMode"] = "Wissel modus",
 
         // Tournament sub-nav
