@@ -328,6 +328,7 @@ else
     private List<TableAssignment> tables = new();
     private DateTime sessionDate = DateTime.Today;
     private TimeSpan? hanchanStartTime;
+    private TimeSpan defaultStartTime;
     private bool saved;
     private string searchText = string.Empty;
     private bool showRegenerateConfirm;
@@ -370,6 +371,9 @@ else
             if (int.TryParse(query["fromWorkflow"], out var idx))
                 workflowStepIndex = idx;
 
+            var clubSettings = await SettingsService.GetAsync();
+            defaultStartTime = clubSettings.DefaultStartTime;
+
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
 
@@ -401,14 +405,12 @@ else
         {
             currentHanchan = null;
             excludeFromOptimization = false;
-            // Preserve sessionStartTime if it was pre-set from the schedule
-            if (hanchanStartTime == null)
-            {
-                var settings = await SettingsService.GetAsync();
-                var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
-                if (entry != null && entry.StartTimes.Count > 0)
-                    hanchanStartTime = entry.StartTimes.OrderBy(t => t).First();
-            }
+            // Set start time from schedule for this day, or fall back to default
+            var settings = await SettingsService.GetAsync();
+            var entry = settings.Schedule.FirstOrDefault(e => e.Day == sessionDate.DayOfWeek);
+            hanchanStartTime = (entry != null && entry.StartTimes.Count > 0)
+                ? entry.StartTimes.OrderBy(t => t).First()
+                : defaultStartTime;
             presentIds.Clear();
             tables.Clear();
         }
@@ -419,7 +421,7 @@ else
     private void LoadFromHanchan(Hanchan hanchan)
     {
         currentHanchan = hanchan;
-        hanchanStartTime = hanchan.StartTime;
+        hanchanStartTime = hanchan.StartTime ?? defaultStartTime;
         presentIds = new HashSet<Guid>(hanchan.PresentMemberIds);
         tables = hanchan.Tables;
         excludeFromOptimization = hanchan.ExcludeFromOptimization;
@@ -463,7 +465,7 @@ else
                 if (usedTimes.Any())
                     hanchanStartTime = usedTimes.Max().Add(TimeSpan.FromHours(1));
                 else
-                    hanchanStartTime = null;
+                    hanchanStartTime = defaultStartTime;
             }
             else
             {
@@ -472,7 +474,7 @@ else
         }
         else
         {
-            hanchanStartTime = null;
+            hanchanStartTime = defaultStartTime;
         }
     }
 
@@ -522,7 +524,7 @@ else
         }
         else
         {
-            hanchanStartTime = null;
+            hanchanStartTime = defaultStartTime;
         }
     }
 
@@ -536,7 +538,7 @@ else
         }
         else
         {
-            hanchanStartTime = null;
+            hanchanStartTime = defaultStartTime;
         }
     }
 

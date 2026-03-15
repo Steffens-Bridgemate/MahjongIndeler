@@ -75,6 +75,30 @@
             </div>
         }
 
+        <h5 class="card-title mt-4">@Lang.Get("DefaultStartTime")</h5>
+        <p class="text-muted">@Lang.Get("DefaultStartTimeDesc")</p>
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <select class="form-select" style="max-width: 75px;"
+                    value="@defaultStartHour"
+                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var h)) { defaultStartHour = h; saved = false; } }">
+                @for (int h = 0; h < 24; h++)
+                {
+                    var hh = h;
+                    <option value="@hh">@hh.ToString("D2")</option>
+                }
+            </select>
+            <span>:</span>
+            <select class="form-select" style="max-width: 75px;"
+                    value="@defaultStartMinute"
+                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var m)) { defaultStartMinute = m; saved = false; } }">
+                @for (int m = 0; m < 60; m += 5)
+                {
+                    var mm = m;
+                    <option value="@mm">@mm.ToString("D2")</option>
+                }
+            </select>
+        </div>
+
         @if (saved)
         {
             <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
@@ -89,6 +113,8 @@
     private Dictionary<DayOfWeek, List<TimeSpan>> schedule = new();
     private Dictionary<DayOfWeek, int> newHours = new();
     private Dictionary<DayOfWeek, int> newMinutes = new();
+    private int defaultStartHour = 13;
+    private int defaultStartMinute = 0;
     private bool saved;
 
     private static readonly DayOfWeek[] allDays = new[]
@@ -107,9 +133,10 @@
             var settings = await SettingsService.GetAsync();
             foreach (var entry in settings.Schedule)
             {
-                schedule[entry.Day] = new List<TimeSpan>(entry.
-                    StartTimes);
+                schedule[entry.Day] = new List<TimeSpan>(entry.StartTimes);
             }
+            defaultStartHour = settings.DefaultStartTime.Hours;
+            defaultStartMinute = settings.DefaultStartTime.Minutes;
             StateHasChanged();
         }
     }
@@ -173,7 +200,8 @@
                     Day = kv.Key,
                     StartTimes = kv.Value.OrderBy(t => t).ToList()
                 })
-                .ToList()
+                .ToList(),
+            DefaultStartTime = new TimeSpan(defaultStartHour, defaultStartMinute, 0)
         };
         await SettingsService.SaveAsync(settings);
         saved = true;
