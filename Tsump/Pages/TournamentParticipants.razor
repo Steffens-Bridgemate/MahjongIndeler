@@ -93,7 +93,7 @@ else
             @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
             {
                 var participant = p;
-                <tr>
+                <tr @key="participant.Id">
                     <td>@participant.Number</td>
                     <td>
                         @if (editingNames)
@@ -127,7 +127,7 @@ else
                         }
                     </td>
                     <td>
-                        <button class="btn btn-sm text-danger p-0" style="font-size: 1.5em; font-weight: bold; line-height: 1;" title="@Lang.Get("Remove")" @onclick="() => RemoveParticipant(participant.Id)">
+                        <button class="btn btn-sm text-danger p-0" style="font-size: 1.5em; font-weight: bold; line-height: 1;" title="@Lang.Get("Remove")" tabindex="-1" @onclick="() => RemoveParticipant(participant.Id)">
                             &#x1F5D1;
                         </button>
                     </td>
