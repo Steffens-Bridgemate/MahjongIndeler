@@ -285,7 +285,7 @@
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
             var members = JsonSerializer.Deserialize<List<Member>>(root.GetProperty("Members").GetRawText(), options);
-            var sessions = JsonSerializer.Deserialize<List<WeeklySession>>(root.GetProperty("Sessions").GetRawText(), options);
+            var sessions = JsonSerializer.Deserialize<List<Hanchan>>(root.GetProperty("Sessions").GetRawText(), options);
 
             if (members != null)
                 await Storage.SetAsync("tsump_members", members);

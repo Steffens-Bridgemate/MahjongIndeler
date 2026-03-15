@@ -1,6 +1,6 @@
 namespace Tsump.Models;
 
-public class WeeklySession
+public class Hanchan
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public DateTime Date { get; set; }

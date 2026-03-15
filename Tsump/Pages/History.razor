@@ -134,7 +134,7 @@ else
 }
 
 @code {
-    private List<WeeklySession>? sessions;
+    private List<Hanchan>? sessions;
     private List<Member> members = new();
     private List<PlayerStat> playerStats = new();
     private Guid? deleteConfirmId;
@@ -158,7 +158,7 @@ else
         return members.FirstOrDefault(m => m.Id == id)?.Name ?? Lang.Get("Unknown");
     }
 
-    private int? GetSessionNumber(WeeklySession session)
+    private int? GetSessionNumber(Hanchan session)
     {
         if (sessions == null) return null;
         var sameDateSessions = sessions.Where(s => s.Date.Date == session.Date.Date).ToList();

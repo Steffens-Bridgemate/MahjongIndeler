@@ -335,8 +335,8 @@ else
     private bool excludeFromOptimization;
     private bool attendanceExpanded = true;
 
-    private List<WeeklySession> hanchansOnDate = new();
-    private WeeklySession? currentHanchan;
+    private List<Hanchan> hanchansOnDate = new();
+    private Hanchan? currentHanchan;
 
     private List<Guid> selectedPlayerIds = new();
     private Guid? draggedPlayerId;
@@ -416,7 +416,7 @@ else
         showRegenerateConfirm = false;
     }
 
-    private void LoadFromHanchan(WeeklySession hanchan)
+    private void LoadFromHanchan(Hanchan hanchan)
     {
         currentHanchan = hanchan;
         hanchanStartTime = hanchan.StartTime;
@@ -428,7 +428,7 @@ else
         showRegenerateConfirm = false;
     }
 
-    private void SelectHanchan(WeeklySession hanchan)
+    private void SelectHanchan(Hanchan hanchan)
     {
         LoadFromHanchan(hanchan);
     }
@@ -476,7 +476,7 @@ else
         }
     }
 
-    private string GetSessionLabel(WeeklySession session)
+    private string GetSessionLabel(Hanchan session)
     {
         var ordered = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
         var index = ordered.IndexOf(session) + 1;
@@ -871,7 +871,7 @@ else
     {
         if (IsLockedPastSession) return;
 
-        var hanchan = new WeeklySession
+        var hanchan = new Hanchan
         {
             Date = sessionDate,
             StartTime = hanchanStartTime,

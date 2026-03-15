@@ -12,18 +12,18 @@ public class SessionService
         _storage = storage;
     }
 
-    public async Task<List<WeeklySession>> GetAllAsync()
+    public async Task<List<Hanchan>> GetAllAsync()
     {
-        return await _storage.GetAsync<List<WeeklySession>>(StorageKey) ?? new List<WeeklySession>();
+        return await _storage.GetAsync<List<Hanchan>>(StorageKey) ?? new List<Hanchan>();
     }
 
-    public async Task<WeeklySession?> GetByIdAsync(Guid id)
+    public async Task<Hanchan?> GetByIdAsync(Guid id)
     {
         var sessions = await GetAllAsync();
         return sessions.FirstOrDefault(s => s.Id == id);
     }
 
-    public async Task SaveAsync(WeeklySession session)
+    public async Task SaveAsync(Hanchan session)
     {
         var sessions = await GetAllAsync();
         var index = sessions.FindIndex(s => s.Id == session.Id);

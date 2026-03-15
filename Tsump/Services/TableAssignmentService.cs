@@ -27,8 +27,8 @@ public class TableAssignmentService
         (int fourPlayerTables, int threePlayerTables) tableNumbers = CalculateNumberofFourAndThreePLayerTables(playerCount);
         var threePlayerTables=tableNumbers.threePlayerTables;
 
-        List <WeeklySession> allHistory = await _sessionService.GetAllAsync();
-        List<WeeklySession> history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
+        List <Hanchan> allHistory = await _sessionService.GetAllAsync();
+        List<Hanchan> history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
         List<Member> members = await _memberService.GetAllAsync();
         Dictionary<Guid, int> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
         Dictionary<Guid, int> attendance = CountAttendance(history, presentPlayerIds);
@@ -311,7 +311,7 @@ public class TableAssignmentService
     /// if they were at a 3-player table. Returns the set of players who were.
     /// </summary>
     private static HashSet<Guid> FindPlayersAtThreeTableLastSession(
-        List<WeeklySession> history, List<Guid> presentPlayerIds)
+        List<Hanchan> history, List<Guid> presentPlayerIds)
     {
         var result = new HashSet<Guid>();
         var sessionsDescending = history
@@ -344,7 +344,7 @@ public class TableAssignmentService
     }
 
     private static Dictionary<Guid, int> CountAttendance(
-        List<WeeklySession> history, List<Guid> relevantPlayerIds)
+        List<Hanchan> history, List<Guid> relevantPlayerIds)
     {
         var counts = new Dictionary<Guid, int>();
         foreach (var id in relevantPlayerIds)
@@ -363,7 +363,7 @@ public class TableAssignmentService
     }
 
     private static Dictionary<Guid, int> CountThreePlayerAssignments(
-        List<WeeklySession> history, List<Guid> relevantPlayerIds,
+        List<Hanchan> history, List<Guid> relevantPlayerIds,
         Dictionary<Guid, int>? extraCounts = null)
     {
         var counts = new Dictionary<Guid, int>();
@@ -389,7 +389,7 @@ public class TableAssignmentService
     }
 
     private static Dictionary<string, int> BuildMeetingMatrix(
-        List<WeeklySession> history, List<Guid> relevantPlayerIds)
+        List<Hanchan> history, List<Guid> relevantPlayerIds)
     {
         var matrix = new Dictionary<string, int>();
         var relevantSet = new HashSet<Guid>(relevantPlayerIds);

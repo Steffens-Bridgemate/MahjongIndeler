@@ -173,7 +173,7 @@ else
         }
     }
 
-    private void BuildMatrix(List<WeeklySession> sessions)
+    private void BuildMatrix(List<Hanchan> sessions)
     {
         var attendedIds = new HashSet<Guid>(
             sessions.SelectMany(s => s.PresentMemberIds));
