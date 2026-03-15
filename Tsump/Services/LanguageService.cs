@@ -63,7 +63,7 @@ public class LanguageService
         // Home page
         ["WelcomeTo"] = "Welkom bij Tsumo!",
         ["ManageMembers"] = "Leden beheren",
-        ["MembersDesc"] = "Leden toevoegen, bewerken en beheren.",
+        ["MembersDesc"] = "Leden toevoegen en bewerken",
         ["StartSession"] = "Zitting aanmaken",
         ["WeeklySessionDesc"] = "Aanwezigheid bijhouden en tafels indelen.",
         ["ViewHistory"] = "Geschiedenis bekijken",
@@ -115,7 +115,7 @@ public class LanguageService
         ["DeleteHanchan"] = "Hanchan Verwijderen",
         ["DeleteHanchanConfirm"] = "Weet je zeker dat je deze hanchan wilt verwijderen?",
         ["YesDelete"] = "Ja, verwijderen",
-        ["ConfirmDeletion"] = "Bevestig verwijdering",
+        ["ConfirmDeletion"] = "Bevestig verwijderen",
         ["Attendance"] = "Aanwezigheid",
         ["present"] = "aanwezig",
         ["of"] = "van",
