@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
     <link href="Tsump.styles.css" rel="stylesheet" />
     <script type="importmap"></script>
 </head>
@@ -67,6 +69,7 @@
         };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+    <script>navigator.serviceWorker.register('service-worker.js');</script>
 </body>
 
 </html>

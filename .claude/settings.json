@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where magick:*)",
+      "Bash(where convert:*)"
+    ]
+  }
+}
