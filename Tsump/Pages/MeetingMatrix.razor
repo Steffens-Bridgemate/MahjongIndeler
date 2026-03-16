@@ -59,25 +59,23 @@ else
     </div>
 
     <div class="mt-3">
-        <h5>@Lang.Get("Legend")</h5>
-        <span class="badge bg-light text-dark border me-2">@Lang.Get("NeverMet")</span>
-        <span class="badge matrix-low me-2">@Lang.Get("Meetings1_2")</span>
-        <span class="badge matrix-mid me-2">@Lang.Get("Meetings3_5")</span>
-        <span class="badge matrix-high me-2">@Lang.Get("Meetings6Plus")</span>
-    </div>
-
-    <div class="mt-3">
-        <h5>@Lang.Get("Summary")</h5>
-        <ul>
-            <li>@Lang.Get("TotalPairs"): @totalPairs</li>
-            <li>@Lang.Get("PairsMet"): @metPairs</li>
-            <li>@Lang.Get("PairsNeverMet"): @(totalPairs - metPairs)</li>
-            @if (metPairs > 0)
-            {
-                <li>@Lang.Get("AvgMeetings"): @avgMeetings.ToString("F1")</li>
-                <li>@Lang.Get("MinMeetings"): @minMeetings / @Lang.Get("MaxMeetings"): @maxMeetings</li>
-            }
-        </ul>
+        <table class="table table-bordered table-sm" style="width:auto;">
+            <thead>
+                <tr>
+                    <th class="text-center">@Lang.Get("Meetings")</th>
+                    <th class="text-center">@Lang.Get("Pairs")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in meetingDistribution)
+                {
+                    <tr>
+                        <td class="text-center @GetCellClass(entry.Key)">@entry.Key</td>
+                        <td class="text-center">@entry.Value</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 }
 
@@ -153,11 +151,7 @@ else
     private List<Member>? members;
     private List<Member> activePlayers = new();
     private Dictionary<string, int> matrix = new();
-    private int totalPairs;
-    private int metPairs;
-    private double avgMeetings;
-    private int minMeetings;
-    private int maxMeetings;
+    private List<KeyValuePair<int, int>> meetingDistribution = new();
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -200,17 +194,21 @@ else
             }
         }
 
+        // Build distribution: count pairs per number of meetings
         var n = activePlayers.Count;
-        totalPairs = n * (n - 1) / 2;
-        metPairs = matrix.Count(kv => kv.Value > 0);
+        var totalPairs = n * (n - 1) / 2;
+        var metPairs = matrix.Count(kv => kv.Value > 0);
+        var zeroPairs = totalPairs - metPairs;
 
-        if (metPairs > 0)
+        var dist = new Dictionary<int, int>();
+        if (zeroPairs > 0)
+            dist[0] = zeroPairs;
+        foreach (var kv in matrix)
         {
-            var values = matrix.Values.Where(v => v > 0).ToList();
-            avgMeetings = values.Average();
-            minMeetings = values.Min();
-            maxMeetings = values.Max();
+            if (kv.Value > 0)
+                dist[kv.Value] = dist.GetValueOrDefault(kv.Value) + 1;
         }
+        meetingDistribution = dist.OrderBy(kv => kv.Key).ToList();
     }
 
     private static string MakeKey(Guid a, Guid b)

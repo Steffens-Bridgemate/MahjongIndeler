@@ -239,7 +239,7 @@ else
                                             {
                                                 var key = TableAssignmentService.MakeKey(row.Id, col.Id);
                                                 var count = tournamentMatrix.GetValueOrDefault(key, 0);
-                                                <td class="text-center @GetCellClass(count)">@count</td>
+                                                <td class="text-center @GetMatrixCellClass(count)">@count</td>
                                             }
                                         }
                                     </tr>
@@ -249,25 +249,23 @@ else
                     </div>
 
                     <div class="mt-3">
-                        <h5>@Lang.Get("Legend")</h5>
-                        <span class="badge bg-light text-dark border me-2">@Lang.Get("NeverMet")</span>
-                        <span class="badge matrix-low me-2">@Lang.Get("Meetings1_2")</span>
-                        <span class="badge matrix-mid me-2">@Lang.Get("Meetings3_5")</span>
-                        <span class="badge matrix-high me-2">@Lang.Get("Meetings6Plus")</span>
-                    </div>
-
-                    <div class="mt-3">
-                        <h5>@Lang.Get("Summary")</h5>
-                        <ul>
-                            <li>@Lang.Get("TotalPairs"): @matrixTotalPairs</li>
-                            <li>@Lang.Get("PairsMet"): @matrixMetPairs</li>
-                            <li>@Lang.Get("PairsNeverMet"): @(matrixTotalPairs - matrixMetPairs)</li>
-                            @if (matrixMetPairs > 0)
-                            {
-                                <li>@Lang.Get("AvgMeetings"): @matrixAvg.ToString("F1")</li>
-                                <li>@Lang.Get("MinMeetings"): @matrixMin / @Lang.Get("MaxMeetings"): @matrixMax</li>
-                            }
-                        </ul>
+                        <table class="table table-bordered table-sm" style="width:auto;">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">@Lang.Get("Meetings")</th>
+                                    <th class="text-center">@Lang.Get("Pairs")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in matrixDistribution)
+                                {
+                                    <tr>
+                                        <td class="text-center @GetMatrixCellClass(entry.Key)">@entry.Key</td>
+                                        <td class="text-center">@entry.Value</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             }
@@ -313,11 +311,7 @@ else
     // Meeting matrix data
     private List<TournamentParticipant> sortedParticipants = new();
     private Dictionary<string, int> tournamentMatrix = new();
-    private int matrixTotalPairs;
-    private int matrixMetPairs;
-    private double matrixAvg;
-    private int matrixMin;
-    private int matrixMax;
+    private List<KeyValuePair<int, int>> matrixDistribution = new();
 
     private List<Guid> selectedPlayerIds = new();
     private int? selectedSessionNumber;
@@ -662,20 +656,24 @@ else
             }
         }
 
+        // Build distribution
         var n = sortedParticipants.Count;
-        matrixTotalPairs = n * (n - 1) / 2;
-        matrixMetPairs = tournamentMatrix.Count(kv => kv.Value > 0);
+        var totalPairs = n * (n - 1) / 2;
+        var metPairs = tournamentMatrix.Count(kv => kv.Value > 0);
+        var zeroPairs = totalPairs - metPairs;
 
-        if (matrixMetPairs > 0)
+        var dist = new Dictionary<int, int>();
+        if (zeroPairs > 0)
+            dist[0] = zeroPairs;
+        foreach (var kv in tournamentMatrix)
         {
-            var values = tournamentMatrix.Values.Where(v => v > 0).ToList();
-            matrixAvg = values.Average();
-            matrixMin = values.Min();
-            matrixMax = values.Max();
+            if (kv.Value > 0)
+                dist[kv.Value] = dist.GetValueOrDefault(kv.Value) + 1;
         }
+        matrixDistribution = dist.OrderBy(kv => kv.Key).ToList();
     }
 
-    private static string GetCellClass(int count) => count switch
+    private static string GetMatrixCellClass(int count) => count switch
     {
         0 => "cell-zero",
         <= 2 => "cell-low",
