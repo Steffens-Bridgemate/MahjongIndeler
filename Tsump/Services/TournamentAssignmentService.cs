@@ -178,6 +178,45 @@ public class TournamentAssignmentService
 
         if (allPlayerIds.Count == 0) return;
 
+        // Build meeting count matrix: how often each pair of players sits at the same table
+        var meetingCounts = new Dictionary<(Guid, Guid), int>();
+        foreach (var session in sessions)
+            foreach (var table in session.Tables)
+                for (int i = 0; i < table.PlayerIds.Count; i++)
+                    for (int j = i + 1; j < table.PlayerIds.Count; j++)
+                    {
+                        var key = table.PlayerIds[i].CompareTo(table.PlayerIds[j]) < 0
+                            ? (table.PlayerIds[i], table.PlayerIds[j])
+                            : (table.PlayerIds[j], table.PlayerIds[i]);
+                        meetingCounts[key] = meetingCounts.GetValueOrDefault(key) + 1;
+                    }
+
+        int GetMeetings(Guid a, Guid b)
+        {
+            var key = a.CompareTo(b) < 0 ? (a, b) : (b, a);
+            return meetingCounts.GetValueOrDefault(key);
+        }
+
+        // Count how many meetings a player would have with the other players at a table
+        int TableMeetings(Guid player, TableAssignment table)
+        {
+            int count = 0;
+            foreach (var id in table.PlayerIds)
+                if (id != player)
+                    count += GetMeetings(player, id);
+            return count;
+        }
+
+        void UpdateMeetings(Guid player, List<Guid> tablemates, int delta)
+        {
+            foreach (var id in tablemates)
+            {
+                if (id == player) continue;
+                var key = player.CompareTo(id) < 0 ? (player, id) : (id, player);
+                meetingCounts[key] = meetingCounts.GetValueOrDefault(key) + delta;
+            }
+        }
+
         for (int iteration = 0; iteration < 1000; iteration++)
         {
             // Count 3-player table assignments per player
@@ -197,46 +236,67 @@ public class TournamentAssignmentService
             if (maxCount - minCount <= 1)
                 break;
 
-            // Find an over-assigned player and an under-assigned player
+            // Find an over-assigned player
             var overPlayer = threePlayerCount
                 .Where(kv => kv.Value == maxCount)
                 .Select(kv => kv.Key)
                 .First();
-            var underPlayer = threePlayerCount
+
+            // Find all possible swaps: underPlayers at a 4-player table
+            // in a session where overPlayer is at a 3-player table
+            var candidates = new List<(Guid underPlayer, TournamentSession session,
+                TableAssignment threeTable, TableAssignment fourTable, int meetingScore)>();
+
+            var underPlayerIds = threePlayerCount
                 .Where(kv => kv.Value == minCount)
                 .Select(kv => kv.Key)
-                .First();
+                .ToHashSet();
 
-            // Find a session where overPlayer is at a 3-player table
-            // and underPlayer is at a 4-player table, then swap them
-            var swapped = false;
             foreach (var session in sessions)
             {
                 TableAssignment? threeTable = null;
-                TableAssignment? fourTable = null;
+                foreach (var table in session.Tables)
+                    if (table.PlayerCount == 3 && table.PlayerIds.Contains(overPlayer))
+                    { threeTable = table; break; }
+
+                if (threeTable == null) continue;
 
                 foreach (var table in session.Tables)
                 {
-                    if (table.PlayerCount == 3 && table.PlayerIds.Contains(overPlayer))
-                        threeTable = table;
-                    if (table.PlayerCount == 4 && table.PlayerIds.Contains(underPlayer))
-                        fourTable = table;
-                }
+                    if (table.PlayerCount != 4) continue;
+                    foreach (var candidate in table.PlayerIds)
+                    {
+                        if (!underPlayerIds.Contains(candidate)) continue;
 
-                if (threeTable != null && fourTable != null)
-                {
-                    // Swap: move overPlayer to 4-player table, underPlayer to 3-player table
-                    var overIdx = threeTable.PlayerIds.IndexOf(overPlayer);
-                    var underIdx = fourTable.PlayerIds.IndexOf(underPlayer);
-                    threeTable.PlayerIds[overIdx] = underPlayer;
-                    fourTable.PlayerIds[underIdx] = overPlayer;
-                    swapped = true;
-                    break;
+                        // Score: fewer meetings with new tablemates is better
+                        // underPlayer moves to 3-player table, overPlayer moves to 4-player table
+                        var score = TableMeetings(candidate, threeTable)
+                                  + TableMeetings(overPlayer, table);
+
+                        candidates.Add((candidate, session, threeTable, table, score));
+                    }
                 }
             }
 
-            if (!swapped)
+            if (candidates.Count == 0)
                 break;
+
+            // Pick the swap that minimizes meetings between swapped players and their new tablemates
+            var best = candidates.OrderBy(c => c.meetingScore).First();
+
+            // Update meeting counts: remove old pairings, add new ones
+            UpdateMeetings(overPlayer, best.threeTable.PlayerIds, -1);
+            UpdateMeetings(best.underPlayer, best.fourTable.PlayerIds, -1);
+
+            // Perform the swap
+            var overIdx = best.threeTable.PlayerIds.IndexOf(overPlayer);
+            var underIdx = best.fourTable.PlayerIds.IndexOf(best.underPlayer);
+            best.threeTable.PlayerIds[overIdx] = best.underPlayer;
+            best.fourTable.PlayerIds[underIdx] = overPlayer;
+
+            // Add new pairings
+            UpdateMeetings(best.underPlayer, best.threeTable.PlayerIds, 1);
+            UpdateMeetings(overPlayer, best.fourTable.PlayerIds, 1);
         }
     }
 
