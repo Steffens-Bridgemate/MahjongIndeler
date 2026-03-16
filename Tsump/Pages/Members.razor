@@ -2,6 +2,7 @@
 @using Tsump.Models
 @using Tsump.Services
 @inject MemberService MemberService
+@inject SessionService SessionService
 @inject LanguageService Lang
 @implements IDisposable
 
@@ -66,11 +67,13 @@ else
                 <th>@Lang.Get("Email")</th>
                 <th>@Lang.Get("Phone")</th>
                 <th>@Lang.Get("Joined")</th>
-                <th class="text-center">@Lang.Get("Active")</th>
+                <th class="text-center" style="cursor:pointer;" @onclick="() => activeSortDescending = !activeSortDescending">
+                    @Lang.Get("Active") <span>@(activeSortDescending ? "\u25BC" : "\u25B2")</span>
+                </th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var member in members.OrderBy(m => m.Name))
+            @foreach (var member in (activeSortDescending ? members.OrderByDescending(m => m.IsActive) : members.OrderBy(m => m.IsActive)).ThenBy(m => m.Name))
             {
                 <tr>
                     <td>
@@ -84,7 +87,7 @@ else
                     <td>@member.Name</td>
                     <td>@member.Email</td>
                     <td>@member.Phone</td>
-                    <td>@member.JoinedDate.ToShortDateString()</td>
+                    <td>@FormatDate(member.JoinedDate)</td>
                     <td class="text-center">
                         @if (member.IsActive)
                         {
@@ -118,6 +121,7 @@ else
     private bool isEditing;
     private bool userLoweredFirst;
     private Guid? deleteConfirmId;
+    private bool activeSortDescending = true;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -205,7 +209,25 @@ else
     {
         if (deleteConfirmId == id)
         {
-            await MemberService.DeleteAsync(id);
+            // Check if member participates in any past sessions
+            var allSessions = await SessionService.GetAllAsync();
+            var hasHistory = allSessions.Any(s => s.PresentMemberIds.Contains(id));
+
+            if (hasHistory)
+            {
+                // Deactivate instead of deleting
+                var member = members!.FirstOrDefault(m => m.Id == id);
+                if (member != null)
+                {
+                    member.IsActive = false;
+                    await MemberService.UpdateAsync(member);
+                }
+            }
+            else
+            {
+                await MemberService.DeleteAsync(id);
+            }
+
             members = await MemberService.GetAllAsync();
             deleteConfirmId = null;
         }
@@ -213,5 +235,17 @@ else
         {
             deleteConfirmId = id;
         }
+    }
+
+    private static readonly string[] DutchMonths = { "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec" };
+    private static readonly string[] EnglishMonths = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    private string FormatDate(DateTime date)
+    {
+        var month = Lang.IsDutch ? DutchMonths[date.Month - 1] : EnglishMonths[date.Month - 1];
+        var yy = date.ToString("yy");
+        return Lang.IsDutch
+            ? $"{date.Day:D2}-{month}-{yy}"
+            : $"{month} {date.Day:D2}, {yy}";
     }
 }

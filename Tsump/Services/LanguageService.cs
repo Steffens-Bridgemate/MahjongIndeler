@@ -141,7 +141,7 @@ public class LanguageService
         // History page
         ["SessionHistory"] = "Geschiedenis",
         ["NoSessionsYet"] = "Nog geen zittingen vastgelegd.",
-        ["CreateFirstSession"] = "Maak je zitting hanchan",
+        ["CreateFirstSession"] = "Maak je eerste zitting",
         ["PresentPlayers"] = "Aanwezige spelers",
         ["AbsentPlayers"] = "Afwezige spelers",
         ["DeleteSession"] = "Zitting verwijderen",
