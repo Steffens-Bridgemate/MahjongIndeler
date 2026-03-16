@@ -143,22 +143,16 @@ public class TournamentAssignmentService
                 });
             }
 
-            // Renumber: 3-player tables first, then 4-player
-            var reordered = tables
-                .OrderBy(t => t.PlayerCount == 3 ? 0 : 1)
-                .ThenBy(t => t.TableNumber)
-                .ToList();
-            for (int i = 0; i < reordered.Count; i++)
-                reordered[i].TableNumber = i + 1;
-
             sessions.Add(new TournamentSession
             {
                 SessionNumber = sessionNr,
-                Tables = reordered
+                Tables = tables
             });
         }
 
         BalanceThreePlayerDistribution(sessions);
+        ReduceDuplicateMeetings(sessions);
+        ApplyUniversalStartPositions(sessions, sortedParticipants);
 
         return sessions;
     }
@@ -297,6 +291,213 @@ public class TournamentAssignmentService
             // Add new pairings
             UpdateMeetings(best.underPlayer, best.threeTable.PlayerIds, 1);
             UpdateMeetings(overPlayer, best.fourTable.PlayerIds, 1);
+        }
+    }
+
+    /// <summary>
+    /// Renumber participants and tables using "universal start positions":
+    /// - Session 1 tables are ordered: 4-player tables first, then 3-player tables
+    /// - Participants are renumbered sequentially by table order in session 1:
+    ///   table 1 gets 1-4, table 2 gets 5-8, etc.
+    /// - 3-player tables get the highest table numbers and participant numbers.
+    /// - All sessions use the same table numbering; players are sorted by number within each table.
+    /// </summary>
+    private static void ApplyUniversalStartPositions(
+        List<TournamentSession> sessions, List<TournamentParticipant> participants)
+    {
+        if (sessions.Count == 0) return;
+
+        // Order session 1 tables: 4-player first, then 3-player
+        var session1 = sessions.First();
+        var ordered = session1.Tables
+            .OrderBy(t => t.PlayerCount == 3 ? 1 : 0)
+            .ToList();
+
+        // Renumber tables
+        for (int i = 0; i < ordered.Count; i++)
+            ordered[i].TableNumber = i + 1;
+        session1.Tables = ordered;
+
+        // Assign new participant numbers sequentially by table order
+        var newNumberById = new Dictionary<Guid, int>();
+        int num = 1;
+        foreach (var table in session1.Tables)
+        {
+            foreach (var playerId in table.PlayerIds)
+            {
+                newNumberById[playerId] = num++;
+            }
+        }
+
+        // Apply new numbers to the participant objects
+        foreach (var p in participants)
+        {
+            if (newNumberById.TryGetValue(p.Id, out var newNum))
+                p.Number = newNum;
+        }
+
+        // Sort players within each table by new number, in all sessions
+        foreach (var session in sessions)
+        {
+            foreach (var table in session.Tables)
+                table.PlayerIds = table.PlayerIds
+                    .OrderBy(id => newNumberById.GetValueOrDefault(id, int.MaxValue))
+                    .ToList();
+        }
+
+        // Renumber tables in sessions 2+ : 4-player first, then 3-player,
+        // within each group sorted by lowest participant number
+        for (int s = 1; s < sessions.Count; s++)
+        {
+            var session = sessions[s];
+            var reordered = session.Tables
+                .OrderBy(t => t.PlayerCount == 3 ? 1 : 0)
+                .ThenBy(t => t.PlayerIds.Select(id => newNumberById.GetValueOrDefault(id, int.MaxValue)).Min())
+                .ToList();
+            for (int i = 0; i < reordered.Count; i++)
+                reordered[i].TableNumber = i + 1;
+            session.Tables = reordered;
+        }
+    }
+
+    /// <summary>
+    /// Post-processing: reduce duplicate meetings by swapping players between tables
+    /// within the same session. Only swaps players on tables of the same size to
+    /// preserve the 3-player distribution balance.
+    /// </summary>
+    private static void ReduceDuplicateMeetings(List<TournamentSession> sessions)
+    {
+        // Build meeting count matrix
+        var meetingCounts = new Dictionary<(Guid, Guid), int>();
+
+        (Guid, Guid) Key(Guid a, Guid b) =>
+            a.CompareTo(b) < 0 ? (a, b) : (b, a);
+
+        foreach (var session in sessions)
+            foreach (var table in session.Tables)
+                for (int i = 0; i < table.PlayerIds.Count; i++)
+                    for (int j = i + 1; j < table.PlayerIds.Count; j++)
+                    {
+                        var key = Key(table.PlayerIds[i], table.PlayerIds[j]);
+                        meetingCounts[key] = meetingCounts.GetValueOrDefault(key) + 1;
+                    }
+
+        int GetMeetings(Guid a, Guid b)
+        {
+            return meetingCounts.GetValueOrDefault(Key(a, b));
+        }
+
+        void RemovePairings(Guid player, List<Guid> tablemates)
+        {
+            foreach (var id in tablemates)
+                if (id != player)
+                {
+                    var key = Key(player, id);
+                    meetingCounts[key] = meetingCounts.GetValueOrDefault(key) - 1;
+                }
+        }
+
+        void AddPairings(Guid player, List<Guid> tablemates)
+        {
+            foreach (var id in tablemates)
+                if (id != player)
+                {
+                    var key = Key(player, id);
+                    meetingCounts[key] = meetingCounts.GetValueOrDefault(key) + 1;
+                }
+        }
+
+        // Score = sum of all pairwise meetings that exceed 1 (i.e. duplicate meetings)
+        int GlobalDuplicateScore()
+        {
+            int score = 0;
+            foreach (var kv in meetingCounts)
+                if (kv.Value > 1)
+                    score += kv.Value - 1;
+            return score;
+        }
+
+        // Try to improve by swapping players between same-size tables within a session
+        for (int iteration = 0; iteration < 2000; iteration++)
+        {
+            if (GlobalDuplicateScore() == 0)
+                break;
+
+            bool improved = false;
+
+            foreach (var session in sessions)
+            {
+                for (int t1 = 0; t1 < session.Tables.Count && !improved; t1++)
+                {
+                    var table1 = session.Tables[t1];
+                    for (int t2 = t1 + 1; t2 < session.Tables.Count && !improved; t2++)
+                    {
+                        var table2 = session.Tables[t2];
+
+                        // Only swap between tables of the same size to preserve 3-player balance
+                        if (table1.PlayerCount != table2.PlayerCount) continue;
+
+                        // Try all player pairs between the two tables
+                        for (int p1 = 0; p1 < table1.PlayerIds.Count && !improved; p1++)
+                        {
+                            for (int p2 = 0; p2 < table2.PlayerIds.Count && !improved; p2++)
+                            {
+                                var player1 = table1.PlayerIds[p1];
+                                var player2 = table2.PlayerIds[p2];
+
+                                // Calculate current duplicate cost for these two players at their tables
+                                int currentCost = 0;
+                                foreach (var id in table1.PlayerIds)
+                                    if (id != player1 && GetMeetings(player1, id) > 1)
+                                        currentCost += GetMeetings(player1, id) - 1;
+                                foreach (var id in table2.PlayerIds)
+                                    if (id != player2 && GetMeetings(player2, id) > 1)
+                                        currentCost += GetMeetings(player2, id) - 1;
+
+                                // Simulate swap: player1 goes to table2, player2 goes to table1
+                                // Calculate new cost
+                                RemovePairings(player1, table1.PlayerIds);
+                                RemovePairings(player2, table2.PlayerIds);
+
+                                table1.PlayerIds[p1] = player2;
+                                table2.PlayerIds[p2] = player1;
+
+                                AddPairings(player2, table1.PlayerIds);
+                                AddPairings(player1, table2.PlayerIds);
+
+                                int newCost = 0;
+                                foreach (var id in table1.PlayerIds)
+                                    if (id != player2 && GetMeetings(player2, id) > 1)
+                                        newCost += GetMeetings(player2, id) - 1;
+                                foreach (var id in table2.PlayerIds)
+                                    if (id != player1 && GetMeetings(player1, id) > 1)
+                                        newCost += GetMeetings(player1, id) - 1;
+
+                                if (newCost < currentCost)
+                                {
+                                    // Keep the swap
+                                    improved = true;
+                                }
+                                else
+                                {
+                                    // Revert the swap
+                                    RemovePairings(player2, table1.PlayerIds);
+                                    RemovePairings(player1, table2.PlayerIds);
+
+                                    table1.PlayerIds[p1] = player1;
+                                    table2.PlayerIds[p2] = player2;
+
+                                    AddPairings(player1, table1.PlayerIds);
+                                    AddPairings(player2, table2.PlayerIds);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!improved)
+                break;
         }
     }
 
