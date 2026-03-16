@@ -167,6 +167,8 @@ else
         if (firstRender)
         {
             tournament = await TournamentService.GetByIdAsync(Id);
+            if (tournament != null && tournament.Participants.Count >= 13)
+                generatePlayerCount = tournament.Participants.Count;
             StateHasChanged();
         }
     }
