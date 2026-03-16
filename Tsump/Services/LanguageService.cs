@@ -56,7 +56,7 @@ public class LanguageService
         ["Members"] = "Leden",
         ["WeeklySession"] = "Zitting",
         ["History"] = "Geschiedenis",
-        ["MeetingMatrix"] = "Ontmoetingsmatrix",
+        ["MeetingMatrix"] = "Ontmoetingen",
         ["ClubManager"] = "Clubbeheer",
         ["MahjongclubTsumo"] = "Mahjongclub Tsumo!",
 
@@ -66,9 +66,9 @@ public class LanguageService
         ["MembersDesc"] = "Leden toevoegen en bewerken",
         ["StartSession"] = "Zitting aanmaken",
         ["WeeklySessionDesc"] = "Aanwezigheid bijhouden en tafels indelen.",
-        ["ViewHistory"] = "Geschiedenis bekijken",
+        ["ViewHistory"] = "Geschiedenis",
         ["HistoryDesc"] = "Eerdere zittingen en spelerstatistieken bekijken.",
-        ["ViewMatrix"] = "Matrix bekijken",
+        ["ViewMatrix"] = "Ontmoetingen",
         ["MeetingMatrixDesc"] = "Bekijk hoe vaak spelers tegen elkaar gespeeld hebben.",
         ["WorkflowHomeDesc"] = "Volg het stappenplan om een zitting voor te bereiden en af te ronden.",
         ["StartWorkflow"] = "Start stappenplan",
@@ -154,7 +154,7 @@ public class LanguageService
         ["tables"] = "tafels",
 
         // Meeting Matrix page
-        ["MeetingMatrixTitle"] = "Ontmoetingsmatrix",
+        ["MeetingMatrixTitle"] = "Ontmoetingen",
         ["MeetingMatrixSubtitle"] = "Hoe vaak elk paar spelers aan dezelfde tafel heeft gezeten.",
         ["NoSessionData"] = "Nog geen zittingsgegevens.",
         ["Legend"] = "Legenda",
@@ -312,7 +312,7 @@ public class LanguageService
         ["Members"] = "Members",
         ["WeeklySession"] = "Session",
         ["History"] = "History",
-        ["MeetingMatrix"] = "Meeting Matrix",
+        ["MeetingMatrix"] = "Meetings",
         ["ClubManager"] = "Club Manager",
         ["MahjongclubTsumo"] = "Mahjongclub Tsumo",
 
@@ -322,9 +322,9 @@ public class LanguageService
         ["MembersDesc"] = "Add, edit, and manage club members.",
         ["StartSession"] = "Start Session",
         ["WeeklySessionDesc"] = "Track attendance and assign tables.",
-        ["ViewHistory"] = "View History",
+        ["ViewHistory"] = "History",
         ["HistoryDesc"] = "View past sessions and player statistics.",
-        ["ViewMatrix"] = "View Matrix",
+        ["ViewMatrix"] = "Meetings",
         ["MeetingMatrixDesc"] = "See how often each pair of players has met.",
         ["WorkflowHomeDesc"] = "Follow the step-by-step guide to prepare and finalize a session.",
         ["StartWorkflow"] = "Start workflow",
@@ -410,7 +410,7 @@ public class LanguageService
         ["tables"] = "tables",
 
         // Meeting Matrix page
-        ["MeetingMatrixTitle"] = "Meeting Matrix",
+        ["MeetingMatrixTitle"] = "Meetings",
         ["MeetingMatrixSubtitle"] = "How many times each pair of players has been at the same table.",
         ["NoSessionData"] = "No hanchan data yet.",
         ["Legend"] = "Legend",
