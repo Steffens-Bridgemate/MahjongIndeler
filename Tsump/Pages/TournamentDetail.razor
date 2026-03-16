@@ -64,8 +64,15 @@ else
     @* --- Sessions display --- *@
     @if (tournament.Sessions.Count > 0)
     {
+        <div class="card mt-3 mb-3">
+        <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => assignmentsExpanded = !assignmentsExpanded">
+            <h4 class="mb-0 flex-grow-1">@Lang.Get("TableAssignments")</h4>
+            <span class="ms-2">@(assignmentsExpanded ? "\u25B2" : "\u25BC")</span>
+        </div>
+        @if (assignmentsExpanded)
+        {
+        <div class="card-body">
         <div class="d-flex align-items-center mb-3 flex-wrap gap-1">
-            <h4 class="mb-0">@Lang.Get("TableAssignments")</h4>
             @if (showExportAll)
             {
                 <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyAllToClipboard">
@@ -157,34 +164,41 @@ else
                 }
             </div>
         }
+        </div>
+        }
+        </div>
 
         @* --- 3-player distribution --- *@
         <div class="card mt-4 mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">@Lang.Get("ThreePlayerDistribution")</h5>
+            <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => threePlayerExpanded = !threePlayerExpanded">
+                <h5 class="mb-0 flex-grow-1">@Lang.Get("ThreePlayerDistribution")</h5>
+                <span class="ms-2">@(threePlayerExpanded ? "\u25B2" : "\u25BC")</span>
             </div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>@Lang.Get("ParticipantNumber")</th>
-                            <th>@Lang.Get("ParticipantName")</th>
-                            <th>@Lang.Get("TimesAt3Table")</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
-                        {
-                            var count = CountThreePlayerTables(p.Id);
+            @if (threePlayerExpanded)
+            {
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
                             <tr>
-                                <td>@p.Number</td>
-                                <td>@p.Name</td>
-                                <td>@count</td>
+                                <th>@Lang.Get("ParticipantNumber")</th>
+                                <th>@Lang.Get("ParticipantName")</th>
+                                <th>@Lang.Get("TimesAt3Table")</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+                            {
+                                var count = CountThreePlayerTables(p.Id);
+                                <tr>
+                                    <td>@p.Number</td>
+                                    <td>@p.Name</td>
+                                    <td>@count</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </div>
 
         @* --- Meeting matrix --- *@
@@ -292,6 +306,8 @@ else
     private bool showExportAll;
     private int? exportSingleHanchan;
     private bool saved;
+    private bool assignmentsExpanded = true;
+    private bool threePlayerExpanded;
     private bool matrixExpanded;
 
     // Meeting matrix data
