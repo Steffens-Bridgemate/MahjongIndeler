@@ -214,6 +214,7 @@ else
             Number = nextNumber
         });
 
+        ResetAssignments();
         await TournamentService.SaveAsync(tournament);
         newParticipantName = string.Empty;
         userLoweredFirst = false;
@@ -234,6 +235,7 @@ else
         }
 
         editingNames = true;
+        ResetAssignments();
         await TournamentService.SaveAsync(tournament);
     }
 
@@ -304,6 +306,7 @@ else
             }
 
             tournament.Participants = participants;
+            ResetAssignments();
             await TournamentService.SaveAsync(tournament);
         }
         catch
@@ -359,6 +362,14 @@ else
         for (int i = 0; i < sorted.Count; i++)
             sorted[i].Number = i + 1;
 
+        ResetAssignments();
         await TournamentService.SaveAsync(tournament);
+    }
+
+    private void ResetAssignments()
+    {
+        if (tournament == null) return;
+        tournament.Sessions.Clear();
+        tournament.IsGenerated = false;
     }
 }
