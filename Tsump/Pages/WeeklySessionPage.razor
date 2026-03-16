@@ -129,6 +129,14 @@ else
         @if (attendanceExpanded)
         {
             <div class="card-body">
+                @if (showAttendanceWarning)
+                {
+                    <div class="alert alert-warning py-2 mb-2">
+                        @Lang.Get("ChangeAttendanceWarning")
+                        <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmAttendanceReset">@Lang.Get("YesContinue")</button>
+                        <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelAttendanceReset">@Lang.Get("Cancel")</button>
+                    </div>
+                }
                 @if (!IsLockedPastSession)
                 {
                     <div class="mb-2">
@@ -335,6 +343,8 @@ else
     private string searchText = string.Empty;
     private bool showRegenerateConfirm;
     private bool showDeleteConfirm;
+    private bool attendanceResetConfirmed;
+    private bool showAttendanceWarning;
     private bool excludeFromOptimization;
     private bool attendanceExpanded = true;
 
@@ -546,6 +556,25 @@ else
         saved = false;
     }
 
+    private void ConfirmAttendanceReset()
+    {
+        attendanceResetConfirmed = true;
+        showAttendanceWarning = false;
+        tables.Clear();
+        saved = false;
+        showRegenerateConfirm = false;
+    }
+
+    private async Task CancelAttendanceReset()
+    {
+        showAttendanceWarning = false;
+        // Reload to revert all attendance changes
+        if (currentHanchan != null)
+            LoadFromHanchan(currentHanchan);
+        else
+            await LoadSessionsForDate();
+    }
+
     private void ToggleAttendance(Guid memberId, bool isPresent)
     {
         if (IsLockedPastSession) return;
@@ -554,6 +583,13 @@ else
             presentIds.Add(memberId);
         else
             presentIds.Remove(memberId);
+
+        if (tables.Count > 0 && !attendanceResetConfirmed)
+        {
+            showAttendanceWarning = true;
+            return;
+        }
+
         tables.Clear();
         saved = false;
         showRegenerateConfirm = false;
@@ -564,6 +600,13 @@ else
         if (IsLockedPastSession) return;
 
         presentIds = new HashSet<Guid>(activeMembers.Select(m => m.Id));
+
+        if (tables.Count > 0 && !attendanceResetConfirmed)
+        {
+            showAttendanceWarning = true;
+            return;
+        }
+
         tables.Clear();
         saved = false;
         showRegenerateConfirm = false;
@@ -574,6 +617,13 @@ else
         if (IsLockedPastSession) return;
 
         presentIds.Clear();
+
+        if (tables.Count > 0 && !attendanceResetConfirmed)
+        {
+            showAttendanceWarning = true;
+            return;
+        }
+
         tables.Clear();
         saved = false;
         showRegenerateConfirm = false;
@@ -606,6 +656,7 @@ else
     private async Task DoGenerateTables()
     {
         tables = await TableAssignmentService.AssignTables(presentIds.ToList());
+        attendanceResetConfirmed = false;
         await SaveHanchan();
     }
 
