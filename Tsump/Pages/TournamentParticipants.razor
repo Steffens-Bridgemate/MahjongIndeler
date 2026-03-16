@@ -74,6 +74,15 @@ else
         }
     </div>
 
+    @if (showResetWarning)
+    {
+        <div class="alert alert-warning py-2 mb-2">
+            @Lang.Get("ChangeParticipantsWarning")
+            <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmReset">@Lang.Get("YesContinue")</button>
+            <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showResetWarning = false">@Lang.Get("Cancel")</button>
+        </div>
+    }
+
     @if (csvImportError != null)
     {
         <div class="alert alert-danger py-1 mb-2">@csvImportError</div>
@@ -156,6 +165,9 @@ else
     private bool editingNames;
     private string? csvImportError;
     private bool userLoweredFirst;
+    private bool resetConfirmed;
+    private bool showResetWarning;
+    private Func<Task>? pendingAction;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -204,6 +216,13 @@ else
         if (tournament == null || string.IsNullOrWhiteSpace(newParticipantName))
             return;
 
+        if (NeedsResetConfirmation())
+        {
+            pendingAction = AddParticipant;
+            showResetWarning = true;
+            return;
+        }
+
         var nextNumber = tournament.Participants.Count > 0
             ? tournament.Participants.Max(p => p.Number) + 1
             : 1;
@@ -223,6 +242,13 @@ else
     private async Task GeneratePlayers()
     {
         if (tournament == null || generatePlayerCount < 13) return;
+
+        if (NeedsResetConfirmation())
+        {
+            pendingAction = GeneratePlayers;
+            showResetWarning = true;
+            return;
+        }
 
         tournament.Participants.Clear();
         for (int i = 1; i <= generatePlayerCount; i++)
@@ -257,6 +283,12 @@ else
 
     private async Task TriggerCsvImport()
     {
+        if (NeedsResetConfirmation())
+        {
+            pendingAction = TriggerCsvImport;
+            showResetWarning = true;
+            return;
+        }
         csvImportError = null;
         await JS.InvokeVoidAsync("triggerFileInput", "csvImportInput");
     }
@@ -356,6 +388,13 @@ else
     {
         if (tournament == null) return;
 
+        if (NeedsResetConfirmation())
+        {
+            pendingAction = () => RemoveParticipant(participantId);
+            showResetWarning = true;
+            return;
+        }
+
         tournament.Participants.RemoveAll(p => p.Id == participantId);
 
         var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
@@ -366,10 +405,28 @@ else
         await TournamentService.SaveAsync(tournament);
     }
 
+    private bool NeedsResetConfirmation()
+    {
+        return tournament != null && tournament.IsGenerated && !resetConfirmed;
+    }
+
+    private void ConfirmReset()
+    {
+        resetConfirmed = true;
+        showResetWarning = false;
+        if (pendingAction != null)
+        {
+            var action = pendingAction;
+            pendingAction = null;
+            _ = action();
+        }
+    }
+
     private void ResetAssignments()
     {
         if (tournament == null) return;
         tournament.Sessions.Clear();
         tournament.IsGenerated = false;
+        resetConfirmed = false;
     }
 }
