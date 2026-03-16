@@ -22,5 +22,6 @@ public class TournamentParticipant
 public class TournamentSession
 {
     public int SessionNumber { get; set; }
+    public TimeSpan? StartTime { get; set; }
     public List<TableAssignment> Tables { get; set; } = new();
 }

@@ -3,6 +3,7 @@
 @using Tsump.Services
 @inject TournamentService TournamentService
 @inject TournamentAssignmentService AssignmentService
+@inject SettingsService SettingsService
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @inject NavigationManager Nav
@@ -114,8 +115,30 @@ else
         @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
         {
             var sn = session.SessionNumber;
+            var sess = session;
             <div class="d-flex align-items-center mt-4 mb-2 flex-wrap gap-1">
                 <h5 class="mb-0">@Lang.Get("Hanchan") @sn</h5>
+                <select class="form-select form-select-sm" style="max-width:65px;"
+                        value="@(sess.StartTime.HasValue ? sess.StartTime.Value.Hours : -1)"
+                        @onchange="e => OnSessionHourChanged(sess, e)">
+                    <option value="-1">--</option>
+                    @for (int h = 0; h < 24; h++)
+                    {
+                        var hh = h;
+                        <option value="@hh">@hh.ToString("D2")</option>
+                    }
+                </select>
+                <span>:</span>
+                <select class="form-select form-select-sm" style="max-width:65px;"
+                        value="@(sess.StartTime.HasValue ? sess.StartTime.Value.Minutes : -1)"
+                        @onchange="e => OnSessionMinuteChanged(sess, e)">
+                    <option value="-1">--</option>
+                    @for (int m = 0; m < 60; m += 5)
+                    {
+                        var mm = m;
+                        <option value="@mm">@mm.ToString("D2")</option>
+                    }
+                </select>
                 @if (exportSingleHanchan == sn)
                 {
                     <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="() => CopySingleHanchanToClipboard(sn)">
@@ -360,12 +383,53 @@ else
         tournament.Sessions = AssignmentService.GenerateAllSessions(
             tournament.Participants, tournament.SessionCount);
         tournament.IsGenerated = true;
+
+        // Assign default start times from settings
+        var settings = await SettingsService.GetAsync();
+        var defaultTimes = settings.TournamentStartTimes.OrderBy(t => t).ToList();
+        for (int i = 0; i < tournament.Sessions.Count; i++)
+        {
+            tournament.Sessions[i].StartTime = i < defaultTimes.Count
+                ? defaultTimes[i]
+                : null;
+        }
+
         BuildTournamentMatrix();
 
         await TournamentService.SaveAsync(tournament);
         saved = true;
         _ = ResetSavedFlag();
         StateHasChanged();
+    }
+
+    private async Task OnSessionHourChanged(TournamentSession session, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var h) && h >= 0)
+        {
+            var currentMinute = session.StartTime?.Minutes ?? 0;
+            session.StartTime = new TimeSpan(h, currentMinute, 0);
+        }
+        else
+        {
+            session.StartTime = null;
+        }
+        if (tournament != null)
+            await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task OnSessionMinuteChanged(TournamentSession session, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var m) && m >= 0)
+        {
+            var currentHour = session.StartTime?.Hours ?? 0;
+            session.StartTime = new TimeSpan(currentHour, m, 0);
+        }
+        else
+        {
+            session.StartTime = null;
+        }
+        if (tournament != null)
+            await TournamentService.SaveAsync(tournament);
     }
 
     private int CountThreePlayerTables(Guid participantId)

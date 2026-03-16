@@ -99,6 +99,46 @@
             </select>
         </div>
 
+        <h5 class="card-title mt-4">@Lang.Get("TournamentStartTimes")</h5>
+        <p class="text-muted">@Lang.Get("TournamentStartTimesDesc")</p>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            @foreach (var time in tournamentStartTimes.OrderBy(t => t))
+            {
+                var t = time;
+                <span class="badge bg-primary d-flex align-items-center" style="font-size: 0.95em;">
+                    @t.ToString(@"hh\:mm")
+                    <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6em;"
+                            @onclick="() => RemoveTournamentTime(t)"></button>
+                </span>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <select class="form-select" style="max-width: 75px;"
+                    value="@newTournamentHour"
+                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var h)) newTournamentHour = h; }">
+                <option value="-1">--</option>
+                @for (int h = 0; h < 24; h++)
+                {
+                    var hh = h;
+                    <option value="@hh">@hh.ToString("D2")</option>
+                }
+            </select>
+            <span>:</span>
+            <select class="form-select" style="max-width: 75px;"
+                    value="@newTournamentMinute"
+                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var m)) newTournamentMinute = m; }">
+                <option value="-1">--</option>
+                @for (int m = 0; m < 60; m += 5)
+                {
+                    var mm = m;
+                    <option value="@mm">@mm.ToString("D2")</option>
+                }
+            </select>
+            <button class="btn btn-sm btn-outline-primary" @onclick="AddTournamentTime">
+                + @Lang.Get("AddStartTime")
+            </button>
+        </div>
+
         @if (saved)
         {
             <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
@@ -115,6 +155,9 @@
     private Dictionary<DayOfWeek, int> newMinutes = new();
     private int defaultStartHour = 13;
     private int defaultStartMinute = 0;
+    private List<TimeSpan> tournamentStartTimes = new();
+    private int newTournamentHour = -1;
+    private int newTournamentMinute = -1;
     private bool saved;
 
     private static readonly DayOfWeek[] allDays = new[]
@@ -137,6 +180,7 @@
             }
             defaultStartHour = settings.DefaultStartTime.Hours;
             defaultStartMinute = settings.DefaultStartTime.Minutes;
+            tournamentStartTimes = new List<TimeSpan>(settings.TournamentStartTimes);
             StateHasChanged();
         }
     }
@@ -189,6 +233,23 @@
         saved = false;
     }
 
+    private void AddTournamentTime()
+    {
+        if (newTournamentHour < 0 || newTournamentMinute < 0) return;
+        var time = new TimeSpan(newTournamentHour, newTournamentMinute, 0);
+        if (!tournamentStartTimes.Contains(time))
+            tournamentStartTimes.Add(time);
+        newTournamentHour = -1;
+        newTournamentMinute = -1;
+        saved = false;
+    }
+
+    private void RemoveTournamentTime(TimeSpan time)
+    {
+        tournamentStartTimes.Remove(time);
+        saved = false;
+    }
+
     private async Task Save()
     {
         var settings = new ClubSettings
@@ -201,7 +262,8 @@
                     StartTimes = kv.Value.OrderBy(t => t).ToList()
                 })
                 .ToList(),
-            DefaultStartTime = new TimeSpan(defaultStartHour, defaultStartMinute, 0)
+            DefaultStartTime = new TimeSpan(defaultStartHour, defaultStartMinute, 0),
+            TournamentStartTimes = tournamentStartTimes.OrderBy(t => t).ToList()
         };
         await SettingsService.SaveAsync(settings);
         saved = true;

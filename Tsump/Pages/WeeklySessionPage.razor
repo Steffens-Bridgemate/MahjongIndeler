@@ -176,7 +176,7 @@ else
                     @Lang.Get("GenerateTableAssignments")
                 </button>
             }
-            <button class="btn btn-success" @onclick="SaveHanchan" disabled="@(tables.Count == 0)">
+            <button class="btn save-hanchan-btn @(saved ? "btn-outline-secondary" : "btn-success")" @onclick="SaveHanchan" disabled="@(tables.Count == 0)">
                 @Lang.Get("SaveHanchan")
             </button>
             @if (workflowStepIndex.HasValue)
@@ -314,12 +314,14 @@ else
         }
     }
 
-    @if (saved)
-    {
-        <div class="alert alert-success mt-3">@Lang.Get("SessionSaved")</div>
-    }
 
 }
+
+<style>
+    .save-hanchan-btn {
+        transition: background-color 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+    }
+</style>
 
 @code {
     private List<Member>? members;
@@ -414,7 +416,6 @@ else
             presentIds.Clear();
             tables.Clear();
         }
-        saved = false;
         showRegenerateConfirm = false;
     }
 
@@ -426,7 +427,7 @@ else
         tables = hanchan.Tables;
         excludeFromOptimization = hanchan.ExcludeFromOptimization;
         attendanceExpanded = !hanchan.IsFinalized;
-        saved = false;
+        saved = hanchan.Tables.Count > 0;
         showRegenerateConfirm = false;
     }
 
@@ -527,6 +528,7 @@ else
         {
             hanchanStartTime = defaultStartTime;
         }
+        saved = false;
     }
 
     private void OnMinuteChanged(ChangeEventArgs e)
@@ -541,6 +543,7 @@ else
         {
             hanchanStartTime = defaultStartTime;
         }
+        saved = false;
     }
 
     private void ToggleAttendance(Guid memberId, bool isPresent)
@@ -603,7 +606,7 @@ else
     private async Task DoGenerateTables()
     {
         tables = await TableAssignmentService.AssignTables(presentIds.ToList());
-        saved = false;
+        await SaveHanchan();
     }
 
     private void AppendTablesHtml(System.Text.StringBuilder html, System.Text.StringBuilder text, List<TableAssignment> tablesToRender)
