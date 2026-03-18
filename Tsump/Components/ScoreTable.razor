@@ -1,0 +1,304 @@
+@using Tsump.Models
+@using Tsump.Services
+@inject LanguageService Lang
+
+@{
+    var score = Table.Score;
+    if (score == null) return;
+    var sumDiff = score.PlayerScores.Sum(p => p.Difference);
+    var allEndPointsFilled = score.PlayerScores.All(p => p.EndPoints.HasValue);
+    var hasError = allEndPointsFilled && sumDiff != 0;
+}
+
+<div class="card mb-3 @(Table.PlayerCount == 3 ? "border-warning" : "border-success")">
+    <div class="card-header @(Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white") py-1">
+        @Lang.Get("Table") @Table.TableNumber (@Table.PlayerCount @Lang.Get("players"))
+    </div>
+    <div class="card-body p-2">
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th style="min-width:110px;"></th>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            <th class="text-center" style="min-width:90px;">
+                                @if (ps.IsVirtual)
+                                {
+                                    <em>@ps.VirtualName</em>
+                                }
+                                else
+                                {
+                                    @GetPlayerName(ps.PlayerId)
+                                }
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@Lang.Get("StartingPoints")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            var psRef = ps;
+                            <td class="text-center">
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       value="@FormatDisplay(psRef.StartingPoints)"
+                                       @onchange="e => OnStartingPointsChanged(psRef, e)"
+                                       style="width:100%;" />
+                            </td>
+                        }
+                    </tr>
+                    <tr>
+                        <td>@Lang.Get("EndPoints")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            var psRef = ps;
+                            <td class="text-center">
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
+                                       placeholder="—"
+                                       @onchange="e => OnEndPointsChanged(psRef, e)"
+                                       style="width:100%;" />
+                            </td>
+                        }
+                    </tr>
+                    <tr class="@(hasError ? "table-danger" : "")">
+                        <td>
+                            @Lang.Get("Difference")
+                            @if (hasError)
+                            {
+                                <br /><small class="text-danger">@(sumDiff < 0 ? Lang.Get("Deficit") : Lang.Get("Surplus")): @Math.Abs(sumDiff) @Lang.Get("Points")</small>
+                            }
+                        </td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            <td class="text-center fw-bold">
+                                @if (ps.IsVirtual)
+                                {
+                                    @* Mr. X: no computed values *@
+                                }
+                                else if (ps.EndPoints.HasValue)
+                                {
+                                    @FormatDisplaySigned(ps.Difference)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        }
+                    </tr>
+                    <tr>
+                        <td>@Lang.Get("Uma")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            <td class="text-center">
+                                @if (ps.IsVirtual)
+                                {
+                                    @* Mr. X: no Uma *@
+                                }
+                                else if (allEndPointsFilled && sumDiff == 0)
+                                {
+                                    @FormatDisplaySigned(ps.Uma)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        }
+                    </tr>
+                    <tr class="table-active fw-bold">
+                        <td>@Lang.Get("FinalScore")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            <td class="text-center">
+                                @if (ps.IsVirtual)
+                                {
+                                    @* Mr. X: no final score *@
+                                }
+                                else if (allEndPointsFilled && sumDiff == 0)
+                                {
+                                    @FormatDisplaySigned(ps.Total)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        }
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TableAssignment Table { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Func<Guid, string> PlayerNameResolver { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnScoresComplete { get; set; }
+
+    [Parameter]
+    public int DefaultStartingPoints { get; set; } = 30000;
+
+    [Parameter]
+    public List<int> Uma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };
+
+    [Parameter]
+    public List<int> Uma3Players { get; set; } = new() { 12500, 0, -12500 };
+
+    private string GetPlayerName(Guid id) => PlayerNameResolver(id);
+
+    // Display: internal int ÷ 100, one decimal
+    private static string FormatDisplay(int value)
+    {
+        return (value / 1000.0).ToString("0.0");
+    }
+
+    private static string FormatDisplaySigned(int value)
+    {
+        return (value / 1000.0).ToString("+0.0;-0.0;0.0");
+    }
+
+    // Parse: user enters decimal (e.g. "285.0"), store as int × 100
+    private static int? ParseInput(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+        // Accept both . and , as decimal separator
+        var normalized = input.Replace(',', '.');
+        if (decimal.TryParse(normalized, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return (int)Math.Round(d * 1000);
+        return null;
+    }
+
+    private async Task OnStartingPointsChanged(PlayerScore ps, ChangeEventArgs e)
+    {
+        ps.StartingPoints = ParseInput(e.Value?.ToString()) ?? DefaultStartingPoints;
+        CalculateUma();
+        await CheckAndNotifyComplete();
+    }
+
+    private async Task OnEndPointsChanged(PlayerScore ps, ChangeEventArgs e)
+    {
+        ps.EndPoints = ParseInput(e.Value?.ToString());
+        CalculateUma();
+        await CheckAndNotifyComplete();
+    }
+
+    private async Task CheckAndNotifyComplete()
+    {
+        var score = Table.Score;
+        if (score == null) return;
+
+        bool allFilled = score.PlayerScores.All(p => p.EndPoints.HasValue);
+        int sumDiff = score.PlayerScores.Sum(p => p.Difference);
+
+        if (allFilled && sumDiff == 0)
+        {
+            await OnScoresComplete.InvokeAsync();
+        }
+    }
+
+    private void CalculateUma()
+    {
+        var score = Table.Score;
+        if (score == null) return;
+
+        foreach (var ps in score.PlayerScores)
+            ps.Uma = 0;
+
+        // Only apply Uma when all end points are filled and sum is zero
+        if (!score.PlayerScores.All(p => p.EndPoints.HasValue))
+            return;
+        if (score.PlayerScores.Sum(p => p.Difference) != 0)
+            return;
+
+        var ranked = score.PlayerScores
+            .Where(p => !p.IsVirtual)
+            .OrderByDescending(p => p.Difference)
+            .ToList();
+
+        if (ranked.Count == 0) return;
+
+        int[] umaValues = Table.PlayerCount == 3
+            ? Uma3Players.ToArray()
+            : Uma4Players.ToArray();
+
+        // Group tied players and assign average Uma
+        int i = 0;
+        while (i < ranked.Count && i < umaValues.Length)
+        {
+            // Find all players tied with the same difference
+            int tieStart = i;
+            while (i + 1 < ranked.Count && ranked[i + 1].Difference == ranked[tieStart].Difference)
+                i++;
+            int tieEnd = i;
+
+            // Average the Uma values for the tied positions
+            int sum = 0;
+            int count = 0;
+            for (int j = tieStart; j <= tieEnd && j < umaValues.Length; j++)
+            {
+                sum += umaValues[j];
+                count++;
+            }
+            int avgUma = count > 0 ? sum / count : 0;
+
+            for (int j = tieStart; j <= tieEnd; j++)
+            {
+                ranked[j].Uma = avgUma;
+            }
+
+            i++;
+        }
+    }
+
+    public static void InitializeScores(List<TableAssignment> tables, Func<string, string> langGet, int startingPoints = 30000)
+    {
+        foreach (var table in tables)
+        {
+            if (table.Score == null)
+                table.Score = new TableScore();
+
+            var score = table.Score;
+            var existingIds = score.PlayerScores.Select(p => p.PlayerId).ToHashSet();
+
+            foreach (var pid in table.PlayerIds)
+            {
+                if (!existingIds.Contains(pid))
+                    score.PlayerScores.Add(new PlayerScore { PlayerId = pid, StartingPoints = startingPoints });
+            }
+
+            score.PlayerScores.RemoveAll(p => !p.IsVirtual && !table.PlayerIds.Contains(p.PlayerId));
+
+            if (table.PlayerCount == 3 && !score.PlayerScores.Any(p => p.IsVirtual))
+            {
+                score.PlayerScores.Add(new PlayerScore
+                {
+                    IsVirtual = true,
+                    VirtualName = langGet("MrX"),
+                    StartingPoints = startingPoints
+                });
+            }
+
+            if (table.PlayerCount >= 4)
+                score.PlayerScores.RemoveAll(p => p.IsVirtual);
+
+            var ordered = new List<PlayerScore>();
+            foreach (var pid in table.PlayerIds)
+            {
+                var ps = score.PlayerScores.FirstOrDefault(p => p.PlayerId == pid);
+                if (ps != null) ordered.Add(ps);
+            }
+            ordered.AddRange(score.PlayerScores.Where(p => p.IsVirtual));
+            score.PlayerScores = ordered;
+        }
+    }
+}

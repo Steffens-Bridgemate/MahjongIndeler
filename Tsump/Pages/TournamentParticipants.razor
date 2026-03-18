@@ -5,6 +5,7 @@
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject SettingsService SettingsService
 @implements IDisposable
 
 <PageTitle>@Lang.Get("TournamentParticipants") - Tsumo!</PageTitle>
@@ -154,6 +155,57 @@ else
             @Lang.Get("AddParticipant")
         </button>
     </div>
+
+    @* --- Scoring overrides --- *@
+    <div class="card mt-4">
+        <div class="card-header d-flex align-items-center" style="cursor:pointer;" @onclick="() => scoringExpanded = !scoringExpanded">
+            <h5 class="mb-0 flex-grow-1">@Lang.Get("ScoringOverrides")</h5>
+            <span class="ms-2">@(scoringExpanded ? "\u25B2" : "\u25BC")</span>
+        </div>
+        @if (scoringExpanded)
+        {
+            <div class="card-body">
+                <p class="text-muted">@Lang.Get("ScoringOverridesDesc")</p>
+                <div class="row mb-2">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">@Lang.Get("StartingPoints")</label>
+                        <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
+                               value="@FormatPoints(tournament.StartingPoints ?? clubTournamentStartingPoints)"
+                               @onchange="e => OnOverrideStartingPoints(e)" />
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">@Lang.Get("Uma4Players")</label>
+                        <div class="d-flex gap-1">
+                            @{ var u4 = tournament.Uma4Players ?? clubUma4Players; }
+                            @for (int idx = 0; idx < u4.Count; idx++)
+                            {
+                                var i = idx;
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                                       value="@FormatPointsSigned(u4[i])"
+                                       @onchange="e => OnOverrideUma4(i, e)" />
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">@Lang.Get("Uma3Players")</label>
+                        <div class="d-flex gap-1">
+                            @{ var u3 = tournament.Uma3Players ?? clubUma3Players; }
+                            @for (int idx = 0; idx < u3.Count; idx++)
+                            {
+                                var i = idx;
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                                       value="@FormatPointsSigned(u3[i])"
+                                       @onchange="e => OnOverrideUma3(i, e)" />
+                            }
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ResetScoringOverrides">@Lang.Get("UseDefaults")</button>
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -162,6 +214,10 @@ else
     private Tournament? tournament;
     private string newParticipantName = string.Empty;
     private int generatePlayerCount = 20;
+    private bool scoringExpanded;
+    private int clubTournamentStartingPoints = 30000;
+    private List<int> clubUma4Players = new() { 15000, 5000, -5000, -15000 };
+    private List<int> clubUma3Players = new() { 12500, 0, -12500 };
     private bool editingNames;
     private string? csvImportError;
     private bool userLoweredFirst;
@@ -181,6 +237,10 @@ else
             tournament = await TournamentService.GetByIdAsync(Id);
             if (tournament != null && tournament.Participants.Count >= 13)
                 generatePlayerCount = tournament.Participants.Count;
+            var settings = await SettingsService.GetAsync();
+            clubTournamentStartingPoints = settings.TournamentStartingPoints;
+            clubUma4Players = new List<int>(settings.TournamentUma4Players);
+            clubUma3Players = new List<int>(settings.TournamentUma3Players);
             StateHasChanged();
         }
     }
@@ -428,5 +488,48 @@ else
         tournament.Sessions.Clear();
         tournament.IsGenerated = false;
         resetConfirmed = false;
+    }
+
+    private static string FormatPoints(int value) => (value / 1000.0).ToString("0.0");
+    private static string FormatPointsSigned(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
+    private static int ParsePoints(string? input, int fallback)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return fallback;
+        var normalized = input.Replace(',', '.');
+        if (decimal.TryParse(normalized, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return (int)Math.Round(d * 1000);
+        return fallback;
+    }
+
+    private async Task OnOverrideStartingPoints(ChangeEventArgs e)
+    {
+        if (tournament == null) return;
+        tournament.StartingPoints = ParsePoints(e.Value?.ToString(), clubTournamentStartingPoints);
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task OnOverrideUma4(int index, ChangeEventArgs e)
+    {
+        if (tournament == null) return;
+        tournament.Uma4Players ??= new List<int>(clubUma4Players);
+        tournament.Uma4Players[index] = ParsePoints(e.Value?.ToString(), 0);
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task OnOverrideUma3(int index, ChangeEventArgs e)
+    {
+        if (tournament == null) return;
+        tournament.Uma3Players ??= new List<int>(clubUma3Players);
+        tournament.Uma3Players[index] = ParsePoints(e.Value?.ToString(), 0);
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task ResetScoringOverrides()
+    {
+        if (tournament == null) return;
+        tournament.StartingPoints = null;
+        tournament.Uma4Players = null;
+        tournament.Uma3Players = null;
+        await TournamentService.SaveAsync(tournament);
     }
 }

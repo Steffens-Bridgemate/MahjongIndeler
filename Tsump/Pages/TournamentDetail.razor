@@ -73,6 +73,22 @@ else
         @if (assignmentsExpanded)
         {
         <div class="card-body">
+
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(tournamentActiveTab == "tables" ? "active" : "")" href="javascript:void(0)" @onclick='() => tournamentActiveTab = "tables"'>
+                    @Lang.Get("TableAssignments")
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateScoresTab">
+                    @Lang.Get("Scores")
+                </a>
+            </li>
+        </ul>
+
+        @if (tournamentActiveTab == "tables")
+        {
         <div class="d-flex align-items-center mb-3 flex-wrap gap-1">
             @if (showExportAll)
             {
@@ -186,6 +202,24 @@ else
                     </div>
                 }
             </div>
+        }
+        }
+        else if (tournamentActiveTab == "scores")
+        {
+            @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
+            {
+                <h5 class="mt-3 mb-2">@Lang.Get("Hanchan") @session.SessionNumber
+                    @if (session.StartTime.HasValue)
+                    {
+                        <small class="text-muted">@session.StartTime.Value.ToString(@"hh\:mm")</small>
+                    }
+                </h5>
+                @foreach (var table in session.Tables)
+                {
+                    <ScoreTable Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores"
+                                DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                }
+            }
         }
         </div>
         }
@@ -330,6 +364,10 @@ else
     private bool assignmentsExpanded = true;
     private bool threePlayerExpanded;
     private bool matrixExpanded;
+    private string tournamentActiveTab = "tables";
+    private int tournamentStartingPoints = 30000;
+    private List<int> uma4Players = new() { 15000, 5000, -5000, -15000 };
+    private List<int> uma3Players = new() { 12500, 0, -12500 };
 
     // Meeting matrix data
     private List<TournamentParticipant> sortedParticipants = new();
@@ -351,6 +389,10 @@ else
         if (firstRender)
         {
             tournament = await TournamentService.GetByIdAsync(Id);
+            var settings = await SettingsService.GetAsync();
+            tournamentStartingPoints = tournament?.StartingPoints ?? settings.TournamentStartingPoints;
+            uma4Players = tournament?.Uma4Players != null ? new List<int>(tournament.Uma4Players) : new List<int>(settings.TournamentUma4Players);
+            uma3Players = tournament?.Uma3Players != null ? new List<int>(tournament.Uma3Players) : new List<int>(settings.TournamentUma3Players);
             if (tournament != null && tournament.IsGenerated)
                 BuildTournamentMatrix();
             StateHasChanged();
@@ -606,6 +648,20 @@ else
         }
 
         return (html.ToString(), text.ToString().TrimEnd());
+    }
+
+    private void ActivateScoresTab()
+    {
+        tournamentActiveTab = "scores";
+        if (tournament == null) return;
+        var allTables = tournament.Sessions.SelectMany(s => s.Tables).ToList();
+        ScoreTable.InitializeScores(allTables, Lang.Get, tournamentStartingPoints);
+    }
+
+    private async Task SaveScores()
+    {
+        if (tournament == null) return;
+        await TournamentService.SaveAsync(tournament);
     }
 
     private string WrapAsHtmlDocument(string title, string bodyContent, bool includePrintButton = false)

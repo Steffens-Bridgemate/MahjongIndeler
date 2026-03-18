@@ -266,59 +266,83 @@ else
             }
         </div>
 
-        @if (!IsLockedPastSession && selectedPlayerIds.Count > 0)
-        {
-            <div class="mb-3">
-                <span class="text-muted me-2">
-                    @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetPlayerName(id)))
-                </span>
-                @if (selectedPlayerIds.Count == 2)
-                {
-                    <button class="btn btn-sm btn-warning me-1" @onclick="SwapSelectedPlayers">
-                        @Lang.Get("SwapPlayers")
-                    </button>
-                }
-                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSelection">
-                    @Lang.Get("ClearSelection")
-                </button>
-            </div>
-        }
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link @(activeTab == "tables" ? "active" : "")" href="javascript:void(0)" @onclick='() => activeTab = "tables"'>
+                    @Lang.Get("TableAssignments")
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @(activeTab == "scores" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateScoresTab">
+                    @Lang.Get("Scores")
+                </a>
+            </li>
+        </ul>
 
-        <div class="row">
-            @foreach (var table in tables)
+        @if (activeTab == "tables")
+        {
+            @if (!IsLockedPastSession && selectedPlayerIds.Count > 0)
             {
-                <div class="col-md-4 mb-3">
-                    <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
-                        <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
-                            @Lang.Get("Table") @table.TableNumber (@table.PlayerCount @Lang.Get("players"))
-                        </div>
-                        <ul class="list-group list-group-flush">
-                            @foreach (var playerId in table.PlayerIds)
-                            {
-                                var pid = playerId;
-                                var player = members.FirstOrDefault(m => m.Id == pid);
-                                var isSelected = selectedPlayerIds.Contains(pid);
-                                <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "")"
-                                    style="cursor: @(IsLockedPastSession ? "default" : "grab")"
-                                    draggable="@(!IsLockedPastSession)"
-                                    @ondragstart="() => OnDragStart(pid)"
-                                    @ondragover:preventDefault
-                                    @ondrop="() => OnDrop(pid)"
-                                    @onclick="() => OnPlayerClick(pid)">
-                                    <span>@(player?.Name ?? Lang.Get("Unknown"))</span>
-                                </li>
-                            }
-                        </ul>
-                    </div>
+                <div class="mb-3">
+                    <span class="text-muted me-2">
+                        @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetPlayerName(id)))
+                    </span>
+                    @if (selectedPlayerIds.Count == 2)
+                    {
+                        <button class="btn btn-sm btn-warning me-1" @onclick="SwapSelectedPlayers">
+                            @Lang.Get("SwapPlayers")
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSelection">
+                        @Lang.Get("ClearSelection")
+                    </button>
                 </div>
             }
-        </div>
 
-        @if (presentIds.Count - tables.Sum(t => t.PlayerCount) > 0)
-        {
-            <div class="alert alert-info">
-                @(presentIds.Count - tables.Sum(t => t.PlayerCount)) @Lang.Get("UnassignedPlayers")
+            <div class="row">
+                @foreach (var table in tables)
+                {
+                    <div class="col-md-4 mb-3">
+                        <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
+                            <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
+                                @Lang.Get("Table") @table.TableNumber (@table.PlayerCount @Lang.Get("players"))
+                            </div>
+                            <ul class="list-group list-group-flush">
+                                @foreach (var playerId in table.PlayerIds)
+                                {
+                                    var pid = playerId;
+                                    var player = members.FirstOrDefault(m => m.Id == pid);
+                                    var isSelected = selectedPlayerIds.Contains(pid);
+                                    <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "")"
+                                        style="cursor: @(IsLockedPastSession ? "default" : "grab")"
+                                        draggable="@(!IsLockedPastSession)"
+                                        @ondragstart="() => OnDragStart(pid)"
+                                        @ondragover:preventDefault
+                                        @ondrop="() => OnDrop(pid)"
+                                        @onclick="() => OnPlayerClick(pid)">
+                                        <span>@(player?.Name ?? Lang.Get("Unknown"))</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
             </div>
+
+            @if (presentIds.Count - tables.Sum(t => t.PlayerCount) > 0)
+            {
+                <div class="alert alert-info">
+                    @(presentIds.Count - tables.Sum(t => t.PlayerCount)) @Lang.Get("UnassignedPlayers")
+                </div>
+            }
+        }
+        else if (activeTab == "scores")
+        {
+            @foreach (var table in tables)
+            {
+                <ScoreTable Table="table" PlayerNameResolver="GetPlayerName" OnScoresComplete="SaveScores"
+                            DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+            }
         }
     }
 
@@ -358,6 +382,10 @@ else
     private bool showExportSingle;
     private bool showExportAll;
     private int? workflowStepIndex;
+    private string activeTab = "tables";
+    private int weeklyStartingPoints = 30000;
+    private List<int> uma4Players = new() { 15000, 5000, -5000, -15000 };
+    private List<int> uma3Players = new() { 12500, 0, -12500 };
 
     private bool IsLockedPastSession =>
         sessionDate.Date < DateTime.Today && currentHanchan is { IsFinalized: true };
@@ -385,6 +413,9 @@ else
 
             var clubSettings = await SettingsService.GetAsync();
             defaultStartTime = clubSettings.DefaultStartTime;
+            weeklyStartingPoints = clubSettings.WeeklyStartingPoints;
+            uma4Players = new List<int>(clubSettings.WeeklyUma4Players);
+            uma3Players = new List<int>(clubSettings.WeeklyUma3Players);
 
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
@@ -439,6 +470,7 @@ else
         attendanceExpanded = !hanchan.IsFinalized;
         saved = hanchan.Tables.Count > 0;
         showRegenerateConfirm = false;
+        activeTab = "tables";
     }
 
     private void SelectHanchan(Hanchan hanchan)
@@ -914,6 +946,12 @@ else
         saved = false;
     }
 
+    private void ActivateScoresTab()
+    {
+        activeTab = "scores";
+        ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
+    }
+
     private void RequestDeleteHanchan()
     {
         showDeleteConfirm = true;
@@ -963,6 +1001,13 @@ else
 
         saved = true;
         attendanceExpanded = false;
+    }
+
+    private async Task SaveScores()
+    {
+        if (currentHanchan == null) return;
+        currentHanchan.Tables = tables;
+        await SessionService.SaveAsync(currentHanchan);
     }
 
     private async Task BackToWorkflow()

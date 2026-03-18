@@ -17,4 +17,22 @@ public class TableAssignment
     public int TableNumber { get; set; }
     public List<Guid> PlayerIds { get; set; } = new();
     public int PlayerCount => PlayerIds.Count;
+    public TableScore? Score { get; set; }
+}
+
+public class TableScore
+{
+    public List<PlayerScore> PlayerScores { get; set; } = new();
+}
+
+public class PlayerScore
+{
+    public Guid PlayerId { get; set; }
+    public bool IsVirtual { get; set; }
+    public string VirtualName { get; set; } = string.Empty;
+    public int StartingPoints { get; set; }
+    public int? EndPoints { get; set; }
+    public int Difference => (EndPoints ?? StartingPoints) - StartingPoints;
+    public int Uma { get; set; }
+    public int Total => Difference + Uma;
 }

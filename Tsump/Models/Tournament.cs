@@ -9,6 +9,11 @@ public class Tournament
     public List<TournamentParticipant> Participants { get; set; } = new();
     public List<TournamentSession> Sessions { get; set; } = new();
     public bool IsGenerated { get; set; }
+
+    // Scoring overrides (null = use club defaults)
+    public int? StartingPoints { get; set; }
+    public List<int>? Uma4Players { get; set; }
+    public List<int>? Uma3Players { get; set; }
 }
 
 public class TournamentParticipant

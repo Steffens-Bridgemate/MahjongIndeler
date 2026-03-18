@@ -139,12 +139,80 @@
             </button>
         </div>
 
+        <h5 class="card-title mt-4">@Lang.Get("WeeklyMode") — @Lang.Get("ScoringSettings")</h5>
+        <div class="row mb-2">
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("StartingPoints")</label>
+                <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
+                       value="@FormatPoints(weeklyStartingPoints)"
+                       @onchange="e => { weeklyStartingPoints = ParsePoints(e.Value?.ToString(), 30000); saved = false; }" />
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("Uma4Players")</label>
+                <div class="d-flex gap-1">
+                    @for (int idx = 0; idx < weeklyUma4Players.Count; idx++)
+                    {
+                        var i = idx;
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                               value="@FormatPointsSigned(weeklyUma4Players[i])"
+                               @onchange="e => { weeklyUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                    }
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("Uma3Players")</label>
+                <div class="d-flex gap-1">
+                    @for (int idx = 0; idx < weeklyUma3Players.Count; idx++)
+                    {
+                        var i = idx;
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                               value="@FormatPointsSigned(weeklyUma3Players[i])"
+                               @onchange="e => { weeklyUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                    }
+                </div>
+            </div>
+        </div>
+
+        <h5 class="card-title mt-4">@Lang.Get("TournamentMode") — @Lang.Get("ScoringSettings")</h5>
+        <div class="row mb-2">
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("StartingPoints")</label>
+                <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
+                       value="@FormatPoints(tournamentStartingPoints)"
+                       @onchange="e => { tournamentStartingPoints = ParsePoints(e.Value?.ToString(), 30000); saved = false; }" />
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("Uma4Players")</label>
+                <div class="d-flex gap-1">
+                    @for (int idx = 0; idx < tournamentUma4Players.Count; idx++)
+                    {
+                        var i = idx;
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                               value="@FormatPointsSigned(tournamentUma4Players[i])"
+                               @onchange="e => { tournamentUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                    }
+                </div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("Uma3Players")</label>
+                <div class="d-flex gap-1">
+                    @for (int idx = 0; idx < tournamentUma3Players.Count; idx++)
+                    {
+                        var i = idx;
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                               value="@FormatPointsSigned(tournamentUma3Players[i])"
+                               @onchange="e => { tournamentUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                    }
+                </div>
+            </div>
+        </div>
+
         @if (saved)
         {
             <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
         }
 
-        <button class="btn btn-success" @onclick="Save">@Lang.Get("Save")</button>
+        <button class="btn btn-success mt-3" @onclick="Save">@Lang.Get("Save")</button>
     </div>
 </div>
 
@@ -158,6 +226,12 @@
     private List<TimeSpan> tournamentStartTimes = new();
     private int newTournamentHour = -1;
     private int newTournamentMinute = -1;
+    private int weeklyStartingPoints = 30000;
+    private List<int> weeklyUma4Players = new() { 15000, 5000, -5000, -15000 };
+    private List<int> weeklyUma3Players = new() { 12500, 0, -12500 };
+    private int tournamentStartingPoints = 30000;
+    private List<int> tournamentUma4Players = new() { 15000, 5000, -5000, -15000 };
+    private List<int> tournamentUma3Players = new() { 12500, 0, -12500 };
     private bool saved;
 
     private static readonly DayOfWeek[] allDays = new[]
@@ -181,6 +255,12 @@
             defaultStartHour = settings.DefaultStartTime.Hours;
             defaultStartMinute = settings.DefaultStartTime.Minutes;
             tournamentStartTimes = new List<TimeSpan>(settings.TournamentStartTimes);
+            weeklyStartingPoints = settings.WeeklyStartingPoints;
+            weeklyUma4Players = new List<int>(settings.WeeklyUma4Players);
+            weeklyUma3Players = new List<int>(settings.WeeklyUma3Players);
+            tournamentStartingPoints = settings.TournamentStartingPoints;
+            tournamentUma4Players = new List<int>(settings.TournamentUma4Players);
+            tournamentUma3Players = new List<int>(settings.TournamentUma3Players);
             StateHasChanged();
         }
     }
@@ -250,6 +330,17 @@
         saved = false;
     }
 
+    private static string FormatPoints(int value) => (value / 1000.0).ToString("0.0");
+    private static string FormatPointsSigned(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
+    private static int ParsePoints(string? input, int fallback)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return fallback;
+        var normalized = input.Replace(',', '.');
+        if (decimal.TryParse(normalized, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return (int)Math.Round(d * 1000);
+        return fallback;
+    }
+
     private async Task Save()
     {
         var settings = new ClubSettings
@@ -263,7 +354,13 @@
                 })
                 .ToList(),
             DefaultStartTime = new TimeSpan(defaultStartHour, defaultStartMinute, 0),
-            TournamentStartTimes = tournamentStartTimes.OrderBy(t => t).ToList()
+            TournamentStartTimes = tournamentStartTimes.OrderBy(t => t).ToList(),
+            WeeklyStartingPoints = weeklyStartingPoints,
+            WeeklyUma4Players = new List<int>(weeklyUma4Players),
+            WeeklyUma3Players = new List<int>(weeklyUma3Players),
+            TournamentStartingPoints = tournamentStartingPoints,
+            TournamentUma4Players = new List<int>(tournamentUma4Players),
+            TournamentUma3Players = new List<int>(tournamentUma3Players)
         };
         await SettingsService.SaveAsync(settings);
         saved = true;
