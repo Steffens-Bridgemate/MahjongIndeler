@@ -9,7 +9,19 @@
 
 <h1>@Lang.Get("Settings")</h1>
 
-<div class="card mb-4">
+@if (saved)
+{
+    <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
+}
+
+@* --- Club night settings --- *@
+
+<div class="d-flex align-items-center justify-content-between mt-3 mb-3">
+    <h4 class="mb-0">@Lang.Get("WeeklyMode")</h4>
+    <button class="btn btn-success btn-sm" @onclick="Save">@Lang.Get("Save")</button>
+</div>
+
+<div class="card mb-3">
     <div class="card-body">
         <h5 class="card-title">@Lang.Get("PlayingDays")</h5>
         <p class="text-muted">@Lang.Get("PlayingDaysDesc")</p>
@@ -74,10 +86,14 @@
                 </div>
             </div>
         }
+    </div>
+</div>
 
-        <h5 class="card-title mt-4">@Lang.Get("DefaultStartTime")</h5>
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">@Lang.Get("DefaultStartTime")</h5>
         <p class="text-muted">@Lang.Get("DefaultStartTimeDesc")</p>
-        <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="d-flex align-items-center gap-2">
             <select class="form-select" style="max-width: 75px;"
                     value="@defaultStartHour"
                     @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var h)) { defaultStartHour = h; saved = false; } }">
@@ -98,48 +114,12 @@
                 }
             </select>
         </div>
+    </div>
+</div>
 
-        <h5 class="card-title mt-4">@Lang.Get("TournamentStartTimes")</h5>
-        <p class="text-muted">@Lang.Get("TournamentStartTimesDesc")</p>
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            @foreach (var time in tournamentStartTimes.OrderBy(t => t))
-            {
-                var t = time;
-                <span class="badge bg-primary d-flex align-items-center" style="font-size: 0.95em;">
-                    @t.ToString(@"hh\:mm")
-                    <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6em;"
-                            @onclick="() => RemoveTournamentTime(t)"></button>
-                </span>
-            }
-        </div>
-        <div class="d-flex align-items-center gap-2 mb-3">
-            <select class="form-select" style="max-width: 75px;"
-                    value="@newTournamentHour"
-                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var h)) newTournamentHour = h; }">
-                <option value="-1">--</option>
-                @for (int h = 0; h < 24; h++)
-                {
-                    var hh = h;
-                    <option value="@hh">@hh.ToString("D2")</option>
-                }
-            </select>
-            <span>:</span>
-            <select class="form-select" style="max-width: 75px;"
-                    value="@newTournamentMinute"
-                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var m)) newTournamentMinute = m; }">
-                <option value="-1">--</option>
-                @for (int m = 0; m < 60; m += 5)
-                {
-                    var mm = m;
-                    <option value="@mm">@mm.ToString("D2")</option>
-                }
-            </select>
-            <button class="btn btn-sm btn-outline-primary" @onclick="AddTournamentTime">
-                + @Lang.Get("AddStartTime")
-            </button>
-        </div>
-
-        <h5 class="card-title mt-4">@Lang.Get("WeeklyMode") — @Lang.Get("ScoringSettings")</h5>
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">@Lang.Get("ScoringSettings")</h5>
         <div class="row mb-2">
             <div class="col-md-4 mb-2">
                 <label class="form-label">@Lang.Get("StartingPoints")</label>
@@ -172,8 +152,63 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <h5 class="card-title mt-4">@Lang.Get("TournamentMode") — @Lang.Get("ScoringSettings")</h5>
+@* --- Tournament settings --- *@
+
+<div class="d-flex align-items-center justify-content-between mt-3 mb-3">
+    <h4 class="mb-0">@Lang.Get("TournamentMode")</h4>
+    <button class="btn btn-success btn-sm" @onclick="Save">@Lang.Get("Save")</button>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">@Lang.Get("TournamentStartTimes")</h5>
+        <p class="text-muted">@Lang.Get("TournamentStartTimesDesc")</p>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            @foreach (var time in tournamentStartTimes.OrderBy(t => t))
+            {
+                var t = time;
+                <span class="badge bg-primary d-flex align-items-center" style="font-size: 0.95em;">
+                    @t.ToString(@"hh\:mm")
+                    <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.6em;"
+                            @onclick="() => RemoveTournamentTime(t)"></button>
+                </span>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <select class="form-select" style="max-width: 75px;"
+                    value="@newTournamentHour"
+                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var h)) newTournamentHour = h; }">
+                <option value="-1">--</option>
+                @for (int h = 0; h < 24; h++)
+                {
+                    var hh = h;
+                    <option value="@hh">@hh.ToString("D2")</option>
+                }
+            </select>
+            <span>:</span>
+            <select class="form-select" style="max-width: 75px;"
+                    value="@newTournamentMinute"
+                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var m)) newTournamentMinute = m; }">
+                <option value="-1">--</option>
+                @for (int m = 0; m < 60; m += 5)
+                {
+                    var mm = m;
+                    <option value="@mm">@mm.ToString("D2")</option>
+                }
+            </select>
+            <button class="btn btn-sm btn-outline-primary" @onclick="AddTournamentTime">
+                + @Lang.Get("AddStartTime")
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">@Lang.Get("ScoringSettings")</h5>
         <div class="row mb-2">
             <div class="col-md-4 mb-2">
                 <label class="form-label">@Lang.Get("StartingPoints")</label>
@@ -206,13 +241,6 @@
                 </div>
             </div>
         </div>
-
-        @if (saved)
-        {
-            <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
-        }
-
-        <button class="btn btn-success mt-3" @onclick="Save">@Lang.Get("Save")</button>
     </div>
 </div>
 
