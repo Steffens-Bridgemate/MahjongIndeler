@@ -4,6 +4,7 @@
 @inject SessionService SessionService
 @inject MemberService MemberService
 @inject LanguageService Lang
+@inject LocalStorageService Storage
 @implements IDisposable
 
 <PageTitle>@Lang.Get("CompetitionRankingTitle") - Tsumo!</PageTitle>
@@ -21,6 +22,11 @@ else if (entries.Count == 0)
 }
 else
 {
+    <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="groupByDate" checked="@groupByDate" @onchange="OnGroupByDateChanged" />
+        <label class="form-check-label" for="groupByDate">@Lang.Get("ShowResultsPerDate")</label>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-sm table-bordered table-striped">
             <thead>
@@ -28,7 +34,7 @@ else
                     <th>@Lang.Get("Rank")</th>
                     <th>@Lang.Get("Name")</th>
                     <th class="text-center">@Lang.Get("AverageScore")</th>
-                    @foreach (var label in hanchanLabels)
+                    @foreach (var label in displayLabels)
                     {
                         <th class="text-center">@label</th>
                     }
@@ -42,9 +48,11 @@ else
                         <td>@rank</td>
                         <td>@entry.Name</td>
                         <td class="text-center fw-bold">@FormatAverage(entry.Average)</td>
-                        @foreach (var score in entry.Scores)
+                        @for (int col = 0; col < entry.DisplayScores.Count; col++)
                         {
-                            <td class="text-center">@(score.HasValue ? FormatScore(score.Value) : "—")</td>
+                            var score = entry.DisplayScores[col];
+                            var bg = col == 0 && score.HasValue ? GetPodiumClass(score.Value) : "";
+                            <td class="text-center @bg">@(score.HasValue ? FormatScore(score.Value) : "—")</td>
                         }
                     </tr>
                     rank++;
@@ -54,9 +62,24 @@ else
     </div>
 }
 
+<style>
+    .podium-gold { background-color: #fff3cd !important; }
+    .podium-silver { background-color: #d6e9f8 !important; }
+    .podium-bronze { background-color: #f8d7da !important; }
+</style>
+
 @code {
     private List<CompetitionEntry>? entries;
-    private List<string> hanchanLabels = new();
+    private List<string> displayLabels = new();
+    private HashSet<int> podiumGold = new();
+    private HashSet<int> podiumSilver = new();
+    private HashSet<int> podiumBronze = new();
+    private bool groupByDate;
+
+    // Raw per-hanchan data, kept for regrouping without reloading
+    private Dictionary<Guid, List<int?>>? rawPlayerScores;
+    private Dictionary<Guid, string>? nameMap;
+    private List<Hanchan>? loadedHanchans;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += Refresh;
     public void Dispose() => Lang.OnLanguageChanged -= Refresh;
@@ -65,37 +88,45 @@ else
     {
         if (firstRender)
         {
-            await BuildRankings();
+            groupByDate = await Storage.GetAsync<bool>("tsump_ranking_group_by_date");
+            await LoadData();
+            BuildEntries();
             StateHasChanged();
         }
     }
 
     private async void Refresh()
     {
-        await BuildRankings();
+        await LoadData();
+        BuildEntries();
         StateHasChanged();
     }
 
-    private async Task BuildRankings()
+    private async Task OnGroupByDateChanged(ChangeEventArgs e)
+    {
+        groupByDate = (bool)(e.Value ?? false);
+        await Storage.SetAsync("tsump_ranking_group_by_date", groupByDate);
+        BuildEntries();
+    }
+
+    private async Task LoadData()
     {
         var members = await MemberService.GetAllAsync();
-        var nameMap = members.ToDictionary(m => m.Id, m => m.Name);
+        nameMap = members.ToDictionary(m => m.Id, m => m.Name);
 
         var allSessions = await SessionService.GetAllAsync();
-        var hanchans = allSessions
+        loadedHanchans = allSessions
             .Where(s => !s.ExcludeFromOptimization)
-            .OrderBy(s => s.Date)
+            .OrderByDescending(s => s.Date)
             .ThenBy(s => s.StartTime ?? TimeSpan.Zero)
             .ToList();
 
-        hanchanLabels = BuildLabels(hanchans);
+        rawPlayerScores = new Dictionary<Guid, List<int?>>();
 
-        var playerScores = new Dictionary<Guid, List<int?>>();
-
-        for (int hi = 0; hi < hanchans.Count; hi++)
+        for (int hi = 0; hi < loadedHanchans.Count; hi++)
         {
             var scoresInHanchan = new Dictionary<Guid, int>();
-            foreach (var table in hanchans[hi].Tables)
+            foreach (var table in loadedHanchans[hi].Tables)
             {
                 if (table.Score == null) continue;
                 var allFilled = table.Score.PlayerScores.All(p => p.EndPoints.HasValue);
@@ -109,26 +140,80 @@ else
 
             foreach (var pid in scoresInHanchan.Keys)
             {
-                if (!playerScores.ContainsKey(pid))
-                    playerScores[pid] = Enumerable.Repeat<int?>(null, hi).ToList();
+                if (!rawPlayerScores.ContainsKey(pid))
+                    rawPlayerScores[pid] = Enumerable.Repeat<int?>(null, hi).ToList();
             }
 
-            foreach (var kv in playerScores)
+            foreach (var kv in rawPlayerScores)
             {
                 kv.Value.Add(scoresInHanchan.TryGetValue(kv.Key, out var s) ? s : null);
             }
         }
+    }
 
-        entries = playerScores
-            .Select(kv =>
+    private void BuildEntries()
+    {
+        if (rawPlayerScores == null || loadedHanchans == null || nameMap == null)
+        {
+            entries = new();
+            return;
+        }
+
+        if (groupByDate)
+        {
+            var dateGroups = new List<(DateTime Date, List<int> HanchanIndices)>();
+            for (int i = 0; i < loadedHanchans.Count; i++)
             {
-                var validScores = kv.Value.Where(s => s.HasValue).Select(s => s!.Value).ToList();
-                var average = validScores.Count > 0 ? validScores.Average() : 0.0;
-                var name = nameMap.TryGetValue(kv.Key, out var n) ? n : "?";
-                return new CompetitionEntry(name, average, kv.Value);
-            })
-            .OrderByDescending(e => e.Average)
-            .ToList();
+                var date = loadedHanchans[i].Date.Date;
+                if (dateGroups.Count > 0 && dateGroups[^1].Date == date)
+                    dateGroups[^1].HanchanIndices.Add(i);
+                else
+                    dateGroups.Add((date, new List<int> { i }));
+            }
+
+            displayLabels = dateGroups.Select(g => g.Date.ToString("dd/MM")).ToList();
+
+            entries = rawPlayerScores
+                .Select(kv =>
+                {
+                    var perHanchan = kv.Value;
+                    // Average is always per-hanchan
+                    var validScores = perHanchan.Where(s => s.HasValue).Select(s => s!.Value).ToList();
+                    var average = validScores.Count > 0 ? validScores.Average() : 0.0;
+
+                    // Display scores are summed per date
+                    var dateScores = dateGroups.Select(g =>
+                    {
+                        var scores = g.HanchanIndices
+                            .Where(idx => idx < perHanchan.Count && perHanchan[idx].HasValue)
+                            .Select(idx => perHanchan[idx]!.Value)
+                            .ToList();
+                        return scores.Count > 0 ? (int?)scores.Sum() : null;
+                    }).ToList();
+
+                    var name = nameMap.TryGetValue(kv.Key, out var n) ? n : "?";
+                    return new CompetitionEntry(name, average, dateScores);
+                })
+                .OrderByDescending(e => e.Average)
+                .ToList();
+        }
+        else
+        {
+            displayLabels = BuildLabels(loadedHanchans);
+
+            entries = rawPlayerScores
+                .Select(kv =>
+                {
+                    var validScores = kv.Value.Where(s => s.HasValue).Select(s => s!.Value).ToList();
+                    var average = validScores.Count > 0 ? validScores.Average() : 0.0;
+                    var name = nameMap.TryGetValue(kv.Key, out var n) ? n : "?";
+                    return new CompetitionEntry(name, average, kv.Value);
+                })
+                .OrderByDescending(e => e.Average)
+                .ToList();
+        }
+
+        ComputePodiumThresholds();
     }
 
     private static List<string> BuildLabels(List<Hanchan> hanchans)
@@ -157,8 +242,37 @@ else
         return labels;
     }
 
+    private void ComputePodiumThresholds()
+    {
+        podiumGold.Clear();
+        podiumSilver.Clear();
+        podiumBronze.Clear();
+
+        if (entries == null || entries.Count == 0) return;
+
+        var topScores = entries
+            .Where(e => e.DisplayScores.Count > 0 && e.DisplayScores[0].HasValue)
+            .Select(e => e.DisplayScores[0]!.Value)
+            .Distinct()
+            .OrderByDescending(s => s)
+            .Take(3)
+            .ToList();
+
+        if (topScores.Count > 0) podiumGold.Add(topScores[0]);
+        if (topScores.Count > 1) podiumSilver.Add(topScores[1]);
+        if (topScores.Count > 2) podiumBronze.Add(topScores[2]);
+    }
+
+    private string GetPodiumClass(int score)
+    {
+        if (podiumGold.Contains(score)) return "podium-gold";
+        if (podiumSilver.Contains(score)) return "podium-silver";
+        if (podiumBronze.Contains(score)) return "podium-bronze";
+        return "";
+    }
+
     private static string FormatScore(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
     private static string FormatAverage(double value) => (value / 1000.0).ToString("+0.00;-0.00;0.00");
 
-    private record CompetitionEntry(string Name, double Average, List<int?> Scores);
+    private record CompetitionEntry(string Name, double Average, List<int?> DisplayScores);
 }
