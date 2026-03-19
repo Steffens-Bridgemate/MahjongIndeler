@@ -1,0 +1,111 @@
+@using Tsump.Services
+@inject LanguageService Lang
+
+@if (Entries.Count == 0)
+{
+    <p class="text-muted">@Lang.Get("Scores"): —</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>@Lang.Get("Rank")</th>
+                    <th>@Lang.Get("Name")</th>
+                    <th class="text-center">@Lang.Get("TotalScore")</th>
+                    @foreach (var h in Entries.First().HanchanScores)
+                    {
+                        <th class="text-center">@h.Label</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @{ int rank = 1; }
+                @foreach (var entry in Entries)
+                {
+                    <tr>
+                        <td>@rank</td>
+                        <td>@entry.Name</td>
+                        <td class="text-center fw-bold">@FormatScore(entry.Total)</td>
+                        @foreach (var hs in entry.HanchanScores)
+                        {
+                            <td class="text-center">@(hs.Score.HasValue ? FormatScore(hs.Score.Value) : "—")</td>
+                        }
+                    </tr>
+                    rank++;
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public List<RankingEntry> Entries { get; set; } = new();
+
+    private static string FormatScore(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
+
+    public record HanchanScore(string Label, int? Score);
+    public record RankingEntry(string Name, int Total, List<HanchanScore> HanchanScores);
+
+    /// <summary>
+    /// Builds ranking entries from a list of hanchans (sessions with tables).
+    /// </summary>
+    public static List<RankingEntry> BuildRankings(
+        List<(string Label, List<Models.TableAssignment> Tables)> hanchans,
+        Func<Guid, string> nameResolver,
+        HashSet<Guid>? allParticipantIds = null)
+    {
+        if (hanchans.Count == 0) return new();
+
+        var playerScores = new Dictionary<Guid, List<int?>>();
+
+        // Pre-populate all known participants if provided
+        if (allParticipantIds != null)
+        {
+            foreach (var pid in allParticipantIds)
+                playerScores[pid] = new List<int?>();
+        }
+
+        foreach (var (label, tables) in hanchans)
+        {
+            var scoresInHanchan = new Dictionary<Guid, int>();
+            foreach (var table in tables)
+            {
+                if (table.Score == null) continue;
+                var allFilled = table.Score.PlayerScores.All(p => p.EndPoints.HasValue);
+                var sumZero = table.Score.PlayerScores.Sum(p => p.Difference) == 0;
+                if (!allFilled || !sumZero) continue;
+                foreach (var ps in table.Score.PlayerScores.Where(p => !p.IsVirtual))
+                {
+                    scoresInHanchan[ps.PlayerId] = ps.Total;
+                }
+            }
+
+            // Ensure new players get null entries for previous hanchans
+            var hanchanIndex = hanchans.IndexOf((label, tables));
+            foreach (var pid in scoresInHanchan.Keys)
+            {
+                if (!playerScores.ContainsKey(pid))
+                    playerScores[pid] = Enumerable.Repeat<int?>(null, hanchanIndex).ToList();
+            }
+
+            foreach (var kv in playerScores)
+            {
+                kv.Value.Add(scoresInHanchan.TryGetValue(kv.Key, out var s) ? s : null);
+            }
+        }
+
+        var labels = hanchans.Select(h => h.Label).ToList();
+
+        return playerScores
+            .Select(kv => new RankingEntry(
+                nameResolver(kv.Key),
+                kv.Value.Where(s => s.HasValue).Sum(s => s!.Value),
+                kv.Value.Select((s, i) => new HanchanScore(labels[i], s)).ToList()
+            ))
+            .OrderByDescending(e => e.Total)
+            .ToList();
+    }
+}

@@ -37,6 +37,9 @@ else
         <li class="nav-item">
             <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/guidesheets" : "#")">@Lang.Get("TournamentGuidesheets")</a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/rankings" : "#")">@Lang.Get("Rankings")</a>
+        </li>
     </ul>
 
     @* --- Generate button --- *@
@@ -132,6 +135,7 @@ else
         {
             var sn = session.SessionNumber;
             var sess = session;
+            var isHanchanExpanded = expandedHanchans.Contains(sn);
             <div class="d-flex align-items-center mt-4 mb-2 flex-wrap gap-1">
                 <h5 class="mb-0">@Lang.Get("Hanchan") @sn</h5>
                 <select class="form-select form-select-sm" style="max-width:65px;"
@@ -173,7 +177,12 @@ else
                         @Lang.Get("Export")
                     </button>
                 }
+                <button class="btn btn-sm btn-outline-dark ms-3" @onclick="() => ToggleHanchan(sn)" style="font-size:1.1em;line-height:1;padding:2px 8px;">
+                    @(isHanchanExpanded ? "\u25B2" : "\u25BC")
+                </button>
             </div>
+            @if (isHanchanExpanded)
+            {
             <div class="row">
                 @foreach (var table in session.Tables)
                 {
@@ -202,22 +211,32 @@ else
                     </div>
                 }
             </div>
+            }
         }
         }
         else if (tournamentActiveTab == "scores")
         {
             @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
             {
-                <h5 class="mt-3 mb-2">@Lang.Get("Hanchan") @session.SessionNumber
+                var sn = session.SessionNumber;
+                var isHanchanExpanded = expandedHanchans.Contains(sn);
+                <div class="d-flex align-items-baseline mt-3 mb-2 gap-2">
+                    <h5 class="mb-0">@Lang.Get("Hanchan") @sn</h5>
                     @if (session.StartTime.HasValue)
                     {
-                        <small class="text-muted">@session.StartTime.Value.ToString(@"hh\:mm")</small>
+                        <span class="fw-bold" style="font-size:1.25rem;">@session.StartTime.Value.ToString(@"hh\:mm")</span>
                     }
-                </h5>
-                @foreach (var table in session.Tables)
+                    <button class="btn btn-sm btn-outline-dark ms-2" @onclick="() => ToggleHanchan(sn)" style="font-size:1.1em;line-height:1;padding:2px 8px;">
+                        @(isHanchanExpanded ? "\u25B2" : "\u25BC")
+                    </button>
+                </div>
+                @if (isHanchanExpanded)
                 {
-                    <ScoreTable Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores"
-                                DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                    @foreach (var table in session.Tables)
+                    {
+                        <ScoreTable Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores"
+                                    DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                    }
                 }
             }
         }
@@ -374,6 +393,8 @@ else
     private Dictionary<string, int> tournamentMatrix = new();
     private List<KeyValuePair<int, int>> matrixDistribution = new();
 
+    private HashSet<int> expandedHanchans = new();
+
     private List<Guid> selectedPlayerIds = new();
     private int? selectedSessionNumber;
     private Guid? draggedPlayerId;
@@ -383,6 +404,12 @@ else
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
     private void GoToList() => Nav.NavigateTo("tournaments");
+
+    private void ToggleHanchan(int sessionNumber)
+    {
+        if (!expandedHanchans.Remove(sessionNumber))
+            expandedHanchans.Add(sessionNumber);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -394,7 +421,10 @@ else
             uma4Players = tournament?.Uma4Players != null ? new List<int>(tournament.Uma4Players) : new List<int>(settings.TournamentUma4Players);
             uma3Players = tournament?.Uma3Players != null ? new List<int>(tournament.Uma3Players) : new List<int>(settings.TournamentUma3Players);
             if (tournament != null && tournament.IsGenerated)
+            {
                 BuildTournamentMatrix();
+                expandedHanchans = new HashSet<int>(tournament.Sessions.Select(s => s.SessionNumber));
+            }
             StateHasChanged();
         }
     }
@@ -437,6 +467,7 @@ else
         }
 
         BuildTournamentMatrix();
+        expandedHanchans = new HashSet<int>(tournament.Sessions.Select(s => s.SessionNumber));
 
         await TournamentService.SaveAsync(tournament);
         saved = true;
@@ -617,7 +648,8 @@ else
         var html = new System.Text.StringBuilder();
         var text = new System.Text.StringBuilder();
 
-        var header = $"{tournament.Name} — {Lang.Get("Hanchan")} {sessionNumber}";
+        var timeStr = session.StartTime.HasValue ? $" {session.StartTime.Value.ToString(@"hh\:mm")}" : "";
+        var header = $"{tournament.Name} — {Lang.Get("Hanchan")} {sessionNumber}{timeStr}";
         html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin-bottom:8px;\">{header}</div>");
         text.AppendLine($"*{header}*");
         text.AppendLine();
@@ -638,9 +670,10 @@ else
 
         foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
         {
+            var timeStr = session.StartTime.HasValue ? $" {session.StartTime.Value.ToString(@"hh\:mm")}" : "";
             html.Append("<div style=\"break-inside:avoid;page-break-inside:avoid;\">");
-            html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin:12px 0 14px;\">{Lang.Get("Hanchan")} {session.SessionNumber}</div>");
-            text.AppendLine($"*{Lang.Get("Hanchan")} {session.SessionNumber}*");
+            html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin:12px 0 14px;\">{Lang.Get("Hanchan")} {session.SessionNumber}{timeStr}</div>");
+            text.AppendLine($"*{Lang.Get("Hanchan")} {session.SessionNumber}{timeStr}*");
 
             AppendTablesHtml(html, text, session.Tables);
             html.Append("</div>");

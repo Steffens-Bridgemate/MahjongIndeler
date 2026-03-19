@@ -1,0 +1,84 @@
+@page "/tournament/{Id:guid}/rankings"
+@using Tsump.Models
+@using Tsump.Services
+@inject TournamentService TournamentService
+@inject SettingsService SettingsService
+@inject LanguageService Lang
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@Lang.Get("Rankings") - Tsumo!</PageTitle>
+
+<div class="mb-3">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
+        &larr; @Lang.Get("BackToTournaments")
+    </button>
+</div>
+
+@if (tournament == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else
+{
+    <h1>@tournament.Name</h1>
+    <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
+
+    @* --- Sub-navigation --- *@
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link" href="tournament/@Id/participants">@Lang.Get("TournamentParticipants")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="tournament/@Id">@Lang.Get("TournamentAssignments")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/guidesheets" : "#")">@Lang.Get("TournamentGuidesheets")</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="tournament/@Id/rankings">@Lang.Get("Rankings")</a>
+        </li>
+    </ul>
+
+    <RankingTable Entries="BuildTournamentRankings()" />
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Tournament? tournament;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    private void GoToList() => Nav.NavigateTo("tournaments");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            tournament = await TournamentService.GetByIdAsync(Id);
+            StateHasChanged();
+        }
+    }
+
+    private string GetParticipantDisplay(Guid id)
+    {
+        var p = tournament?.Participants.FirstOrDefault(x => x.Id == id);
+        return p != null ? $"{p.Number}. {p.Name}" : Lang.Get("Unknown");
+    }
+
+    private List<RankingTable.RankingEntry> BuildTournamentRankings()
+    {
+        if (tournament == null) return new();
+
+        var hanchans = tournament.Sessions
+            .Where(s => s.Tables.Any(t => t.Score != null))
+            .OrderBy(s => s.SessionNumber)
+            .Select(s => (Label: $"{Lang.Get("Hanchan")} {s.SessionNumber}", Tables: s.Tables))
+            .ToList();
+
+        var allParticipantIds = tournament.Participants.Select(p => p.Id).ToHashSet();
+        return RankingTable.BuildRankings(hanchans, GetParticipantDisplay, allParticipantIds);
+    }
+}

@@ -277,6 +277,11 @@ else
                     @Lang.Get("Scores")
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link @(activeTab == "rankings" ? "active" : "")" href="javascript:void(0)" @onclick='() => activeTab = "rankings"'>
+                    @Lang.Get("Rankings")
+                </a>
+            </li>
         </ul>
 
         @if (activeTab == "tables")
@@ -343,6 +348,10 @@ else
                 <ScoreTable Table="table" PlayerNameResolver="GetPlayerName" OnScoresComplete="SaveScores"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
+        }
+        else if (activeTab == "rankings")
+        {
+            <RankingTable Entries="BuildWeeklyRankings()" />
         }
     }
 
@@ -1008,6 +1017,23 @@ else
         if (currentHanchan == null) return;
         currentHanchan.Tables = tables;
         await SessionService.SaveAsync(currentHanchan);
+    }
+
+    private List<RankingTable.RankingEntry> BuildWeeklyRankings()
+    {
+        var orderedHanchans = hanchansOnDate
+            .Where(h => h.Tables.Any(t => t.Score != null))
+            .OrderBy(h => h.StartTime ?? TimeSpan.Zero)
+            .ToList();
+
+        var hanchans = orderedHanchans.Select((h, i) =>
+        {
+            var timeStr = h.StartTime is { } st ? st.ToString(@"hh\:mm") : "";
+            var label = orderedHanchans.Count > 1 ? $"#{i + 1} {timeStr}".Trim() : timeStr;
+            return (Label: label, Tables: h.Tables);
+        }).ToList();
+
+        return RankingTable.BuildRankings(hanchans, GetPlayerName);
     }
 
     private async Task BackToWorkflow()

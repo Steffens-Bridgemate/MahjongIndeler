@@ -35,6 +35,9 @@ else
         <li class="nav-item">
             <a class="nav-link active" href="tournament/@Id/guidesheets">@Lang.Get("TournamentGuidesheets")</a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/rankings" : "#")">@Lang.Get("Rankings")</a>
+        </li>
     </ul>
 
     <p class="text-muted">@Lang.Get("GuidesheetsDesc")</p>
