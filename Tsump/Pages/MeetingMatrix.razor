@@ -21,6 +21,26 @@ else if (activePlayers.Count == 0)
 }
 else
 {
+    <div class="mb-3">
+        <table class="table table-bordered table-sm" style="width:auto;">
+            <thead>
+                <tr>
+                    <th class="text-center">@Lang.Get("Meetings")</th>
+                    <th class="text-center">@Lang.Get("Pairs")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in meetingDistribution)
+                {
+                    <tr>
+                        <td class="text-center @GetCellClass(entry.Key)">@entry.Key</td>
+                        <td class="text-center">@entry.Value</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-bordered table-sm meeting-matrix">
             <thead>
@@ -52,26 +72,6 @@ else
                                 <td class="text-center @GetCellClass(count)">@count</td>
                             }
                         }
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-    <div class="mt-3">
-        <table class="table table-bordered table-sm" style="width:auto;">
-            <thead>
-                <tr>
-                    <th class="text-center">@Lang.Get("Meetings")</th>
-                    <th class="text-center">@Lang.Get("Pairs")</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var entry in meetingDistribution)
-                {
-                    <tr>
-                        <td class="text-center @GetCellClass(entry.Key)">@entry.Key</td>
-                        <td class="text-center">@entry.Value</td>
                     </tr>
                 }
             </tbody>

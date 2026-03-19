@@ -57,6 +57,7 @@ public class LanguageService
         ["WeeklySession"] = "Zitting",
         ["History"] = "Geschiedenis",
         ["MeetingMatrix"] = "Ontmoetingen",
+        ["CompetitionRanking"] = "Competitiestand",
         ["ClubManager"] = "Clubbeheer",
         ["MahjongclubTsumo"] = "Mahjongclub Tsumo!",
 
@@ -70,6 +71,8 @@ public class LanguageService
         ["HistoryDesc"] = "Eerdere zittingen en spelerstatistieken bekijken.",
         ["ViewMatrix"] = "Ontmoetingen",
         ["MeetingMatrixDesc"] = "Bekijk hoe vaak spelers tegen elkaar gespeeld hebben.",
+        ["ViewCompetitionRanking"] = "Competitiestand",
+        ["CompetitionRankingDesc"] = "Bekijk de gemiddelde scores van de competitie.",
         ["WorkflowHomeDesc"] = "Volg het stappenplan om een zitting voor te bereiden en af te ronden.",
         ["StartWorkflow"] = "Start stappenplan",
 
@@ -123,6 +126,7 @@ public class LanguageService
         ["AllAbsent"] = "Allen afwezig",
         ["SearchMembers"] = "Leden zoeken...",
         ["GenerateTableAssignments"] = "Tafelindeling maken",
+        ["CopyTables"] = "Tafelindeling overnemen",
         ["SaveHanchan"] = "Hanchan opslaan",
         ["NeedAtLeast3"] = "Minimaal 3 aanwezige spelers nodig.",
         ["TableAssignments"] = "Tafelindeling",
@@ -159,6 +163,10 @@ public class LanguageService
         // Meeting Matrix page
         ["MeetingMatrixTitle"] = "Ontmoetingen",
         ["MeetingMatrixSubtitle"] = "Hoe vaak elk paar spelers aan dezelfde tafel heeft gezeten.",
+        ["CompetitionRankingTitle"] = "Competitiestand",
+        ["CompetitionRankingSubtitle"] = "Gemiddelde score van alle zittingen die meetellen voor de competitie.",
+        ["AverageScore"] = "Gemiddelde",
+        ["NoScoreData"] = "Er zijn nog geen scores ingevoerd.",
         ["NoSessionData"] = "Nog geen zittingsgegevens.",
         ["Meetings"] = "Ontmoetingen",
         ["Pairs"] = "Paren",
@@ -340,6 +348,7 @@ public class LanguageService
         ["WeeklySession"] = "Session",
         ["History"] = "History",
         ["MeetingMatrix"] = "Meetings",
+        ["CompetitionRanking"] = "Competition Ranking",
         ["ClubManager"] = "Club Manager",
         ["MahjongclubTsumo"] = "Mahjongclub Tsumo",
 
@@ -353,6 +362,8 @@ public class LanguageService
         ["HistoryDesc"] = "View past sessions and player statistics.",
         ["ViewMatrix"] = "Meetings",
         ["MeetingMatrixDesc"] = "See how often each pair of players has met.",
+        ["ViewCompetitionRanking"] = "Competition Ranking",
+        ["CompetitionRankingDesc"] = "View average competition scores.",
         ["WorkflowHomeDesc"] = "Follow the step-by-step guide to prepare and finalize a session.",
         ["StartWorkflow"] = "Start workflow",
 
@@ -406,6 +417,7 @@ public class LanguageService
         ["AllAbsent"] = "All Absent",
         ["SearchMembers"] = "Search members...",
         ["GenerateTableAssignments"] = "Generate Table Assignments",
+        ["CopyTables"] = "Copy Table Assignments",
         ["SaveHanchan"] = "Save Hanchan",
         ["NeedAtLeast3"] = "Need at least 3 present players.",
         ["TableAssignments"] = "Table Assignments",
@@ -442,6 +454,10 @@ public class LanguageService
         // Meeting Matrix page
         ["MeetingMatrixTitle"] = "Meetings",
         ["MeetingMatrixSubtitle"] = "How many times each pair of players has been at the same table.",
+        ["CompetitionRankingTitle"] = "Competition Ranking",
+        ["CompetitionRankingSubtitle"] = "Average score across all sessions that count towards the competition.",
+        ["AverageScore"] = "Average",
+        ["NoScoreData"] = "No scores have been entered yet.",
         ["NoSessionData"] = "No hanchan data yet.",
         ["Meetings"] = "Meetings",
         ["Pairs"] = "Pairs",

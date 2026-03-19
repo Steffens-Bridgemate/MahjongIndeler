@@ -192,6 +192,12 @@ else
                 <button class="btn btn-primary me-2" @onclick="GenerateTables" disabled="@(presentIds.Count < 3)">
                     @Lang.Get("GenerateTableAssignments")
                 </button>
+                @if (tables.Count == 0 && PreviousHanchanWithTables() != null)
+                {
+                    <button class="btn btn-outline-primary me-2" @onclick="CopyTablesFromPrevious">
+                        @Lang.Get("CopyTables")
+                    </button>
+                }
             }
             <button class="btn save-hanchan-btn icon-btn @(saved ? "btn-outline-secondary" : "btn-success")" @onclick="SaveHanchan" disabled="@(tables.Count == 0)" title="@Lang.Get("SaveHanchan")">
                 &#x1F4BE;
@@ -710,6 +716,30 @@ else
     private void CancelRegenerate()
     {
         showRegenerateConfirm = false;
+    }
+
+    private Hanchan? PreviousHanchanWithTables()
+    {
+        return hanchansOnDate
+            .Where(h => h.Id != currentHanchan?.Id && h.Tables.Count > 0)
+            .OrderByDescending(h => h.StartTime ?? TimeSpan.Zero)
+            .FirstOrDefault();
+    }
+
+    private async Task CopyTablesFromPrevious()
+    {
+        var previous = PreviousHanchanWithTables();
+        if (previous == null) return;
+
+        presentIds = new HashSet<Guid>(previous.PresentMemberIds);
+        tables = previous.Tables.Select(t => new TableAssignment
+        {
+            TableNumber = t.TableNumber,
+            PlayerIds = new List<Guid>(t.PlayerIds)
+        }).ToList();
+
+        attendanceResetConfirmed = false;
+        await SaveHanchan();
     }
 
     private async Task DoGenerateTables()

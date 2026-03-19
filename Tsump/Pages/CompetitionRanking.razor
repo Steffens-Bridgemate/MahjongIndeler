@@ -1,0 +1,164 @@
+@page "/competition-ranking"
+@using Tsump.Models
+@using Tsump.Services
+@inject SessionService SessionService
+@inject MemberService MemberService
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>@Lang.Get("CompetitionRankingTitle") - Tsumo!</PageTitle>
+
+<h1>@Lang.Get("CompetitionRankingTitle")</h1>
+<p class="text-muted">@Lang.Get("CompetitionRankingSubtitle")</p>
+
+@if (entries == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else if (entries.Count == 0)
+{
+    <p class="text-muted">@Lang.Get("NoScoreData")</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>@Lang.Get("Rank")</th>
+                    <th>@Lang.Get("Name")</th>
+                    <th class="text-center">@Lang.Get("AverageScore")</th>
+                    @foreach (var label in hanchanLabels)
+                    {
+                        <th class="text-center">@label</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @{ int rank = 1; }
+                @foreach (var entry in entries)
+                {
+                    <tr>
+                        <td>@rank</td>
+                        <td>@entry.Name</td>
+                        <td class="text-center fw-bold">@FormatAverage(entry.Average)</td>
+                        @foreach (var score in entry.Scores)
+                        {
+                            <td class="text-center">@(score.HasValue ? FormatScore(score.Value) : "—")</td>
+                        }
+                    </tr>
+                    rank++;
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<CompetitionEntry>? entries;
+    private List<string> hanchanLabels = new();
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += Refresh;
+    public void Dispose() => Lang.OnLanguageChanged -= Refresh;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await BuildRankings();
+            StateHasChanged();
+        }
+    }
+
+    private async void Refresh()
+    {
+        await BuildRankings();
+        StateHasChanged();
+    }
+
+    private async Task BuildRankings()
+    {
+        var members = await MemberService.GetAllAsync();
+        var nameMap = members.ToDictionary(m => m.Id, m => m.Name);
+
+        var allSessions = await SessionService.GetAllAsync();
+        var hanchans = allSessions
+            .Where(s => !s.ExcludeFromOptimization)
+            .OrderBy(s => s.Date)
+            .ThenBy(s => s.StartTime ?? TimeSpan.Zero)
+            .ToList();
+
+        hanchanLabels = BuildLabels(hanchans);
+
+        var playerScores = new Dictionary<Guid, List<int?>>();
+
+        for (int hi = 0; hi < hanchans.Count; hi++)
+        {
+            var scoresInHanchan = new Dictionary<Guid, int>();
+            foreach (var table in hanchans[hi].Tables)
+            {
+                if (table.Score == null) continue;
+                var allFilled = table.Score.PlayerScores.All(p => p.EndPoints.HasValue);
+                var sumZero = table.Score.PlayerScores.Sum(p => p.Difference) == 0;
+                if (!allFilled || !sumZero) continue;
+                foreach (var ps in table.Score.PlayerScores.Where(p => !p.IsVirtual))
+                {
+                    scoresInHanchan[ps.PlayerId] = ps.Total;
+                }
+            }
+
+            foreach (var pid in scoresInHanchan.Keys)
+            {
+                if (!playerScores.ContainsKey(pid))
+                    playerScores[pid] = Enumerable.Repeat<int?>(null, hi).ToList();
+            }
+
+            foreach (var kv in playerScores)
+            {
+                kv.Value.Add(scoresInHanchan.TryGetValue(kv.Key, out var s) ? s : null);
+            }
+        }
+
+        entries = playerScores
+            .Select(kv =>
+            {
+                var validScores = kv.Value.Where(s => s.HasValue).Select(s => s!.Value).ToList();
+                var average = validScores.Count > 0 ? validScores.Average() : 0.0;
+                var name = nameMap.TryGetValue(kv.Key, out var n) ? n : "?";
+                return new CompetitionEntry(name, average, kv.Value);
+            })
+            .OrderByDescending(e => e.Average)
+            .ToList();
+    }
+
+    private static List<string> BuildLabels(List<Hanchan> hanchans)
+    {
+        var labels = new List<string>();
+        var grouped = hanchans.GroupBy(h => h.Date.Date).ToList();
+
+        foreach (var group in grouped)
+        {
+            var ordered = group.OrderBy(h => h.StartTime ?? TimeSpan.Zero).ToList();
+            var dateStr = group.Key.ToString("dd/MM");
+
+            if (ordered.Count == 1)
+            {
+                labels.Add(dateStr);
+            }
+            else
+            {
+                for (int i = 0; i < ordered.Count; i++)
+                {
+                    labels.Add($"{dateStr} #{i + 1}");
+                }
+            }
+        }
+
+        return labels;
+    }
+
+    private static string FormatScore(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
+    private static string FormatAverage(double value) => (value / 1000.0).ToString("+0.00;-0.00;0.00");
+
+    private record CompetitionEntry(string Name, double Average, List<int?> Scores);
+}
