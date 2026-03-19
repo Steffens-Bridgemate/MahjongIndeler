@@ -287,6 +287,8 @@
             var members = JsonSerializer.Deserialize<List<Member>>(root.GetProperty("Members").GetRawText(), options);
             var sessions = JsonSerializer.Deserialize<List<Hanchan>>(root.GetProperty("Sessions").GetRawText(), options);
 
+            await ClearAllStoredData();
+
             if (members != null)
                 await Storage.SetAsync("tsump_members", members);
             if (sessions != null)
@@ -306,7 +308,7 @@
                     await Storage.SetAsync("tsump_tournaments", tournaments);
             }
 
-            // Reset workflow after import, but preserve step 1 (manual copy step)
+            // Reset workflow after import, preserve step 1 (manual copy step)
             var wfState = await Storage.GetAsync<Dictionary<int, bool>>("tsump_workflow") ?? new();
             var step1Done = wfState.GetValueOrDefault(0, false);
             await Storage.SetAsync("tsump_workflow", new Dictionary<int, bool> { [0] = step1Done });
@@ -341,12 +343,18 @@
         enteredCode = "";
     }
 
-    private async Task DeleteAllData()
+    private async Task ClearAllStoredData()
     {
         await Storage.RemoveAsync("tsump_members");
         await Storage.RemoveAsync("tsump_sessions");
-        await Storage.RemoveAsync("tsump_tournaments");
         await Storage.RemoveAsync("tsump_settings");
+        await Storage.RemoveAsync("tsump_tournaments");
+        await Storage.RemoveAsync("tsump_workflow");
+    }
+
+    private async Task DeleteAllData()
+    {
+        await ClearAllStoredData();
         showDeleteConfirm = false;
         enteredCode = "";
         dataDeleted = true;
