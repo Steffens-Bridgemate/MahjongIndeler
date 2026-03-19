@@ -61,46 +61,54 @@
     </div>
 </div>
 
-@if (hanchansOnDate.Count > 0)
+@if (hanchansOnDate.Count > 0 || currentHanchan == null)
 {
-    <div class="mb-3">
-        <label class="form-label"><strong>@Lang.Get("SessionsOnDate")</strong></label>
-        <div class="btn-group d-block" role="group">
-            @foreach (var s in hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero))
-            {
-                var isActive = currentHanchan?.Id == s.Id;
-                var sessionLabel = GetSessionLabel(s);
-                <button class="btn btn-sm me-1 mb-1 @(isActive ? "btn-primary" : "btn-outline-primary")"
-                        @onclick="() => SelectHanchan(s)">
+    <ul class="nav nav-tabs mb-2">
+        @foreach (var s in hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero))
+        {
+            var isActive = currentHanchan?.Id == s.Id;
+            var sessionLabel = GetSessionLabel(s);
+            <li class="nav-item">
+                <a class="nav-link @(isActive ? "active" : "")" href="javascript:void(0)" @onclick="() => SelectHanchan(s)">
                     @sessionLabel
+                </a>
+            </li>
+        }
+        @if (hanchansOnDate.Any(h => h.Tables.Any(t => t.Score != null)))
+        {
+            <li class="nav-item">
+                <a class="nav-link @(activeTab == "rankings" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateRankingsTab">
+                    @Lang.Get("Rankings")
+                </a>
+            </li>
+        }
+    </ul>
+    <div class="d-flex align-items-center mb-3 flex-wrap gap-1">
+        <button class="btn btn-sm btn-outline-success" @onclick="StartNewHanchan"
+                disabled="@(currentHanchan != null && !currentHanchan.IsFinalized)">
+            + @Lang.Get("NewSession")
+        </button>
+        @if (hanchansOnDate.Count(s => s.Tables.Count > 0) > 1)
+        {
+            @if (showExportAll)
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyAllHanchansToClipboard">
+                    @(copiedAllToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenAllHanchans">
+                    @Lang.Get("OpenPrint")
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadAllHanchans">
+                    @Lang.Get("DownloadHtml")
                 </button>
             }
-            <button class="btn btn-sm btn-outline-success me-1 mb-1" @onclick="StartNewHanchan"
-                    disabled="@(currentHanchan != null && !currentHanchan.IsFinalized)">
-                + @Lang.Get("NewSession")
-            </button>
-            @if (hanchansOnDate.Count(s => s.Tables.Count > 0) > 1)
+            else
             {
-                @if (showExportAll)
-                {
-                    <button class="btn btn-sm btn-outline-secondary me-1 mb-1" @onclick="CopyAllHanchansToClipboard">
-                        @(copiedAllToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary me-1 mb-1" @onclick="OpenAllHanchans">
-                        @Lang.Get("OpenPrint")
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary me-1 mb-1" @onclick="DownloadAllHanchans">
-                        @Lang.Get("DownloadHtml")
-                    </button>
-                }
-                else
-                {
-                    <button class="btn btn-sm btn-outline-secondary me-1 mb-1" @onclick="() => showExportAll = true">
-                        @Lang.Get("Export")
-                    </button>
-                }
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportAll = true">
+                    @Lang.Get("Export")
+                </button>
             }
-        </div>
+        }
     </div>
 }
 
@@ -242,13 +250,16 @@ else
         </div>
     }
 
-    @if (tables.Count > 0)
+    @if (activeTab == "rankings")
+    {
+        <RankingTable Entries="BuildWeeklyRankings()" />
+    }
+    else if (tables.Count > 0)
     {
         <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
-            <h4 class="mb-0">@Lang.Get("Hanchan") @GetCurrentHanchanHeader()</h4>
             @if (showExportSingle)
             {
-                <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyTablesToClipboard">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyTablesToClipboard">
                     @(copiedToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="OpenSingleHanchan">
@@ -260,7 +271,7 @@ else
             }
             else
             {
-                <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="() => showExportSingle = true">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportSingle = true">
                     @Lang.Get("Export")
                 </button>
             }
@@ -275,11 +286,6 @@ else
             <li class="nav-item">
                 <a class="nav-link @(activeTab == "scores" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateScoresTab">
                     @Lang.Get("Scores")
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link @(activeTab == "rankings" ? "active" : "")" href="javascript:void(0)" @onclick='() => activeTab = "rankings"'>
-                    @Lang.Get("Rankings")
                 </a>
             </li>
         </ul>
@@ -348,10 +354,6 @@ else
                 <ScoreTable Table="table" PlayerNameResolver="GetPlayerName" OnScoresComplete="SaveScores"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
-        }
-        else if (activeTab == "rankings")
-        {
-            <RankingTable Entries="BuildWeeklyRankings()" />
         }
     }
 
@@ -537,26 +539,6 @@ else
         return timeStr;
     }
 
-    private string GetCurrentHanchanHeader()
-    {
-        var ordered = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
-        int index;
-        if (currentHanchan == null)
-            index = ordered.Count + 1;
-        else
-        {
-            var idx = ordered.FindIndex(s => s.Id == currentHanchan.Id);
-            index = idx >= 0 ? idx + 1 : ordered.Count + 1;
-        }
-        var timeStr = hanchanStartTime.HasValue
-            ? hanchanStartTime.Value.ToString(@"hh\:mm")
-            : "";
-
-        var header = $"{index}";
-        if (timeStr.Length > 0)
-            header += $" {timeStr}";
-        return header;
-    }
 
     private async Task OnDateChanged(ChangeEventArgs e)
     {
@@ -959,6 +941,11 @@ else
     {
         activeTab = "scores";
         ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
+    }
+
+    private void ActivateRankingsTab()
+    {
+        activeTab = "rankings";
     }
 
     private void RequestDeleteHanchan()

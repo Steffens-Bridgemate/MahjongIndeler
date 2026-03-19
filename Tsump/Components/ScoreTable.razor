@@ -19,7 +19,7 @@
             <table class="table table-sm table-bordered mb-0">
                 <thead>
                     <tr>
-                        <th style="min-width:110px;"></th>
+                        <th style="min-width:60px;"></th>
                         @foreach (var ps in score.PlayerScores)
                         {
                             <th class="text-center" style="min-width:90px;">
@@ -37,7 +37,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>@Lang.Get("StartingPoints")</td>
+                        <td>@Lang.Get("StartShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             var psRef = ps;
@@ -50,7 +50,7 @@
                         }
                     </tr>
                     <tr>
-                        <td>@Lang.Get("EndPoints")</td>
+                        <td>@Lang.Get("EndShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             var psRef = ps;
@@ -65,7 +65,7 @@
                     </tr>
                     <tr class="@(hasError ? "table-danger" : "")">
                         <td>
-                            @Lang.Get("Difference")
+                            @Lang.Get("DifferenceShort")
                             @if (hasError)
                             {
                                 <br /><small class="text-danger">@(sumDiff < 0 ? Lang.Get("Deficit") : Lang.Get("Surplus")): @Math.Abs(sumDiff) @Lang.Get("Points")</small>
@@ -90,7 +90,7 @@
                         }
                     </tr>
                     <tr>
-                        <td>@Lang.Get("Uma")</td>
+                        <td>@Lang.Get("UmaShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             <td class="text-center">
@@ -110,7 +110,7 @@
                         }
                     </tr>
                     <tr class="table-active fw-bold">
-                        <td>@Lang.Get("FinalScore")</td>
+                        <td>@Lang.Get("FinalScoreShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             <td class="text-center">
