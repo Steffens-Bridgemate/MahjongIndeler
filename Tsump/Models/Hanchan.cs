@@ -32,7 +32,9 @@ public class PlayerScore
     public string VirtualName { get; set; } = string.Empty;
     public int StartingPoints { get; set; }
     public int? EndPoints { get; set; }
-    public int Difference => (EndPoints ?? StartingPoints) - StartingPoints;
+    public int Loan { get; set; }
+    public int Difference => (EndPoints ?? StartingPoints) + Loan - StartingPoints;
     public int Uma { get; set; }
-    public int Total => Difference + Uma;
+    public int Penalty { get; set; }
+    public int Total => Difference + Uma + Penalty;
 }

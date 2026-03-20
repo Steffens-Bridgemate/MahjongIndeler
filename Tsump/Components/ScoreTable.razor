@@ -8,6 +8,8 @@
     var sumDiff = score.PlayerScores.Sum(p => p.Difference);
     var allEndPointsFilled = score.PlayerScores.All(p => p.EndPoints.HasValue);
     var hasError = allEndPointsFilled && sumDiff != 0;
+    if (score.PlayerScores.Any(p => p.Loan != 0 || p.Penalty != 0))
+        showExtras = true;
 }
 
 <div class="card mb-3 @(Table.PlayerCount == 3 ? "border-warning" : "border-success")">
@@ -19,7 +21,11 @@
             <table class="table table-sm table-bordered mb-0">
                 <thead>
                     <tr>
-                        <th style="min-width:60px;"></th>
+                        <th style="min-width:60px;text-align:center;vertical-align:middle;">
+                            <button class="btn btn-outline-secondary" style="font-size:1.5rem;width:2.2rem;height:2.2rem;padding:0;display:inline-flex;align-items:center;justify-content:center;line-height:1;" @onclick="ToggleExtras" title="@Lang.Get("Advanced")">
+                                @(showExtras ? "−" : "+")
+                            </button>
+                        </th>
                         @foreach (var ps in score.PlayerScores)
                         {
                             <th class="text-center" style="min-width:90px;">
@@ -49,6 +55,23 @@
                             </td>
                         }
                     </tr>
+                    @if (showExtras)
+                    {
+                    <tr>
+                        <td>@Lang.Get("LoanShort")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            var psRef = ps;
+                            <td class="text-center">
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       value="@(psRef.Loan != 0 ? FormatDisplay(psRef.Loan) : "")"
+                                       placeholder="—"
+                                       @onchange="e => OnLoanChanged(psRef, e)"
+                                       style="width:100%;" />
+                            </td>
+                        }
+                    </tr>
+                    }
                     <tr>
                         <td>@Lang.Get("EndShort")</td>
                         @foreach (var ps in score.PlayerScores)
@@ -109,6 +132,30 @@
                             </td>
                         }
                     </tr>
+                    @if (showExtras)
+                    {
+                    <tr>
+                        <td>@Lang.Get("PenaltyShort")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            var psRef = ps;
+                            <td class="text-center">
+                                @if (ps.IsVirtual)
+                                {
+                                    @* Mr. X: no penalty *@
+                                }
+                                else
+                                {
+                                    <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                           value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
+                                           placeholder="—"
+                                           @onchange="e => OnPenaltyChanged(psRef, e)"
+                                           style="width:100%;" />
+                                }
+                            </td>
+                        }
+                    </tr>
+                    }
                     <tr class="table-active fw-bold">
                         <td>@Lang.Get("FinalScoreShort")</td>
                         @foreach (var ps in score.PlayerScores)
@@ -154,6 +201,10 @@
     [Parameter]
     public List<int> Uma3Players { get; set; } = new() { 12500, 0, -12500 };
 
+    private bool showExtras;
+
+    private void ToggleExtras() => showExtras = !showExtras;
+
     private string GetPlayerName(Guid id) => PlayerNameResolver(id);
 
     // Display: internal int ÷ 100, one decimal
@@ -185,9 +236,23 @@
         await CheckAndNotifyComplete();
     }
 
+    private async Task OnLoanChanged(PlayerScore ps, ChangeEventArgs e)
+    {
+        ps.Loan = ParseInput(e.Value?.ToString()) ?? 0;
+        CalculateUma();
+        await CheckAndNotifyComplete();
+    }
+
     private async Task OnEndPointsChanged(PlayerScore ps, ChangeEventArgs e)
     {
         ps.EndPoints = ParseInput(e.Value?.ToString());
+        CalculateUma();
+        await CheckAndNotifyComplete();
+    }
+
+    private async Task OnPenaltyChanged(PlayerScore ps, ChangeEventArgs e)
+    {
+        ps.Penalty = ParseInput(e.Value?.ToString()) ?? 0;
         CalculateUma();
         await CheckAndNotifyComplete();
     }
