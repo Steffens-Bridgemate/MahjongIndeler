@@ -147,11 +147,11 @@ public class LanguageService
 
         // History page
         ["SessionHistory"] = "Geschiedenis",
+        ["GoTo"] = "Ga naar",
         ["NoSessionsYet"] = "Nog geen zittingen vastgelegd.",
         ["CreateFirstSession"] = "Maak je eerste zitting",
         ["PresentPlayers"] = "Aanwezige spelers",
         ["AbsentPlayers"] = "Afwezige spelers",
-        ["DeleteSession"] = "Zitting verwijderen",
         ["PlayerStatistics"] = "Spelerstatistieken",
         ["Player"] = "Speler",
         ["SessionsAttended"] = "Hanchans aanwezig",
@@ -443,11 +443,11 @@ public class LanguageService
 
         // History page
         ["SessionHistory"] = "Session History",
+        ["GoTo"] = "Go to",
         ["NoSessionsYet"] = "No sessions recorded yet.",
         ["CreateFirstSession"] = "Create your first session",
         ["PresentPlayers"] = "Present Players",
         ["AbsentPlayers"] = "Absent Players",
-        ["DeleteSession"] = "Delete Session",
         ["PlayerStatistics"] = "Player Statistics",
         ["Player"] = "Player",
         ["SessionsAttended"] = "Hanchans Attended",

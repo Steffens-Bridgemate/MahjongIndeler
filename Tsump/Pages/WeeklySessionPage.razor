@@ -497,12 +497,20 @@ else
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
 
-            // Auto-set date/time to next scheduled slot if no session exists for today
-            var nextSlot = await SettingsService.GetNextScheduledSlotAsync();
-            if (nextSlot != null)
+            // Check if navigated with a specific date
+            if (DateTime.TryParse(query["date"], out var requestedDate))
             {
-                sessionDate = nextSlot.Value.Date;
-                hanchanStartTime = nextSlot.Value.Time;
+                sessionDate = requestedDate;
+            }
+            else
+            {
+                // Auto-set date/time to next scheduled slot if no session exists for today
+                var nextSlot = await SettingsService.GetNextScheduledSlotAsync();
+                if (nextSlot != null)
+                {
+                    sessionDate = nextSlot.Value.Date;
+                    hanchanStartTime = nextSlot.Value.Time;
+                }
             }
 
             await LoadSessionsForDate();
