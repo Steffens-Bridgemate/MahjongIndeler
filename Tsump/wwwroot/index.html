@@ -32,7 +32,22 @@
     </div>
     <script src="lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        window.downloadFile = function (filename, contentBase64) {
+        window.downloadFile = async function (filename, contentBase64) {
+            var bytes = Uint8Array.from(atob(contentBase64), c => c.charCodeAt(0));
+            if (window.showSaveFilePicker) {
+                try {
+                    var handle = await window.showSaveFilePicker({
+                        suggestedName: filename,
+                        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+                    });
+                    var writable = await handle.createWritable();
+                    await writable.write(bytes);
+                    await writable.close();
+                    return;
+                } catch (e) {
+                    if (e.name === 'AbortError') return;
+                }
+            }
             var link = document.createElement('a');
             link.download = filename;
             link.href = "data:application/json;base64," + contentBase64;
