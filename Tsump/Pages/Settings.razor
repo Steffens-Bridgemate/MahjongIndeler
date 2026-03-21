@@ -14,6 +14,17 @@
     <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
 }
 
+@* --- Competition period --- *@
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">@Lang.Get("CompetitionPeriod")</h5>
+        <input type="text" class="form-control" style="max-width:250px;" maxlength="20"
+               value="@competitionPeriod"
+               @onchange="OnCompetitionPeriodChanged" />
+    </div>
+</div>
+
 @* --- Club night settings --- *@
 
 <div class="d-flex align-items-center justify-content-between mt-3 mb-3">
@@ -246,6 +257,7 @@
 
 
 @code {
+    private string competitionPeriod = "";
     private Dictionary<DayOfWeek, List<TimeSpan>> schedule = new();
     private Dictionary<DayOfWeek, int> newHours = new();
     private Dictionary<DayOfWeek, int> newMinutes = new();
@@ -276,6 +288,7 @@
         if (firstRender)
         {
             var settings = await SettingsService.GetAsync();
+            competitionPeriod = settings.CompetitionPeriod;
             foreach (var entry in settings.Schedule)
             {
                 schedule[entry.Day] = new List<TimeSpan>(entry.StartTimes);
@@ -369,10 +382,17 @@
         return fallback;
     }
 
+    private async Task OnCompetitionPeriodChanged(ChangeEventArgs e)
+    {
+        competitionPeriod = e.Value?.ToString() ?? string.Empty;
+        await Save();
+    }
+
     private async Task Save()
     {
         var settings = new ClubSettings
         {
+            CompetitionPeriod = competitionPeriod,
             Schedule = schedule
                 .Where(kv => kv.Value.Count > 0)
                 .Select(kv => new ScheduleEntry

@@ -2,6 +2,7 @@ namespace Tsump.Models;
 
 public class ClubSettings
 {
+    public string CompetitionPeriod { get; set; } = "";
     public List<ScheduleEntry> Schedule { get; set; } = new();
     public TimeSpan DefaultStartTime { get; set; } = new TimeSpan(13, 0, 0);
     public List<TimeSpan> TournamentStartTimes { get; set; } = new()

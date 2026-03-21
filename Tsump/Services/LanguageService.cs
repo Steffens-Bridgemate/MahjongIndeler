@@ -191,6 +191,7 @@ public class LanguageService
 
         // Settings page
         ["Settings"] = "Instellingen",
+        ["CompetitionPeriod"] = "Huidige competitieperiode",
         ["PlayingDays"] = "Speeldagen",
         ["PlayingDaysDesc"] = "Selecteer de dagen waarop de club speelt en stel de starttijden in.",
         ["AddTime"] = "Tijd toevoegen",
@@ -487,6 +488,7 @@ public class LanguageService
 
         // Settings page
         ["Settings"] = "Settings",
+        ["CompetitionPeriod"] = "Current competition period",
         ["PlayingDays"] = "Playing Days",
         ["PlayingDaysDesc"] = "Select the days the club plays and set the starting times.",
         ["AddTime"] = "Add time",

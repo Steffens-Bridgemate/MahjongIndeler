@@ -3,9 +3,10 @@
 @inject LanguageService Lang
 @inject AppModeService Mode
 @inject NavigationManager Nav
+@inject SettingsService SettingsService
 @implements IDisposable
 
-<PageTitle>Tsumo! - @Lang.Get("ClubManager")</PageTitle>
+<PageTitle>Tsumo!@(string.IsNullOrWhiteSpace(competitionPeriod) ? "" : $" - {competitionPeriod}")</PageTitle>
 
 <div class="text-center mt-4">
     <div class="mb-4">
@@ -14,7 +15,10 @@
              class="img-fluid"
              style="max-width: 100%; border-radius: 3px;" />
     </div>
-    <p class="lead">@Lang.Get("ClubManager")</p>
+    @if (!string.IsNullOrWhiteSpace(competitionPeriod))
+    {
+        <h3 class="fw-bold text-primary">@competitionPeriod</h3>
+    }
 
     @* --- Mode selection --- *@
     <div class="row justify-content-center mt-3 mb-3">
@@ -119,11 +123,15 @@
 </div>
 
 @code {
+    private string competitionPeriod = "";
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await Mode.LoadAsync();
+            var settings = await SettingsService.GetAsync();
+            competitionPeriod = settings.CompetitionPeriod;
             StateHasChanged();
         }
     }
