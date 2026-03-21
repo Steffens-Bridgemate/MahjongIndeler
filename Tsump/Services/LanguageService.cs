@@ -214,7 +214,7 @@ public class LanguageService
         ["WfStep1Desc"] = "Importeer het bestand met de clubgegevens.",
         ["WfStep1Button"] = "Naar Gegevensbeheer",
         ["WfStep2Title"] = "Stap 2: Zitting instellen",
-        ["WfStep2Desc"] = "Stel de aanwezigheid in, genereer de tafelindeling en sla de hanchan op.",
+        ["WfStep2Desc"] = "Stel de aanwezigheid in, genereer de tafelindeling en sla de hanchans op.",
         ["WfStep2Button"] = "Naar Zitting",
         ["WfStep2aTitle"] = "Stap 2a: Indeling bekend maken",
         ["WfStep2aDesc"] = "Indeling naar het klembord kopiëren en in de appgroup plakken.",
