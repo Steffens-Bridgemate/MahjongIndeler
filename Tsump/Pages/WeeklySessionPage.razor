@@ -212,7 +212,7 @@ else
             <button class="btn save-hanchan-btn icon-btn @(saved ? "btn-outline-secondary" : "btn-success")" @onclick="SaveHanchan" disabled="@(tables.Count == 0)" title="@Lang.Get("SaveHanchan")">
                 &#x1F4BE;
             </button>
-            @if (workflowStepIndex.HasValue)
+            @if (workflowStepKey != null)
             {
                 <button class="btn @(saved ? "btn-primary" : "btn-outline-secondary") ms-2"
                         disabled="@(!saved)" @onclick="BackToWorkflow">
@@ -457,7 +457,7 @@ else
     private bool copiedAllToClipboard;
     private bool showExportSingle;
     private bool showExportAll;
-    private int? workflowStepIndex;
+    private string? workflowStepKey;
     private string activeTab = "tables";
     private string TabContentKey => $"{currentHanchan?.Id}_{activeTab}";
     private int weeklyStartingPoints = 30000;
@@ -485,8 +485,9 @@ else
             // Check if navigated from workflow
             var uri = new Uri(Nav.Uri);
             var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-            if (int.TryParse(query["fromWorkflow"], out var idx))
-                workflowStepIndex = idx;
+            var wfKey = query["fromWorkflow"];
+            if (!string.IsNullOrEmpty(wfKey))
+                workflowStepKey = wfKey;
 
             var clubSettings = await SettingsService.GetAsync();
             defaultStartTime = clubSettings.DefaultStartTime;
@@ -496,6 +497,11 @@ else
 
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
+
+            // Check if navigated with a specific tab
+            var requestedTab = query["tab"];
+            if (!string.IsNullOrEmpty(requestedTab))
+                activeTab = requestedTab;
 
             // Check if navigated with a specific date
             if (DateTime.TryParse(query["date"], out var requestedDate))
@@ -514,6 +520,22 @@ else
             }
 
             await LoadSessionsForDate();
+
+            // Restore requested tab after LoadSessionsForDate (which resets activeTab via LoadFromHanchan)
+            if (!string.IsNullOrEmpty(requestedTab))
+            {
+                activeTab = requestedTab;
+                if (requestedTab == "allscores")
+                {
+                    foreach (var h in hanchansOnDate.Where(h => h.Tables.Count > 0))
+                        ScoreTable.InitializeScores(h.Tables, Lang.Get, weeklyStartingPoints);
+                }
+                else if (requestedTab == "scores")
+                {
+                    ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
+                }
+            }
+
             StateHasChanged();
         }
     }
@@ -1171,11 +1193,11 @@ else
 
     private async Task BackToWorkflow()
     {
-        if (workflowStepIndex.HasValue)
+        if (workflowStepKey != null)
         {
             // Mark the workflow step as done
-            var state = await Storage.GetAsync<Dictionary<int, bool>>("tsump_workflow") ?? new();
-            state[workflowStepIndex.Value] = true;
+            var state = await Storage.GetAsync<Dictionary<string, bool>>("tsump_workflow") ?? new();
+            state[workflowStepKey!] = true;
             await Storage.SetAsync("tsump_workflow", state);
         }
         Nav.NavigateTo("workflow");

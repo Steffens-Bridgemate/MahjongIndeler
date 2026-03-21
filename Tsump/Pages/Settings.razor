@@ -166,6 +166,17 @@
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox"
+                   checked="@enableScoreEntry"
+                   @onchange="e => { enableScoreEntry = (bool)(e.Value ?? false); saved = false; }" />
+            <label class="form-check-label">@Lang.Get("EnableScoreEntry")</label>
+        </div>
+    </div>
+</div>
+
 @* --- Tournament settings --- *@
 
 <div class="d-flex align-items-center justify-content-between mt-3 mb-3">
@@ -258,6 +269,7 @@
 
 @code {
     private string competitionPeriod = "";
+    private bool enableScoreEntry;
     private Dictionary<DayOfWeek, List<TimeSpan>> schedule = new();
     private Dictionary<DayOfWeek, int> newHours = new();
     private Dictionary<DayOfWeek, int> newMinutes = new();
@@ -289,6 +301,7 @@
         {
             var settings = await SettingsService.GetAsync();
             competitionPeriod = settings.CompetitionPeriod;
+            enableScoreEntry = settings.EnableScoreEntry;
             foreach (var entry in settings.Schedule)
             {
                 schedule[entry.Day] = new List<TimeSpan>(entry.StartTimes);
@@ -393,6 +406,7 @@
         var settings = new ClubSettings
         {
             CompetitionPeriod = competitionPeriod,
+            EnableScoreEntry = enableScoreEntry,
             Schedule = schedule
                 .Where(kv => kv.Value.Count > 0)
                 .Select(kv => new ScheduleEntry

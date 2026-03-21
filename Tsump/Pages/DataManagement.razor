@@ -32,7 +32,7 @@
                 {
                     <div class="alert alert-success mt-2 mb-0">@Lang.Get("ExportSuccess")</div>
                 }
-                @if (workflowStepIndex == 3)
+                @if (workflowStepKey == "export")
                 {
                     <div class="mt-3 p-2 rounded @(exportDone ? "bg-primary-subtle border border-primary" : "bg-light")">
                         <button class="btn @(exportDone ? "btn-primary" : "btn-outline-secondary") btn-sm" disabled="@(!exportDone)" @onclick="BackToWorkflow">
@@ -83,7 +83,7 @@
                 {
                     <div class="alert alert-success mt-2 mb-0">@Lang.Get("ImportSuccess")</div>
                 }
-                @if (workflowStepIndex == 1)
+                @if (workflowStepKey == "import")
                 {
                     <div class="mt-3 p-2 rounded @(importDone ? "bg-primary-subtle border border-primary" : "bg-light")">
                         <button class="btn @(importDone ? "btn-primary" : "btn-outline-secondary") btn-sm" disabled="@(!importDone)" @onclick="BackToWorkflow">
@@ -152,7 +152,7 @@
     private int memberCount;
     private int sessionCount;
     private int tournamentCount;
-    private int? workflowStepIndex;
+    private string? workflowStepKey;
     private bool showDeleteConfirm;
     private bool dataDeleted;
     private int confirmCode;
@@ -163,8 +163,9 @@
         Lang.OnLanguageChanged += StateHasChanged;
         var uri = new Uri(Nav.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        if (int.TryParse(query["fromWorkflow"], out var idx))
-            workflowStepIndex = idx;
+        var wfKey = query["fromWorkflow"];
+        if (!string.IsNullOrEmpty(wfKey))
+            workflowStepKey = wfKey;
     }
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
@@ -366,10 +367,10 @@
 
     private async Task BackToWorkflow()
     {
-        if (workflowStepIndex.HasValue)
+        if (workflowStepKey != null)
         {
-            var state = await Storage.GetAsync<Dictionary<int, bool>>("tsump_workflow") ?? new();
-            state[workflowStepIndex.Value] = true;
+            var state = await Storage.GetAsync<Dictionary<string, bool>>("tsump_workflow") ?? new();
+            state[workflowStepKey] = true;
             await Storage.SetAsync("tsump_workflow", state);
         }
         Nav.NavigateTo("workflow");

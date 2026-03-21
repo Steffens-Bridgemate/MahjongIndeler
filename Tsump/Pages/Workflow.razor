@@ -4,6 +4,7 @@
 @inject LanguageService Lang
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject SettingsService SettingsService
 @implements IDisposable
 
 <PageTitle>@Lang.Get("Workflow") - Tsumo!</PageTitle>
@@ -13,7 +14,8 @@
 
 @if (stepsLoaded)
 {
-    var allDone = steps.All(s => s.Done);
+    var activeSteps = steps.Where(s => !s.Optional || s.Enabled).ToList();
+    var allDone = activeSteps.All(s => s.Done);
     <div class="mb-3 p-2 rounded @(allDone ? "bg-primary-subtle border border-primary" : "bg-light")">
         <button class="btn @(allDone ? "btn-primary" : "btn-outline-secondary") btn-sm" disabled="@(!allDone)" @onclick="ResetWorkflow">
             @Lang.Get("ResetWorkflow")
@@ -29,8 +31,12 @@
         {
             var step = steps[i];
             var index = i;
-            var isEnabled = index == 0 || steps[index - 1].Done;
-            var statusClass = step.Done ? "list-group-item-success" : isEnabled ? "" : "list-group-item-light text-muted";
+            var isSkipped = step.Optional && !step.Enabled;
+            var prevDone = index == 0 || IsPreviousEffectiveDone(index);
+            var isEnabled = !isSkipped && prevDone;
+            var statusClass = isSkipped ? "list-group-item-light text-muted"
+                : step.Done ? "list-group-item-success"
+                : isEnabled ? "" : "list-group-item-light text-muted";
 
             <div class="list-group-item @statusClass">
                 <div class="d-flex align-items-start">
@@ -41,7 +47,13 @@
                                @onchange="e => ToggleStep(index, (bool)(e.Value ?? false))" />
                     </div>
                     <div class="flex-grow-1">
-                        <div class="fw-bold mb-1">@Lang.Get(step.TitleKey)</div>
+                        <div class="fw-bold mb-1">
+                            @Lang.Get(step.TitleKey)
+                            @if (isSkipped)
+                            {
+                                <span class="badge bg-secondary ms-2">@Lang.Get("Disabled")</span>
+                            }
+                        </div>
                         <div class="small @(isEnabled ? "text-muted" : "")">@Lang.Get(step.DescKey)</div>
                         @if (step.TargetPage != null && isEnabled && !step.Done)
                         {
@@ -66,6 +78,7 @@
     private bool stepsLoaded;
 
     private bool hasSaveFilePicker;
+    private bool enableScoreEntry;
     private List<WorkflowStep> steps = new();
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
@@ -76,15 +89,17 @@
         if (firstRender)
         {
             hasSaveFilePicker = await JS.InvokeAsync<bool>("eval", "!!window.showSaveFilePicker");
+            var settings = await SettingsService.GetAsync();
+            enableScoreEntry = settings.EnableScoreEntry;
             BuildSteps();
 
-            var saved = await Storage.GetAsync<Dictionary<int, bool>>(StorageKey);
+            var saved = await Storage.GetAsync<Dictionary<string, bool>>(StorageKey);
             if (saved != null)
             {
-                foreach (var kv in saved)
+                foreach (var step in steps)
                 {
-                    if (kv.Key >= 0 && kv.Key < steps.Count)
-                        steps[kv.Key].Done = kv.Value;
+                    if (saved.TryGetValue(step.Key, out var done))
+                        step.Done = done;
                 }
             }
             stepsLoaded = true;
@@ -96,25 +111,37 @@
     {
         steps = new List<WorkflowStep>
         {
-            new() { TitleKey = "WfStep1Title", DescKey = "WfStep1Desc" },
-            new() { TitleKey = "WfStep2Title", DescKey = "WfStep2Desc", TargetPage = "data", ButtonKey = "WfStep2Button" },
-            new() { TitleKey = "WfStep3Title", DescKey = "WfStep3Desc", TargetPage = "session", ButtonKey = "WfStep3Button" },
-            new() { TitleKey = "WfStep3aTitle", DescKey = "WfStep3aDesc" },
-            new() { TitleKey = hasSaveFilePicker ? "WfStep4TitleSaveAs" : "WfStep4Title",
-                     DescKey = hasSaveFilePicker ? "WfStep4DescSaveAs" : "WfStep4Desc",
-                     TargetPage = "data", ButtonKey = "WfStep4Button" },
+            new() { Key = "import", TitleKey = "WfStep1Title", DescKey = "WfStep1Desc", TargetPage = "data", ButtonKey = "WfStep1Button" },
+            new() { Key = "session", TitleKey = "WfStep2Title", DescKey = "WfStep2Desc", TargetPage = "session", ButtonKey = "WfStep2Button" },
+            new() { Key = "publish", TitleKey = "WfStep2aTitle", DescKey = "WfStep2aDesc" },
+            new() { Key = "scores", TitleKey = "WfStepScoresTitle", DescKey = "WfStepScoresDesc",
+                     TargetPage = "session?tab=allscores", ButtonKey = "WfStepScoresButton",
+                     Optional = true, Enabled = enableScoreEntry },
+            new() { Key = "export", TitleKey = hasSaveFilePicker ? "WfStep3TitleSaveAs" : "WfStep3Title",
+                     DescKey = hasSaveFilePicker ? "WfStep3DescSaveAs" : "WfStep3Desc",
+                     TargetPage = "data", ButtonKey = "WfStep3Button" },
         };
 
         if (!hasSaveFilePicker)
         {
-            steps.Add(new() { TitleKey = "WfStep5Title", DescKey = "WfStep5Desc" });
+            steps.Add(new() { Key = "copyback", TitleKey = "WfStep4Title", DescKey = "WfStep4Desc" });
         }
+    }
+
+    private bool IsPreviousEffectiveDone(int index)
+    {
+        for (int i = index - 1; i >= 0; i--)
+        {
+            if (steps[i].Optional && !steps[i].Enabled)
+                continue;
+            return steps[i].Done;
+        }
+        return true;
     }
 
     private async Task ToggleStep(int index, bool value)
     {
         steps[index].Done = value;
-        // Uncheck subsequent steps when unchecking a step
         if (!value)
         {
             for (int i = index + 1; i < steps.Count; i++)
@@ -125,15 +152,19 @@
 
     private async Task SaveState()
     {
-        var state = new Dictionary<int, bool>();
-        for (int i = 0; i < steps.Count; i++)
-            state[i] = steps[i].Done;
+        var state = new Dictionary<string, bool>();
+        foreach (var step in steps)
+            state[step.Key] = step.Done;
         await Storage.SetAsync(StorageKey, state);
     }
 
     private void NavigateToStep(int index)
     {
-        Nav.NavigateTo($"{steps[index].TargetPage}?fromWorkflow={index}");
+        var step = steps[index];
+        var page = step.TargetPage!;
+        var separator = page.Contains('?') ? '&' : '?';
+        page += $"{separator}fromWorkflow={step.Key}";
+        Nav.NavigateTo(page);
     }
 
     private async Task ResetWorkflow()
@@ -145,10 +176,13 @@
 
     private class WorkflowStep
     {
+        public string Key { get; set; } = "";
         public string TitleKey { get; set; } = "";
         public string DescKey { get; set; } = "";
         public string? TargetPage { get; set; }
         public string? ButtonKey { get; set; }
         public bool Done { get; set; }
+        public bool Optional { get; set; }
+        public bool Enabled { get; set; } = true;
     }
 }
