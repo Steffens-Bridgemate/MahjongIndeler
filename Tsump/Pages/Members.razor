@@ -78,10 +78,10 @@ else
                 <tr>
                     <td>
                         <div class="d-flex align-items-center gap-1 member-actions">
-                            <button class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center member-action-btn" title="@Lang.Get("Edit")" @onclick="() => EditMember(member)"><span class="fluent-icon">&#xE70F;</span></button>
+                            <button class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center member-action-btn" title="@Lang.Get("Edit")" @onclick="() => EditMember(member)"><i class="bi bi-pencil"></i></button>
                             <button class="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center @(deleteConfirmId == member.Id ? "member-action-btn-confirm" : "member-action-btn")"
                                     title="@(deleteConfirmId == member.Id ? Lang.Get("ConfirmDeletion") : Lang.Get("Remove"))"
-                                    @onclick="() => DeleteClicked(member.Id)"><span class="fluent-icon">&#xE74D;</span></button>
+                                    @onclick="() => DeleteClicked(member.Id)"><i class="bi bi-trash"></i></button>
                         </div>
                     </td>
                     <td>@member.Name</td>

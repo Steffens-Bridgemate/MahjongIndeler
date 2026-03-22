@@ -41,8 +41,8 @@ else
                             <span class="badge bg-secondary ms-2">@Lang.Get("ExcludedFromOptimization")</span>
                         }
                     </button>
-                    <button class="btn btn-sm btn-outline-primary me-2 fluent-icon" title="@Lang.Get("GoTo")" @onclick="() => GoToSession(session.Date)">
-                        &#xE72A;
+                    <button class="btn btn-sm btn-outline-primary me-2" title="@Lang.Get("GoTo")" @onclick="() => GoToSession(session.Date)">
+                        <i class="bi bi-arrow-right-circle"></i>
                     </button>
                 </h2>
                 <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#historyAccordion">
