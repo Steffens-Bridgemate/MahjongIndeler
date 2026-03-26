@@ -33,18 +33,42 @@
             var index = i;
             var isSkipped = step.Optional && !step.Enabled;
             var prevDone = index == 0 || IsPreviousEffectiveDone(index);
+            var isActive = !isSkipped && prevDone && !step.Done;
             var isEnabled = !isSkipped && prevDone;
             var statusClass = isSkipped ? "list-group-item-light text-muted"
                 : step.Done ? "list-group-item-success"
-                : isEnabled ? "" : "list-group-item-light text-muted";
+                : isActive ? "border-primary"
+                : "list-group-item-light text-muted";
+            var itemOpacity = isActive ? "1" : (step.Done || isSkipped || !isEnabled) ? "0.6" : "0.6";
 
-            <div class="list-group-item @statusClass">
+            <div class="list-group-item @statusClass" style="opacity: @itemOpacity;">
                 <div class="d-flex align-items-start">
-                    <div class="form-check me-3 mt-1">
-                        <input class="form-check-input" type="checkbox"
-                               checked="@step.Done"
-                               disabled="@(!isEnabled)"
-                               @onchange="e => ToggleStep(index, (bool)(e.Value ?? false))" />
+                    <div class="me-3 mt-1">
+                        @if (isEnabled)
+                        {
+                            @if (step.Done)
+                            {
+                                <button class="btn btn-success btn-sm wf-toggle-btn"
+                                        title="@Lang.Get("MarkUncompleted")"
+                                        @onclick="() => ToggleStep(index, false)">
+                                    <i class="bi bi-check-lg text-white"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-secondary btn-sm wf-toggle-btn"
+                                        title="@Lang.Get("MarkCompleted")"
+                                        @onclick="() => ToggleStep(index, true)">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            }
+                        }
+                        else
+                        {
+                            <span class="wf-toggle-btn d-inline-flex align-items-center justify-content-center text-muted" style="opacity:0.3;">
+                                <i class="bi bi-check-lg"></i>
+                            </span>
+                        }
                     </div>
                     <div class="flex-grow-1">
                         <div class="fw-bold mb-1">
@@ -54,8 +78,8 @@
                                 <span class="badge bg-secondary ms-2">@Lang.Get("Disabled")</span>
                             }
                         </div>
-                        <div class="small @(isEnabled ? "text-muted" : "")">@Lang.Get(step.DescKey)</div>
-                        @if (step.TargetPage != null && isEnabled && !step.Done)
+                        <div class="small @(isActive ? "text-muted" : "")">@Lang.Get(step.DescKey)</div>
+                        @if (step.TargetPage != null && isActive)
                         {
                             <button class="btn btn-sm btn-primary mt-2"
                                     @onclick="() => NavigateToStep(index)">
@@ -63,10 +87,6 @@
                             </button>
                         }
                     </div>
-                    @if (step.Done)
-                    {
-                        <span class="text-success fs-4 ms-2">&#10003;</span>
-                    }
                 </div>
             </div>
         }

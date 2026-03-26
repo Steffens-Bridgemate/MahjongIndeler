@@ -215,3 +215,13 @@ code {
     text-align: start;
 }
 
+.wf-toggle-btn {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    border-radius: 50%;
+}
