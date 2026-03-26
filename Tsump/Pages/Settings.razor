@@ -9,11 +9,6 @@
 
 <h1>@Lang.Get("Settings")</h1>
 
-@if (saved)
-{
-    <div class="alert alert-success py-2">@Lang.Get("SettingsSaved")</div>
-}
-
 @* --- Competition period --- *@
 
 <div class="card mb-4">
@@ -27,10 +22,7 @@
 
 @* --- Club night settings --- *@
 
-<div class="d-flex align-items-center justify-content-between mt-3 mb-3">
-    <h4 class="mb-0">@Lang.Get("WeeklyMode")</h4>
-    <button class="btn btn-success btn-sm" @onclick="Save">@Lang.Get("Save")</button>
-</div>
+<h4 class="mt-3 mb-3">@Lang.Get("WeeklyMode")</h4>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -45,7 +37,7 @@
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox"
                                checked="@isChecked"
-                               @onchange="e => ToggleDay(day, (bool)(e.Value ?? false))" />
+                               @onchange="async e => { ToggleDay(day, (bool)(e.Value ?? false)); await Save(); }" />
                         <label class="form-check-label">@Lang.Get(day.ToString())</label>
                     </div>
                 </div>
@@ -107,7 +99,7 @@
         <div class="d-flex align-items-center gap-2">
             <select class="form-select" style="max-width: 75px;"
                     value="@defaultStartHour"
-                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var h)) { defaultStartHour = h; saved = false; } }">
+                    @onchange="async e => { if (int.TryParse(e.Value?.ToString(), out var h)) { defaultStartHour = h; await Save(); } }">
                 @for (int h = 0; h < 24; h++)
                 {
                     var hh = h;
@@ -117,7 +109,7 @@
             <span>:</span>
             <select class="form-select" style="max-width: 75px;"
                     value="@defaultStartMinute"
-                    @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var m)) { defaultStartMinute = m; saved = false; } }">
+                    @onchange="async e => { if (int.TryParse(e.Value?.ToString(), out var m)) { defaultStartMinute = m; await Save(); } }">
                 @for (int m = 0; m < 60; m += 5)
                 {
                     var mm = m;
@@ -136,7 +128,7 @@
                 <label class="form-label">@Lang.Get("StartingPoints")</label>
                 <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
                        value="@FormatPoints(weeklyStartingPoints)"
-                       @onchange="e => { weeklyStartingPoints = ParsePoints(e.Value?.ToString(), 30000); saved = false; }" />
+                       @onchange="async e => { weeklyStartingPoints = ParsePoints(e.Value?.ToString(), 30000); await Save(); }" />
             </div>
             <div class="col-md-4 mb-2">
                 <label class="form-label">@Lang.Get("Uma4Players")</label>
@@ -146,7 +138,7 @@
                         var i = idx;
                         <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
                                value="@FormatPointsSigned(weeklyUma4Players[i])"
-                               @onchange="e => { weeklyUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                               @onchange="async e => { weeklyUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
                     }
                 </div>
             </div>
@@ -158,7 +150,7 @@
                         var i = idx;
                         <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
                                value="@FormatPointsSigned(weeklyUma3Players[i])"
-                               @onchange="e => { weeklyUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                               @onchange="async e => { weeklyUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
                     }
                 </div>
             </div>
@@ -171,7 +163,7 @@
         <div class="form-check">
             <input class="form-check-input" type="checkbox"
                    checked="@enableScoreEntry"
-                   @onchange="e => { enableScoreEntry = (bool)(e.Value ?? false); saved = false; }" />
+                   @onchange="async e => { enableScoreEntry = (bool)(e.Value ?? false); await Save(); }" />
             <label class="form-check-label">@Lang.Get("EnableScoreEntry")</label>
         </div>
     </div>
@@ -179,10 +171,7 @@
 
 @* --- Tournament settings --- *@
 
-<div class="d-flex align-items-center justify-content-between mt-3 mb-3">
-    <h4 class="mb-0">@Lang.Get("TournamentMode")</h4>
-    <button class="btn btn-success btn-sm" @onclick="Save">@Lang.Get("Save")</button>
-</div>
+<h4 class="mt-3 mb-3">@Lang.Get("TournamentMode")</h4>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -236,7 +225,7 @@
                 <label class="form-label">@Lang.Get("StartingPoints")</label>
                 <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
                        value="@FormatPoints(tournamentStartingPoints)"
-                       @onchange="e => { tournamentStartingPoints = ParsePoints(e.Value?.ToString(), 30000); saved = false; }" />
+                       @onchange="async e => { tournamentStartingPoints = ParsePoints(e.Value?.ToString(), 30000); await Save(); }" />
             </div>
             <div class="col-md-4 mb-2">
                 <label class="form-label">@Lang.Get("Uma4Players")</label>
@@ -246,7 +235,7 @@
                         var i = idx;
                         <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
                                value="@FormatPointsSigned(tournamentUma4Players[i])"
-                               @onchange="e => { tournamentUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                               @onchange="async e => { tournamentUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
                     }
                 </div>
             </div>
@@ -258,7 +247,7 @@
                         var i = idx;
                         <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
                                value="@FormatPointsSigned(tournamentUma3Players[i])"
-                               @onchange="e => { tournamentUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); saved = false; }" />
+                               @onchange="async e => { tournamentUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
                     }
                 </div>
             </div>
@@ -284,8 +273,6 @@
     private int tournamentStartingPoints = 30000;
     private List<int> tournamentUma4Players = new() { 15000, 5000, -5000, -15000 };
     private List<int> tournamentUma3Players = new() { 12500, 0, -12500 };
-    private bool saved;
-
     private static readonly DayOfWeek[] allDays = new[]
     {
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
@@ -330,7 +317,6 @@
         {
             schedule.Remove(day);
         }
-        saved = false;
     }
 
     private void OnNewHourChanged(DayOfWeek day, ChangeEventArgs e)
@@ -345,7 +331,7 @@
             newMinutes[day] = m;
     }
 
-    private void AddTime(DayOfWeek day)
+    private async Task AddTime(DayOfWeek day)
     {
         if (!newHours.TryGetValue(day, out var h) || h < 0) return;
         if (!newMinutes.TryGetValue(day, out var m) || m < 0) return;
@@ -357,17 +343,17 @@
             schedule[day].Add(time);
         newHours[day] = -1;
         newMinutes[day] = -1;
-        saved = false;
+        await Save();
     }
 
-    private void RemoveTime(DayOfWeek day, TimeSpan time)
+    private async Task RemoveTime(DayOfWeek day, TimeSpan time)
     {
         if (schedule.ContainsKey(day))
             schedule[day].Remove(time);
-        saved = false;
+        await Save();
     }
 
-    private void AddTournamentTime()
+    private async Task AddTournamentTime()
     {
         if (newTournamentHour < 0 || newTournamentMinute < 0) return;
         var time = new TimeSpan(newTournamentHour, newTournamentMinute, 0);
@@ -375,13 +361,13 @@
             tournamentStartTimes.Add(time);
         newTournamentHour = -1;
         newTournamentMinute = -1;
-        saved = false;
+        await Save();
     }
 
-    private void RemoveTournamentTime(TimeSpan time)
+    private async Task RemoveTournamentTime(TimeSpan time)
     {
         tournamentStartTimes.Remove(time);
-        saved = false;
+        await Save();
     }
 
     private static string FormatPoints(int value) => (value / 1000.0).ToString("0.0");
@@ -425,6 +411,5 @@
             TournamentUma3Players = new List<int>(tournamentUma3Players)
         };
         await SettingsService.SaveAsync(settings);
-        saved = true;
     }
 }
