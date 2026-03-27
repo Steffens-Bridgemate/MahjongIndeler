@@ -20,6 +20,9 @@ public class ClubSettings
     public List<int> WeeklyUma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };
     public List<int> WeeklyUma3Players { get; set; } = new() { 12500, 0, -12500 };
 
+    // Members table pinned columns (default: email visible)
+    public List<string> MembersPinnedColumns { get; set; } = new() { "email" };
+
     // Tournament scoring defaults
     public int TournamentStartingPoints { get; set; } = 30000;
     public List<int> TournamentUma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };

@@ -389,8 +389,10 @@
 
     private async Task Save()
     {
+        var existing = await SettingsService.GetAsync();
         var settings = new ClubSettings
         {
+            MembersPinnedColumns = existing.MembersPinnedColumns,
             CompetitionPeriod = competitionPeriod,
             EnableScoreEntry = enableScoreEntry,
             Schedule = schedule

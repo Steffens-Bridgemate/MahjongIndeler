@@ -5,6 +5,7 @@
 @inject SessionService SessionService
 @inject LanguageService Lang
 @inject IJSRuntime JS
+@inject SettingsService SettingsService
 @implements IDisposable
 
 <PageTitle>@Lang.Get("Members") - Tsumo!</PageTitle>
@@ -273,6 +274,8 @@ else
         if (firstRender)
         {
             members = await MemberService.GetAllAsync();
+            var settings = await SettingsService.GetAsync();
+            pinnedColumns = new HashSet<string>(settings.MembersPinnedColumns);
             StateHasChanged();
         }
     }
@@ -385,10 +388,14 @@ else
 
     private string ColClass(string key, string hideClass) => pinnedColumns.Contains(key) ? "" : hideClass;
 
-    private void TogglePin(string key)
+    private async Task TogglePin(string key)
     {
         if (!pinnedColumns.Remove(key))
             pinnedColumns.Add(key);
+
+        var settings = await SettingsService.GetAsync();
+        settings.MembersPinnedColumns = pinnedColumns.ToList();
+        await SettingsService.SaveAsync(settings);
     }
 
     private string FormatDate(DateTime date)
