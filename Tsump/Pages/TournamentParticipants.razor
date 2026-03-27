@@ -71,12 +71,24 @@ else
 
         @if (tournament.Participants.Count > 0)
         {
-            <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary") ms-auto"
+            <button class="btn btn-outline-secondary btn-sm ms-auto" @onclick="RequestRandomize">
+                @Lang.Get("RandomizeNumbers")
+            </button>
+            <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary")"
                     @onclick="ToggleEditNames">
                 @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
             </button>
         }
     </div>
+
+    @if (showRandomizeConfirm)
+    {
+        <div class="alert alert-warning py-2 mb-2">
+            @Lang.Get("ConfirmRandomize")
+            <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmRandomize">@Lang.Get("YesContinue")</button>
+            <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showRandomizeConfirm = false">@Lang.Get("Cancel")</button>
+        </div>
+    }
 
     @if (showResetWarning)
     {
@@ -84,6 +96,15 @@ else
             @Lang.Get("ChangeParticipantsWarning")
             <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmReset">@Lang.Get("YesContinue")</button>
             <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showResetWarning = false">@Lang.Get("Cancel")</button>
+        </div>
+    }
+
+    @if (showGenerateConfirm)
+    {
+        <div class="alert alert-warning py-2 mb-2">
+            @Lang.Get("ConfirmGenerateParticipants")
+            <button class="btn btn-sm btn-warning ms-2" @onclick="GeneratePlayers">@Lang.Get("YesContinue")</button>
+            <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showGenerateConfirm = false">@Lang.Get("Cancel")</button>
         </div>
     }
 
@@ -226,6 +247,8 @@ else
     private bool userLoweredFirst;
     private bool resetConfirmed;
     private bool showResetWarning;
+    private bool showRandomizeConfirm;
+    private bool showGenerateConfirm;
     private Func<Task>? pendingAction;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
@@ -312,6 +335,13 @@ else
             showResetWarning = true;
             return;
         }
+
+        if (tournament.Participants.Count > 0 && !showGenerateConfirm)
+        {
+            showGenerateConfirm = true;
+            return;
+        }
+        showGenerateConfirm = false;
 
         tournament.Participants.Clear();
         for (int i = 1; i <= generatePlayerCount; i++)
@@ -401,6 +431,8 @@ else
             }
 
             tournament.Participants = participants;
+            if (participants.Count >= 13)
+                generatePlayerCount = participants.Count;
             ResetAssignments();
             await TournamentService.SaveAsync(tournament);
         }
@@ -483,6 +515,32 @@ else
             pendingAction = null;
             _ = action();
         }
+    }
+
+    private void RequestRandomize()
+    {
+        showRandomizeConfirm = true;
+    }
+
+    private async Task ConfirmRandomize()
+    {
+        showRandomizeConfirm = false;
+        if (tournament == null || tournament.Participants.Count == 0) return;
+
+        if (NeedsResetConfirmation())
+        {
+            pendingAction = ConfirmRandomize;
+            showResetWarning = true;
+            return;
+        }
+
+        var rng = new Random();
+        var numbers = Enumerable.Range(1, tournament.Participants.Count).OrderBy(_ => rng.Next()).ToList();
+        for (int i = 0; i < tournament.Participants.Count; i++)
+            tournament.Participants[i].Number = numbers[i];
+
+        ResetAssignments();
+        await TournamentService.SaveAsync(tournament);
     }
 
     private void ResetAssignments()
