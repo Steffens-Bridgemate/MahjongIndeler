@@ -8,5 +8,6 @@ public class Member
     public string Phone { get; set; } = string.Empty;
     public DateTime JoinedDate { get; set; } = DateTime.Today;
     public bool IsActive { get; set; } = true;
+    public string LeagueId { get; set; } = string.Empty;
     public int ExtraThreePlayerTableCount { get; set; }
 }

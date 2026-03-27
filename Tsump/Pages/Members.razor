@@ -94,6 +94,10 @@
                     <InputText class="form-control" @bind-Value="currentMember.Phone" />
                 </div>
                 <div class="mb-3">
+                    <label class="form-label">@Lang.Get("LeagueId")</label>
+                    <InputText class="form-control" @bind-Value="currentMember.LeagueId" />
+                </div>
+                <div class="mb-3">
                     <label class="form-label">@Lang.Get("ExtraThreePlayerTables")</label>
                     <InputNumber class="form-control" style="max-width: 120px;" @bind-Value="currentMember.ExtraThreePlayerTableCount" />
                     <small class="text-muted">@Lang.Get("ExtraThreePlayerTablesDesc")</small>
@@ -119,15 +123,31 @@ else if (members.Count == 0)
 }
 else
 {
+    <div class="d-flex gap-1 mb-1 flex-wrap">
+        @foreach (var (key, showClass, icon, titleKey) in pinColumnDefs)
+        {
+            var k = key;
+            var pinned = pinnedColumns.Contains(k);
+            <span class="@(pinned ? "" : showClass)">
+                <button class="btn btn-sm @(pinned ? "btn-primary" : "btn-outline-secondary") col-pin-btn"
+                        title="@Lang.Get(titleKey)"
+                        @onclick="() => TogglePin(k)">
+                    <i class="bi @icon"></i>
+                </button>
+            </span>
+        }
+    </div>
+    <div class="table-responsive">
     <table class="table table-striped">
         <thead>
             <tr>
                 <th style="width: 50px;"></th>
                 <th>@Lang.Get("Name")</th>
-                <th>@Lang.Get("Email")</th>
-                <th>@Lang.Get("Phone")</th>
-                <th>@Lang.Get("Joined")</th>
-                <th class="text-center" style="cursor:pointer;" @onclick="() => activeSortDescending = !activeSortDescending">
+                <th class="@ColClass("email", "col-hide-always")">@Lang.Get("Email")</th>
+                <th class="@ColClass("phone", "col-hide-sm")">@Lang.Get("Phone")</th>
+                <th class="@ColClass("leagueId", "col-hide-md")">@Lang.Get("LeagueId")</th>
+                <th class="@ColClass("joined", "col-hide-lg")">@Lang.Get("Joined")</th>
+                <th class="@ColClass("active", "col-hide-xl") text-center" style="cursor:pointer;" @onclick="() => activeSortDescending = !activeSortDescending">
                     @Lang.Get("Active") <span>@(activeSortDescending ? "\u25BC" : "\u25B2")</span>
                 </th>
             </tr>
@@ -145,10 +165,11 @@ else
                         </div>
                     </td>
                     <td>@member.Name</td>
-                    <td>@member.Email</td>
-                    <td>@member.Phone</td>
-                    <td>@FormatDate(member.JoinedDate)</td>
-                    <td class="text-center">
+                    <td class="@ColClass("email", "col-hide-always")">@member.Email</td>
+                    <td class="@ColClass("phone", "col-hide-sm")">@member.Phone</td>
+                    <td class="@ColClass("leagueId", "col-hide-md")">@member.LeagueId</td>
+                    <td class="@ColClass("joined", "col-hide-lg")">@FormatDate(member.JoinedDate)</td>
+                    <td class="@ColClass("active", "col-hide-xl") text-center">
                         @if (member.IsActive)
                         {
                             <span class="badge bg-success" style="font-size: 1em;">&check;</span>
@@ -162,6 +183,7 @@ else
             }
         </tbody>
     </table>
+    </div>
     <p class="text-muted">@Lang.Get("Total"): @members.Count @Lang.Get("members") (@members.Count(m => m.IsActive) @Lang.Get("active"))</p>
 }
 
@@ -171,6 +193,52 @@ else
     .member-actions { flex-direction: column; }
     @@media (min-width: 768px) {
         .member-actions { flex-direction: row; }
+    }
+
+    .col-hide-always { display: none; }
+
+    /* Collapse order: Phone, LeagueId, Joined, Active */
+    @@media (max-width: 479.98px) {
+        .col-hide-xs { display: none; }
+    }
+    @@media (max-width: 575.98px) {
+        .col-hide-sm { display: none; }
+    }
+    @@media (max-width: 767.98px) {
+        .col-hide-md { display: none; }
+    }
+    @@media (max-width: 991.98px) {
+        .col-hide-lg { display: none; }
+    }
+    @@media (max-width: 1199.98px) {
+        .col-hide-xl { display: none; }
+    }
+
+    /* Show pin icons only when the corresponding column is hidden */
+    .col-show-xs { display: none; }
+    .col-show-sm { display: none; }
+    .col-show-md { display: none; }
+    .col-show-lg { display: none; }
+    .col-show-xl { display: none; }
+    @@media (max-width: 479.98px) {
+        .col-show-xs { display: inline; }
+    }
+    @@media (max-width: 575.98px) {
+        .col-show-sm { display: inline; }
+    }
+    @@media (max-width: 767.98px) {
+        .col-show-md { display: inline; }
+    }
+    @@media (max-width: 991.98px) {
+        .col-show-lg { display: inline; }
+    }
+    @@media (max-width: 1199.98px) {
+        .col-show-xl { display: inline; }
+    }
+
+    .col-pin-btn {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.8rem;
     }
 </style>
 
@@ -187,6 +255,15 @@ else
     private bool showExportPanel;
     private HashSet<Guid> exportSelectedIds = new();
     private string exportSearchText = string.Empty;
+    private HashSet<string> pinnedColumns = new() { "email" };
+    private static readonly (string key, string showClass, string icon, string titleKey)[] pinColumnDefs = new[]
+    {
+        ("email", "", "bi-envelope", "Email"),
+        ("phone", "col-show-sm", "bi-telephone", "Phone"),
+        ("leagueId", "col-show-md", "bi-person-badge", "LeagueId"),
+        ("joined", "col-show-lg", "bi-calendar", "Joined"),
+        ("active", "col-show-xl", "bi-check-circle", "Active"),
+    };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -219,6 +296,7 @@ else
             Phone = member.Phone,
             JoinedDate = member.JoinedDate,
             IsActive = member.IsActive,
+            LeagueId = member.LeagueId,
             ExtraThreePlayerTableCount = member.ExtraThreePlayerTableCount
         };
         isEditing = true;
@@ -305,6 +383,14 @@ else
     private static readonly string[] DutchMonths = { "jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec" };
     private static readonly string[] EnglishMonths = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
+    private string ColClass(string key, string hideClass) => pinnedColumns.Contains(key) ? "" : hideClass;
+
+    private void TogglePin(string key)
+    {
+        if (!pinnedColumns.Remove(key))
+            pinnedColumns.Add(key);
+    }
+
     private string FormatDate(DateTime date)
     {
         var month = Lang.IsDutch ? DutchMonths[date.Month - 1] : EnglishMonths[date.Month - 1];
@@ -357,7 +443,7 @@ else
         var selected = members.Where(m => exportSelectedIds.Contains(m.Id)).OrderBy(m => m.Name).ToList();
         for (int i = 0; i < selected.Count; i++)
         {
-            sb.AppendLine($"{i + 1};{selected[i].Name};");
+            sb.AppendLine($"{i + 1};{selected[i].Name};{selected[i].LeagueId}");
         }
 
         var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
@@ -403,11 +489,12 @@ else
 
                 var name = parts[1].Trim();
                 if (string.IsNullOrEmpty(name)) continue;
+                var leagueId = parts.Length > 2 ? parts[2].Trim() : string.Empty;
 
                 // Skip duplicates by name
                 if (existingNames.Contains(name.ToLowerInvariant())) continue;
 
-                await MemberService.AddAsync(new Member { Name = name });
+                await MemberService.AddAsync(new Member { Name = name, LeagueId = leagueId });
                 existingNames.Add(name.ToLowerInvariant());
                 imported++;
             }
