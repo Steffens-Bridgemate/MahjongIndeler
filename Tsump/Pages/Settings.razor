@@ -123,10 +123,17 @@
 <div class="card mb-4">
     <div class="card-body">
         <h5 class="card-title">@Lang.Get("ScoringSettings")</h5>
-        <div class="row mb-2">
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox"
+                   checked="@enableScoreEntry"
+                   @onchange="async e => { enableScoreEntry = (bool)(e.Value ?? false); await Save(); }" />
+            <label class="form-check-label">@Lang.Get("EnableScoreEntry")</label>
+        </div>
+        <div class="row mb-2" style="opacity: @(enableScoreEntry ? "1" : "0.5");">
             <div class="col-md-4 mb-2">
                 <label class="form-label">@Lang.Get("StartingPoints")</label>
                 <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
+                       disabled="@(!enableScoreEntry)"
                        value="@FormatPoints(weeklyStartingPoints)"
                        @onchange="async e => { weeklyStartingPoints = ParsePoints(e.Value?.ToString(), 30000); await Save(); }" />
             </div>
@@ -137,6 +144,7 @@
                     {
                         var i = idx;
                         <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                               disabled="@(!enableScoreEntry)"
                                value="@FormatPointsSigned(weeklyUma4Players[i])"
                                @onchange="async e => { weeklyUma4Players[i] = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
                     }
@@ -149,22 +157,12 @@
                     {
                         var i = idx;
                         <input type="text" inputmode="decimal" class="form-control form-control-sm text-center" style="max-width:80px;"
+                               disabled="@(!enableScoreEntry)"
                                value="@FormatPointsSigned(weeklyUma3Players[i])"
                                @onchange="async e => { weeklyUma3Players[i] = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
                     }
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox"
-                   checked="@enableScoreEntry"
-                   @onchange="async e => { enableScoreEntry = (bool)(e.Value ?? false); await Save(); }" />
-            <label class="form-check-label">@Lang.Get("EnableScoreEntry")</label>
         </div>
     </div>
 </div>
