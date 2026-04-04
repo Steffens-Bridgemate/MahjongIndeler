@@ -116,14 +116,22 @@ else
         <table class="table table-sm table-striped">
             <thead>
                 <tr>
-                    <th>@Lang.Get("Player")</th>
-                    <th>@Lang.Get("SessionsAttended")</th>
-                    <th>@Lang.Get("TimesAt3Table")</th>
-                    <th>@Lang.Get("TimesAt4Table")</th>
+                    <th style="cursor:pointer;" @onclick='() => SetSort("name")'>
+                        @Lang.Get("Player") @SortIndicator("name")
+                    </th>
+                    <th style="cursor:pointer;" @onclick='() => SetSort("sessions")'>
+                        @Lang.Get("SessionsAttended") @SortIndicator("sessions")
+                    </th>
+                    <th style="cursor:pointer;" @onclick='() => SetSort("three")'>
+                        @Lang.Get("TimesAt3Table") @SortIndicator("three")
+                    </th>
+                    <th style="cursor:pointer;" @onclick='() => SetSort("four")'>
+                        @Lang.Get("TimesAt4Table") @SortIndicator("four")
+                    </th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var stat in playerStats.OrderBy(s => s.Name))
+                @foreach (var stat in SortedStats)
                 {
                     <tr>
                         <td>@stat.Name</td>
@@ -142,6 +150,59 @@ else
     private List<Member> members = new();
     private List<PlayerStat> playerStats = new();
     private Guid? deleteConfirmId;
+    private string sortColumn = "name";
+    private bool sortDescending = false;
+    private string? secondarySortColumn = null;
+    private bool secondarySortDescending = false;
+
+    private IEnumerable<PlayerStat> SortedStats
+    {
+        get
+        {
+            var ordered = ApplySort(playerStats.AsEnumerable(), sortColumn, sortDescending);
+            if (secondarySortColumn != null && secondarySortColumn != sortColumn)
+                ordered = ApplyThenSort(ordered, secondarySortColumn, secondarySortDescending);
+            return ordered;
+        }
+    }
+
+    private static IOrderedEnumerable<PlayerStat> ApplySort(IEnumerable<PlayerStat> source, string column, bool descending) => column switch
+    {
+        "sessions" => descending ? source.OrderByDescending(s => s.SessionsAttended) : source.OrderBy(s => s.SessionsAttended),
+        "three"    => descending ? source.OrderByDescending(s => s.ThreePlayerCount)  : source.OrderBy(s => s.ThreePlayerCount),
+        "four"     => descending ? source.OrderByDescending(s => s.FourPlayerCount)   : source.OrderBy(s => s.FourPlayerCount),
+        _          => descending ? source.OrderByDescending(s => s.Name)              : source.OrderBy(s => s.Name),
+    };
+
+    private static IOrderedEnumerable<PlayerStat> ApplyThenSort(IOrderedEnumerable<PlayerStat> source, string column, bool descending) => column switch
+    {
+        "sessions" => descending ? source.ThenByDescending(s => s.SessionsAttended) : source.ThenBy(s => s.SessionsAttended),
+        "three"    => descending ? source.ThenByDescending(s => s.ThreePlayerCount)  : source.ThenBy(s => s.ThreePlayerCount),
+        "four"     => descending ? source.ThenByDescending(s => s.FourPlayerCount)   : source.ThenBy(s => s.FourPlayerCount),
+        _          => descending ? source.ThenByDescending(s => s.Name)              : source.ThenBy(s => s.Name),
+    };
+
+    private void SetSort(string column)
+    {
+        if (sortColumn == column)
+            sortDescending = !sortDescending;
+        else
+        {
+            secondarySortColumn = sortColumn;
+            secondarySortDescending = sortDescending;
+            sortColumn = column;
+            sortDescending = column != "name";
+        }
+    }
+
+    private MarkupString SortIndicator(string column)
+    {
+        if (sortColumn == column)
+            return new MarkupString($"<span class='text-primary'>{(sortDescending ? "▼" : "▲")}</span>");
+        if (secondarySortColumn == column)
+            return new MarkupString($"<span class='text-muted' style='font-size:0.75em;'>{(secondarySortDescending ? "▼" : "▲")}<sup>2</sup></span>");
+        return new MarkupString("");
+    }
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
