@@ -18,6 +18,10 @@ public class TableAssignmentService
         _memberService = memberService;
     }
 
+    private const int MaxAttempts = 5;
+    private const double ThreeFairnessWeight = 10.0;
+    private const double MeetingSpreadWeight = 1.0;
+
     public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds)
     {
         var playerCount = presentPlayerIds.Count;
@@ -25,9 +29,9 @@ public class TableAssignmentService
             return new List<TableAssignment>();
 
         (int fourPlayerTables, int threePlayerTables) tableNumbers = CalculateNumberofFourAndThreePLayerTables(playerCount);
-        var threePlayerTables=tableNumbers.threePlayerTables;
+        var threePlayerTables = tableNumbers.threePlayerTables;
 
-        List <Hanchan> allHistory = await _sessionService.GetAllAsync();
+        List<Hanchan> allHistory = await _sessionService.GetAllAsync();
         List<Hanchan> history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
         List<Member> members = await _memberService.GetAllAsync();
         Dictionary<Guid, int> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
@@ -39,37 +43,81 @@ public class TableAssignmentService
         // session cannot be assigned to a 3-player table again
         HashSet<Guid> playedThreeLastTime = FindPlayersAtThreeTableLastSession(history, presentPlayerIds);
 
-        // Priority 1: select who goes to 3-player tables
-        // Sort by ratio: threePlayerCount / attendanceCount (lowest ratio first)
-        // But exclude players who had a 3-player table last time (hard constraint)
         List<Guid> eligible = presentPlayerIds.Where(id => !playedThreeLastTime.Contains(id)).ToList();
         List<Guid> excluded = presentPlayerIds.Where(id => playedThreeLastTime.Contains(id)).ToList();
+        var threePlayerSlots = threePlayerTables * 3;
 
-        List<Guid> sortedEligible = eligible
+        // Compute the ideal (best possible) 3-player fairness score:
+        // sort all eligible by ratio, take the best N — this is the deterministic optimum
+        var idealThreeScore = ComputeIdealThreeFairnessScore(
+            eligible, excluded, threePlayerSlots, threePlayerCounts, attendance);
+
+        List<TableAssignment>? bestResult = null;
+        double bestCombinedScore = double.MaxValue;
+
+        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        {
+            var (tables, threePool) = BuildOneAttempt(
+                presentPlayerIds, eligible, excluded, threePlayerSlots,
+                threePlayerCounts, attendance, meetingCounts);
+
+            // Score this attempt
+            double threeScore = ScoreThreePlayerFairness(threePool, threePlayerCounts, attendance);
+            double meetingScore = ScoreAssignmentRatio(
+                tables.Select(t => t.PlayerIds).ToList(), meetingCounts, attendance);
+            double combined = ThreeFairnessWeight * threeScore + MeetingSpreadWeight * meetingScore;
+
+            if (combined < bestCombinedScore)
+            {
+                bestCombinedScore = combined;
+                bestResult = tables;
+            }
+
+            // Early exit: 3-player fairness is at the ideal (within tiny epsilon)
+            // and meeting score has no room to improve meaningfully
+            if (threeScore <= idealThreeScore + 1e-9)
+                break;
+        }
+
+        return bestResult!;
+    }
+
+    /// <summary>
+    /// Builds one complete assignment attempt: selects 3-player candidates,
+    /// then forms tables for both pools.
+    /// </summary>
+    private static (List<TableAssignment> tables, List<Guid> threePool) BuildOneAttempt(
+        List<Guid> presentPlayerIds,
+        List<Guid> eligible, List<Guid> excluded, int threePlayerSlots,
+        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, int> attendance,
+        Dictionary<string, int> meetingCounts)
+    {
+        // Re-sort with fresh random tie-breaking each attempt.
+        // Tiebreaker: prefer higher attendance (smaller post-assignment ratio impact).
+        var sortedEligible = eligible
             .OrderBy(id =>
             {
                 var attended = attendance.GetValueOrDefault(id, 0);
                 var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
                 return attended == 0 ? 0.0 : (double)threeCount / attended;
             })
+            .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
             .ThenBy(_ => Random.Shared.Next())
             .ToList();
-
-        var threePlayerSlots = threePlayerTables * 3;
 
         List<Guid> threePlayerPool;
         List<Guid> fourPlayerPool;
 
         if (sortedEligible.Count >= threePlayerSlots)
         {
-            // Enough eligible players — fill 3-player tables from eligible only
-            threePlayerPool = sortedEligible.Take(threePlayerSlots).ToList();
-            fourPlayerPool = sortedEligible.Skip(threePlayerSlots).Concat(excluded).ToList();
+            threePlayerPool = SelectThreePlayerCandidates(
+                sortedEligible, threePlayerSlots, threePlayerCounts, attendance);
+            var threePlayerSet = new HashSet<Guid>(threePlayerPool);
+            fourPlayerPool = sortedEligible.Where(id => !threePlayerSet.Contains(id)).Concat(excluded).ToList();
         }
         else
         {
-            // Not enough eligible players — use all eligible, then fill remaining
-            // from excluded (sorted by ratio, so least-penalized go first)
             var sortedExcluded = excluded
                 .OrderBy(id =>
                 {
@@ -77,31 +125,98 @@ public class TableAssignmentService
                     var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
                     return attended == 0 ? 0.0 : (double)threeCount / attended;
                 })
+                .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
                 .ThenBy(_ => Random.Shared.Next())
                 .ToList();
-  
+
             var remaining = threePlayerSlots - sortedEligible.Count;
             threePlayerPool = sortedEligible.Concat(sortedExcluded.Take(remaining)).ToList();
             fourPlayerPool = sortedExcluded.Skip(remaining).ToList();
         }
 
-        // Priority 2: within each pool, form tables to minimize repeated meetings (by ratio)
         var tables = new List<TableAssignment>();
         var tableNumber = 1;
 
-        List<List<Guid>> threePlayerAssignments = FormTablesGreedy(threePlayerPool, 3, meetingCounts, attendance);
-        foreach (var group in threePlayerAssignments)
-        {
+        foreach (var group in FormTablesGreedy(threePlayerPool, 3, meetingCounts, attendance))
             tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
+
+        foreach (var group in FormTablesGreedy(fourPlayerPool, 4, meetingCounts, attendance))
+            tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
+
+        return (tables, threePlayerPool);
+    }
+
+    /// <summary>
+    /// Scores how fair the 3-player assignment is: sum of squared deviations
+    /// of each selected player's post-assignment 3-player ratio from the mean.
+    /// Lower = fairer distribution.
+    /// </summary>
+    private static double ScoreThreePlayerFairness(
+        List<Guid> threePlayerPool,
+        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, int> attendance)
+    {
+        if (threePlayerPool.Count == 0)
+            return 0;
+
+        var threeSet = new HashSet<Guid>(threePlayerPool);
+        // Compute post-assignment ratios for the selected players
+        var ratios = new List<double>();
+        foreach (var id in threePlayerPool)
+        {
+            var attended = attendance.GetValueOrDefault(id, 0) + 1; // +1 for this session
+            var threeCount = threePlayerCounts.GetValueOrDefault(id, 0) + 1; // +1 for being assigned
+            ratios.Add((double)threeCount / attended);
         }
 
-        List<List<Guid>> fourPlayerAssignments = FormTablesGreedy(fourPlayerPool, 4, meetingCounts, attendance);
-        foreach (var group in fourPlayerAssignments)
+        var mean = ratios.Average();
+        return ratios.Sum(r => (r - mean) * (r - mean));
+    }
+
+    /// <summary>
+    /// Computes the ideal (minimum possible) 3-player fairness score by deterministically
+    /// selecting the players with the lowest 3-player ratios.
+    /// </summary>
+    private static double ComputeIdealThreeFairnessScore(
+        List<Guid> eligible, List<Guid> excluded, int slots,
+        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, int> attendance)
+    {
+        if (slots == 0)
+            return 0;
+
+        // Deterministically pick the best candidates (lowest ratio, highest attendance)
+        var sorted = eligible
+            .OrderBy(id =>
+            {
+                var attended = attendance.GetValueOrDefault(id, 0);
+                var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
+                return attended == 0 ? 0.0 : (double)threeCount / attended;
+            })
+            .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
+            .ToList();
+
+        List<Guid> idealPool;
+        if (sorted.Count >= slots)
         {
-            tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
+            idealPool = sorted.Take(slots).ToList();
+        }
+        else
+        {
+            var sortedExcluded = excluded
+                .OrderBy(id =>
+                {
+                    var attended = attendance.GetValueOrDefault(id, 0);
+                    var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
+                    return attended == 0 ? 0.0 : (double)threeCount / attended;
+                })
+                .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
+                .ToList();
+            var remaining = slots - sorted.Count;
+            idealPool = sorted.Concat(sortedExcluded.Take(remaining)).ToList();
         }
 
-        return tables;
+        return ScoreThreePlayerFairness(idealPool, threePlayerCounts, attendance);
     }
 
     /// <summary>
@@ -235,6 +350,65 @@ public class TableAssignmentService
             }
         }
         return total;
+    }
+
+    /// <summary>
+    /// Selects which eligible players go to 3-player tables.
+    /// Players with clearly lower 3-player ratios are always included.
+    /// Among players with similar ratios near the cutoff, prefer those with higher
+    /// attendance — they have a smaller post-assignment ratio impact, keeping the
+    /// distribution fairer.
+    /// </summary>
+    private static List<Guid> SelectThreePlayerCandidates(
+        List<Guid> sortedEligible, int slots,
+        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, int> attendance)
+    {
+        if (sortedEligible.Count <= slots)
+            return sortedEligible.ToList();
+
+        // Compute 3-player ratio for each player
+        double ThreeRatio(Guid id)
+        {
+            var attended = attendance.GetValueOrDefault(id, 0);
+            var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
+            return attended == 0 ? 0.0 : (double)threeCount / attended;
+        }
+
+        // Find the cutoff ratio (the ratio of the last player that would be included
+        // by the simple Take approach)
+        var cutoffRatio = ThreeRatio(sortedEligible[slots - 1]);
+
+        // Split into must-include (ratio clearly below cutoff) and borderline (at or near cutoff)
+        const double ratioEpsilon = 1e-9;
+        var mustInclude = new List<Guid>();
+        var borderline = new List<Guid>();
+
+        foreach (var id in sortedEligible)
+        {
+            var ratio = ThreeRatio(id);
+            if (ratio < cutoffRatio - ratioEpsilon)
+                mustInclude.Add(id);
+            else if (Math.Abs(ratio - cutoffRatio) <= ratioEpsilon)
+                borderline.Add(id);
+        }
+
+        var remainingSlots = slots - mustInclude.Count;
+
+        if (remainingSlots <= 0)
+            return mustInclude.Take(slots).ToList();
+
+        if (borderline.Count <= remainingSlots)
+            return mustInclude.Concat(borderline).Take(slots).ToList();
+
+        // Among borderline: prefer higher attendance (lower post-assignment ratio impact).
+        // Random tiebreak within same attendance gives the multi-attempt loop variety.
+        var sorted = borderline
+            .OrderByDescending(id => attendance.GetValueOrDefault(id, 0))
+            .ThenBy(_ => Random.Shared.Next())
+            .ToList();
+
+        return mustInclude.Concat(sorted.Take(remainingSlots)).ToList();
     }
 
     private static void Shuffle(List<Guid> list)

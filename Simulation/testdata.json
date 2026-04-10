@@ -1,0 +1,1243 @@
+{
+  "ExportDate": "2026-04-10T16:14:59.2440000\u002B02:00",
+  "AppName": "Tsumo!",
+  "Members": [
+    {
+      "Id": "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+      "Name": "Andr\u00E9 ",
+      "Email": "aner.steffens@outlook.com",
+      "Phone": "\u002B31634341108",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "3a502fda-4129-447d-8105-73c8ab145e87",
+      "Name": "Nel",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+      "Name": "Janco",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+      "Name": "Chia-Nien",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+      "Name": "Jacco",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+      "Name": "Henk ",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "ddfeac58-3679-4e63-b19a-bbd80298a825",
+      "Name": "Mats",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+      "Name": "Annelies ",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+      "Name": "Wilma",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+      "Name": "Jinbi Jin",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+      "Name": "Arja ",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+      "Name": "Refina",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0",
+      "Name": "Astrid",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+      "Name": "Marcel",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "ee79b930-9744-4990-8bb9-029a9eaeb994",
+      "Name": "Huy",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "20ac645a-fb48-431d-8c54-4442caf740a4",
+      "Name": "Jacqueline",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "fb0587b2-2ab2-4798-860e-86d448e8169a",
+      "Name": "Christiaan",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+      "Name": "Ivar",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "1d292f09-4827-45c8-bc7b-85d79b59457f",
+      "Name": "Peter",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "992889bc-4f7e-4216-bd55-63a9a499b7a7",
+      "Name": "Nico",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+      "Name": "Hansje",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "dadecf33-6743-4273-8543-fd5fa28ddb91",
+      "Name": "Janny",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "b7f620ac-249d-4393-b238-933b4f387410",
+      "Name": "Saskia",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "85336800-c46c-4e16-b3a8-68de6be44a2e",
+      "Name": "Pauline",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "991d6bc6-0a35-4e43-b115-451e6cb58354",
+      "Name": "Mari\u00EBnne",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "d3f21e0d-129f-404b-8532-093c90a75808",
+      "Name": "Louisette",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+      "Name": "Addy ",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+      "Name": "Menny",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "bc414126-4ca6-4941-a334-202e998287b2",
+      "Name": "Carla",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "4f0a7121-96d6-4b07-b2da-6cbb57191be0",
+      "Name": "Sven",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+      "Name": "Yvonne",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "b2711e8f-1bc2-4936-89f5-b59d85172aab",
+      "Name": "Milou",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-11T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "31ed97ec-3dd0-40cb-9642-73baf3ecbcb6",
+      "Name": "Bas ",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-26T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "8bc3be10-6dc9-430f-abe0-84a3c9275dae",
+      "Name": "Spencer",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-26T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "7a32ea18-a4f8-4e61-b109-b67cab44767f",
+      "Name": "Youri",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-03-26T00:00:00+01:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "7bb06eff-aa55-400f-a290-2ba694be2cdf",
+      "Name": "Esther",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-04-09T00:00:00+02:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    },
+    {
+      "Id": "cc97a76b-22e4-4d4e-a187-4dd9a2ff3edc",
+      "Name": "John",
+      "Email": "",
+      "Phone": "",
+      "JoinedDate": "2026-04-09T00:00:00+02:00",
+      "IsActive": true,
+      "LeagueId": "",
+      "ExtraThreePlayerTableCount": 0
+    }
+  ],
+  "Sessions": [
+    {
+      "Id": "449ea7fa-76d7-45f4-87ba-ed71554bc19c",
+      "Date": "2026-03-12T00:00:00+01:00",
+      "StartTime": "19:30:00",
+      "PresentMemberIds": [
+        "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+        "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+        "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+        "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+        "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+        "20ac645a-fb48-431d-8c54-4442caf740a4",
+        "1d292f09-4827-45c8-bc7b-85d79b59457f",
+        "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+        "ee79b930-9744-4990-8bb9-029a9eaeb994",
+        "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+        "dadecf33-6743-4273-8543-fd5fa28ddb91",
+        "3a502fda-4129-447d-8105-73c8ab145e87",
+        "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+        "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+        "d3f21e0d-129f-404b-8532-093c90a75808",
+        "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+        "b7f620ac-249d-4393-b238-933b4f387410",
+        "85336800-c46c-4e16-b3a8-68de6be44a2e",
+        "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+        "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+        "991d6bc6-0a35-4e43-b115-451e6cb58354",
+        "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+        "b2711e8f-1bc2-4936-89f5-b59d85172aab",
+        "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee"
+      ],
+      "AbsentMemberIds": [
+        "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+        "ddfeac58-3679-4e63-b19a-bbd80298a825",
+        "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+        "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0",
+        "97f03c17-923f-4502-a74c-7f420a9c2bad",
+        "fb0587b2-2ab2-4798-860e-86d448e8169a",
+        "992889bc-4f7e-4216-bd55-63a9a499b7a7",
+        "bc414126-4ca6-4941-a334-202e998287b2",
+        "4f0a7121-96d6-4b07-b2da-6cbb57191be0"
+      ],
+      "Tables": [
+        {
+          "TableNumber": 1,
+          "PlayerIds": [
+            "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+            "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+            "991d6bc6-0a35-4e43-b115-451e6cb58354",
+            "b2711e8f-1bc2-4936-89f5-b59d85172aab"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 2,
+          "PlayerIds": [
+            "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+            "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+            "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+            "1d292f09-4827-45c8-bc7b-85d79b59457f"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 3,
+          "PlayerIds": [
+            "ee79b930-9744-4990-8bb9-029a9eaeb994",
+            "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+            "b7f620ac-249d-4393-b238-933b4f387410",
+            "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 4,
+          "PlayerIds": [
+            "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+            "d3f21e0d-129f-404b-8532-093c90a75808",
+            "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+            "3a502fda-4129-447d-8105-73c8ab145e87"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 5,
+          "PlayerIds": [
+            "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+            "dadecf33-6743-4273-8543-fd5fa28ddb91",
+            "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+            "fe4496c1-3593-4e9c-a6b8-14a02c0da385"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 6,
+          "PlayerIds": [
+            "85336800-c46c-4e16-b3a8-68de6be44a2e",
+            "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+            "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+            "20ac645a-fb48-431d-8c54-4442caf740a4"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        }
+      ],
+      "IsFinalized": true,
+      "ExcludeFromOptimization": false
+    },
+    {
+      "Id": "178d3997-4931-4cac-b6e2-c48f170cd298",
+      "Date": "2026-03-19T00:00:00+01:00",
+      "StartTime": "19:30:00",
+      "PresentMemberIds": [
+        "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+        "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+        "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+        "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+        "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+        "ee79b930-9744-4990-8bb9-029a9eaeb994",
+        "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+        "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+        "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+        "20ac645a-fb48-431d-8c54-4442caf740a4",
+        "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+        "dadecf33-6743-4273-8543-fd5fa28ddb91",
+        "d3f21e0d-129f-404b-8532-093c90a75808",
+        "991d6bc6-0a35-4e43-b115-451e6cb58354",
+        "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+        "3a502fda-4129-447d-8105-73c8ab145e87",
+        "992889bc-4f7e-4216-bd55-63a9a499b7a7",
+        "1d292f09-4827-45c8-bc7b-85d79b59457f",
+        "b7f620ac-249d-4393-b238-933b4f387410",
+        "85336800-c46c-4e16-b3a8-68de6be44a2e",
+        "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+        "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0"
+      ],
+      "AbsentMemberIds": [
+        "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+        "ddfeac58-3679-4e63-b19a-bbd80298a825",
+        "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+        "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+        "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+        "97f03c17-923f-4502-a74c-7f420a9c2bad",
+        "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+        "fb0587b2-2ab2-4798-860e-86d448e8169a",
+        "bc414126-4ca6-4941-a334-202e998287b2",
+        "4f0a7121-96d6-4b07-b2da-6cbb57191be0",
+        "b2711e8f-1bc2-4936-89f5-b59d85172aab"
+      ],
+      "Tables": [
+        {
+          "TableNumber": 1,
+          "PlayerIds": [
+            "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+            "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+            "ac7f0510-916b-47a5-9a31-0c1e1267d98b"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 2,
+          "PlayerIds": [
+            "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+            "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0",
+            "f46df11e-2e47-4aed-a10f-5c7c8dc5462c"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 3,
+          "PlayerIds": [
+            "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+            "991d6bc6-0a35-4e43-b115-451e6cb58354",
+            "dadecf33-6743-4273-8543-fd5fa28ddb91",
+            "48fd0197-690b-4dd5-bc63-6978ea974ba3"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 4,
+          "PlayerIds": [
+            "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+            "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+            "d3f21e0d-129f-404b-8532-093c90a75808",
+            "dd34f981-ce35-41cd-b841-d007d3a6de6f"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 5,
+          "PlayerIds": [
+            "1d292f09-4827-45c8-bc7b-85d79b59457f",
+            "b7f620ac-249d-4393-b238-933b4f387410",
+            "85336800-c46c-4e16-b3a8-68de6be44a2e",
+            "992889bc-4f7e-4216-bd55-63a9a499b7a7"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 6,
+          "PlayerIds": [
+            "3a502fda-4129-447d-8105-73c8ab145e87",
+            "ee79b930-9744-4990-8bb9-029a9eaeb994",
+            "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+            "20ac645a-fb48-431d-8c54-4442caf740a4"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        }
+      ],
+      "IsFinalized": true,
+      "ExcludeFromOptimization": false
+    },
+    {
+      "Id": "27ae43c6-3f06-426a-9dfb-b42d0e94af80",
+      "Date": "2026-03-26T00:00:00+01:00",
+      "StartTime": "19:30:00",
+      "PresentMemberIds": [
+        "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+        "bc414126-4ca6-4941-a334-202e998287b2",
+        "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+        "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+        "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+        "ee79b930-9744-4990-8bb9-029a9eaeb994",
+        "20ac645a-fb48-431d-8c54-4442caf740a4",
+        "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+        "dadecf33-6743-4273-8543-fd5fa28ddb91",
+        "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+        "d3f21e0d-129f-404b-8532-093c90a75808",
+        "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+        "991d6bc6-0a35-4e43-b115-451e6cb58354",
+        "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+        "3a502fda-4129-447d-8105-73c8ab145e87",
+        "85336800-c46c-4e16-b3a8-68de6be44a2e",
+        "1d292f09-4827-45c8-bc7b-85d79b59457f",
+        "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+        "b7f620ac-249d-4393-b238-933b4f387410",
+        "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee"
+      ],
+      "AbsentMemberIds": [
+        "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+        "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+        "ddfeac58-3679-4e63-b19a-bbd80298a825",
+        "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+        "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+        "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0",
+        "fb0587b2-2ab2-4798-860e-86d448e8169a",
+        "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+        "992889bc-4f7e-4216-bd55-63a9a499b7a7",
+        "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+        "4f0a7121-96d6-4b07-b2da-6cbb57191be0",
+        "b2711e8f-1bc2-4936-89f5-b59d85172aab",
+        "31ed97ec-3dd0-40cb-9642-73baf3ecbcb6",
+        "8bc3be10-6dc9-430f-abe0-84a3c9275dae",
+        "7a32ea18-a4f8-4e61-b109-b67cab44767f"
+      ],
+      "Tables": [
+        {
+          "TableNumber": 1,
+          "PlayerIds": [
+            "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+            "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+            "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+            "dd34f981-ce35-41cd-b841-d007d3a6de6f"
+          ],
+          "PlayerCount": 4,
+          "Score": {
+            "PlayerScores": [
+              {
+                "PlayerId": "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              }
+            ]
+          }
+        },
+        {
+          "TableNumber": 2,
+          "PlayerIds": [
+            "b7f620ac-249d-4393-b238-933b4f387410",
+            "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+            "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+            "32497156-cc9b-4cfd-8b02-156fb0167c8e"
+          ],
+          "PlayerCount": 4,
+          "Score": {
+            "PlayerScores": [
+              {
+                "PlayerId": "b7f620ac-249d-4393-b238-933b4f387410",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              }
+            ]
+          }
+        },
+        {
+          "TableNumber": 3,
+          "PlayerIds": [
+            "20ac645a-fb48-431d-8c54-4442caf740a4",
+            "bc414126-4ca6-4941-a334-202e998287b2",
+            "991d6bc6-0a35-4e43-b115-451e6cb58354",
+            "d3f21e0d-129f-404b-8532-093c90a75808"
+          ],
+          "PlayerCount": 4,
+          "Score": {
+            "PlayerScores": [
+              {
+                "PlayerId": "20ac645a-fb48-431d-8c54-4442caf740a4",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "bc414126-4ca6-4941-a334-202e998287b2",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "991d6bc6-0a35-4e43-b115-451e6cb58354",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "d3f21e0d-129f-404b-8532-093c90a75808",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              }
+            ]
+          }
+        },
+        {
+          "TableNumber": 4,
+          "PlayerIds": [
+            "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+            "3a502fda-4129-447d-8105-73c8ab145e87",
+            "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+            "85336800-c46c-4e16-b3a8-68de6be44a2e"
+          ],
+          "PlayerCount": 4,
+          "Score": {
+            "PlayerScores": [
+              {
+                "PlayerId": "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "3a502fda-4129-447d-8105-73c8ab145e87",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "85336800-c46c-4e16-b3a8-68de6be44a2e",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              }
+            ]
+          }
+        },
+        {
+          "TableNumber": 5,
+          "PlayerIds": [
+            "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+            "1d292f09-4827-45c8-bc7b-85d79b59457f",
+            "ee79b930-9744-4990-8bb9-029a9eaeb994",
+            "dadecf33-6743-4273-8543-fd5fa28ddb91"
+          ],
+          "PlayerCount": 4,
+          "Score": {
+            "PlayerScores": [
+              {
+                "PlayerId": "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "1d292f09-4827-45c8-bc7b-85d79b59457f",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "ee79b930-9744-4990-8bb9-029a9eaeb994",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              },
+              {
+                "PlayerId": "dadecf33-6743-4273-8543-fd5fa28ddb91",
+                "IsVirtual": false,
+                "VirtualName": "",
+                "StartingPoints": 30000,
+                "EndPoints": null,
+                "Loan": 0,
+                "Difference": 0,
+                "Uma": 0,
+                "Penalty": 0,
+                "Total": 0
+              }
+            ]
+          }
+        }
+      ],
+      "IsFinalized": true,
+      "ExcludeFromOptimization": false
+    },
+    {
+      "Id": "67122529-f4ae-40f4-b888-a4a6efddf121",
+      "Date": "2026-04-02T00:00:00+02:00",
+      "StartTime": "19:30:00",
+      "PresentMemberIds": [
+        "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+        "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+        "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+        "31ed97ec-3dd0-40cb-9642-73baf3ecbcb6",
+        "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+        "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+        "ee79b930-9744-4990-8bb9-029a9eaeb994",
+        "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+        "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+        "20ac645a-fb48-431d-8c54-4442caf740a4",
+        "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+        "d3f21e0d-129f-404b-8532-093c90a75808",
+        "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+        "991d6bc6-0a35-4e43-b115-451e6cb58354",
+        "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+        "3a502fda-4129-447d-8105-73c8ab145e87",
+        "85336800-c46c-4e16-b3a8-68de6be44a2e",
+        "1d292f09-4827-45c8-bc7b-85d79b59457f",
+        "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+        "b7f620ac-249d-4393-b238-933b4f387410",
+        "4f0a7121-96d6-4b07-b2da-6cbb57191be0",
+        "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee"
+      ],
+      "AbsentMemberIds": [
+        "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+        "ddfeac58-3679-4e63-b19a-bbd80298a825",
+        "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+        "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+        "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0",
+        "fb0587b2-2ab2-4798-860e-86d448e8169a",
+        "992889bc-4f7e-4216-bd55-63a9a499b7a7",
+        "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+        "dadecf33-6743-4273-8543-fd5fa28ddb91",
+        "bc414126-4ca6-4941-a334-202e998287b2",
+        "b2711e8f-1bc2-4936-89f5-b59d85172aab",
+        "8bc3be10-6dc9-430f-abe0-84a3c9275dae",
+        "7a32ea18-a4f8-4e61-b109-b67cab44767f"
+      ],
+      "Tables": [
+        {
+          "TableNumber": 1,
+          "PlayerIds": [
+            "85336800-c46c-4e16-b3a8-68de6be44a2e",
+            "31ed97ec-3dd0-40cb-9642-73baf3ecbcb6",
+            "dd34f981-ce35-41cd-b841-d007d3a6de6f"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 2,
+          "PlayerIds": [
+            "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+            "4f0a7121-96d6-4b07-b2da-6cbb57191be0",
+            "d3f21e0d-129f-404b-8532-093c90a75808"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 3,
+          "PlayerIds": [
+            "b7f620ac-249d-4393-b238-933b4f387410",
+            "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+            "991d6bc6-0a35-4e43-b115-451e6cb58354",
+            "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 4,
+          "PlayerIds": [
+            "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+            "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+            "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+            "ee79b930-9744-4990-8bb9-029a9eaeb994"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 5,
+          "PlayerIds": [
+            "3a502fda-4129-447d-8105-73c8ab145e87",
+            "1d292f09-4827-45c8-bc7b-85d79b59457f",
+            "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+            "542d87cd-15b1-4b70-9729-2069b71b3b3a"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 6,
+          "PlayerIds": [
+            "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+            "20ac645a-fb48-431d-8c54-4442caf740a4",
+            "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+            "052b9e8c-ac3d-4991-84f5-c9f0fe038a93"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        }
+      ],
+      "IsFinalized": true,
+      "ExcludeFromOptimization": false
+    },
+    {
+      "Id": "34abf126-a7ee-42f2-b043-a0e60ce848d8",
+      "Date": "2026-04-10T00:00:00",
+      "StartTime": "13:00:00",
+      "PresentMemberIds": [
+        "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+        "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+        "7bb06eff-aa55-400f-a290-2ba694be2cdf",
+        "ee79b930-9744-4990-8bb9-029a9eaeb994",
+        "20ac645a-fb48-431d-8c54-4442caf740a4",
+        "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+        "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+        "b0c8fff7-498e-46f2-b024-34d7c6d376d3",
+        "7c16a9f5-b437-420e-b482-1bd8fda0bb41",
+        "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+        "dd34f981-ce35-41cd-b841-d007d3a6de6f",
+        "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+        "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+        "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+        "cc97a76b-22e4-4d4e-a187-4dd9a2ff3edc",
+        "991d6bc6-0a35-4e43-b115-451e6cb58354",
+        "85336800-c46c-4e16-b3a8-68de6be44a2e",
+        "b7f620ac-249d-4393-b238-933b4f387410",
+        "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+        "fe4496c1-3593-4e9c-a6b8-14a02c0da385",
+        "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+        "dadecf33-6743-4273-8543-fd5fa28ddb91",
+        "d3f21e0d-129f-404b-8532-093c90a75808",
+        "1d292f09-4827-45c8-bc7b-85d79b59457f",
+        "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0"
+      ],
+      "AbsentMemberIds": [
+        "542d87cd-15b1-4b70-9729-2069b71b3b3a",
+        "3a502fda-4129-447d-8105-73c8ab145e87",
+        "ddfeac58-3679-4e63-b19a-bbd80298a825",
+        "b98826f9-93ed-42e7-ba07-619f2270fa4c",
+        "fb0587b2-2ab2-4798-860e-86d448e8169a",
+        "992889bc-4f7e-4216-bd55-63a9a499b7a7",
+        "bc414126-4ca6-4941-a334-202e998287b2",
+        "4f0a7121-96d6-4b07-b2da-6cbb57191be0",
+        "b2711e8f-1bc2-4936-89f5-b59d85172aab",
+        "31ed97ec-3dd0-40cb-9642-73baf3ecbcb6",
+        "8bc3be10-6dc9-430f-abe0-84a3c9275dae",
+        "7a32ea18-a4f8-4e61-b109-b67cab44767f"
+      ],
+      "Tables": [
+        {
+          "TableNumber": 1,
+          "PlayerIds": [
+            "cc97a76b-22e4-4d4e-a187-4dd9a2ff3edc",
+            "dadecf33-6743-4273-8543-fd5fa28ddb91",
+            "d3f21e0d-129f-404b-8532-093c90a75808"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 2,
+          "PlayerIds": [
+            "b7f620ac-249d-4393-b238-933b4f387410",
+            "7bb06eff-aa55-400f-a290-2ba694be2cdf",
+            "b0c8fff7-498e-46f2-b024-34d7c6d376d3"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 3,
+          "PlayerIds": [
+            "ee79b930-9744-4990-8bb9-029a9eaeb994",
+            "991d6bc6-0a35-4e43-b115-451e6cb58354",
+            "fe4496c1-3593-4e9c-a6b8-14a02c0da385"
+          ],
+          "PlayerCount": 3,
+          "Score": null
+        },
+        {
+          "TableNumber": 4,
+          "PlayerIds": [
+            "e7302cae-a07b-47d2-b431-a2ba3a2677ac",
+            "2c5d9577-454d-46e4-b5fd-ceb7c83f8ac0",
+            "2784d9e3-7339-40ba-aac8-1a21f3d14c01",
+            "1d292f09-4827-45c8-bc7b-85d79b59457f"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 5,
+          "PlayerIds": [
+            "f46df11e-2e47-4aed-a10f-5c7c8dc5462c",
+            "48fd0197-690b-4dd5-bc63-6978ea974ba3",
+            "052b9e8c-ac3d-4991-84f5-c9f0fe038a93",
+            "dd34f981-ce35-41cd-b841-d007d3a6de6f"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 6,
+          "PlayerIds": [
+            "20ac645a-fb48-431d-8c54-4442caf740a4",
+            "f2f9d625-4174-407c-85f2-ac2d0e479cb6",
+            "ac7f0510-916b-47a5-9a31-0c1e1267d98b",
+            "7c16a9f5-b437-420e-b482-1bd8fda0bb41"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        },
+        {
+          "TableNumber": 7,
+          "PlayerIds": [
+            "32497156-cc9b-4cfd-8b02-156fb0167c8e",
+            "8d8440b3-6cc4-43c6-98dd-fcc6b5dc52bd",
+            "6da6c1bf-42b2-486e-a7cd-e8052fb9b9ee",
+            "85336800-c46c-4e16-b3a8-68de6be44a2e"
+          ],
+          "PlayerCount": 4,
+          "Score": null
+        }
+      ],
+      "IsFinalized": true,
+      "ExcludeFromOptimization": false
+    }
+  ],
+  "Settings": {
+    "CompetitionPeriod": "",
+    "EnableScoreEntry": false,
+    "Schedule": [
+      {
+        "Day": 4,
+        "StartTimes": [
+          "19:30:00",
+          "21:00:00"
+        ]
+      }
+    ],
+    "DefaultStartTime": "13:00:00",
+    "TournamentStartTimes": [
+      "10:00:00",
+      "11:30:00",
+      "13:00:00",
+      "14:30:00",
+      "16:00:00"
+    ],
+    "WeeklyStartingPoints": 30000,
+    "WeeklyUma4Players": [
+      15000,
+      5000,
+      -5000,
+      -15000
+    ],
+    "WeeklyUma3Players": [
+      12500,
+      0,
+      -12500
+    ],
+    "MembersPinnedColumns": [
+      "email"
+    ],
+    "TournamentStartingPoints": 30000,
+    "TournamentUma4Players": [
+      15000,
+      5000,
+      -5000,
+      -15000
+    ],
+    "TournamentUma3Players": [
+      12500,
+      0,
+      -12500
+    ]
+  },
+  "Tournaments": []
+}
