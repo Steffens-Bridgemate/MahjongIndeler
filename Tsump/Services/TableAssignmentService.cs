@@ -115,7 +115,7 @@ public class TableAssignmentService
         if (sortedEligible.Count >= threePlayerSlots)
         {
             threePlayerPool = SelectThreePlayerCandidates(
-                sortedEligible, threePlayerSlots, threePlayerCounts, attendance);
+                sortedEligible, threePlayerSlots, threePlayerCounts, attendance, meetingCounts);
             var threePlayerSet = new HashSet<Guid>(threePlayerPool);
             fourPlayerPool = sortedEligible.Where(id => !threePlayerSet.Contains(id)).Concat(excluded).ToList();
         }
@@ -356,21 +356,21 @@ public class TableAssignmentService
     }
 
     /// <summary>
-    /// Selects which eligible players go to 3-player tables.
+    /// Selects which eligible players go to 3-player tables using tiered selection.
     /// Players with clearly lower 3-player ratios are always included.
-    /// Among players with similar ratios near the cutoff, prefer those with higher
-    /// attendance — they have a smaller post-assignment ratio impact, keeping the
-    /// distribution fairer.
+    /// Among borderline players (same ratio at the cutoff), groups by attendance tier
+    /// and fills from highest attendance first (fairness). Within a partial tier,
+    /// uses meeting scores to pick the candidates who have met the group the least.
     /// </summary>
     private static List<Guid> SelectThreePlayerCandidates(
         List<Guid> sortedEligible, int slots,
         Dictionary<Guid, int> threePlayerCounts,
-        Dictionary<Guid, int> attendance)
+        Dictionary<Guid, int> attendance,
+        Dictionary<string, int> meetingCounts)
     {
         if (sortedEligible.Count <= slots)
             return sortedEligible.ToList();
 
-        // Compute 3-player ratio for each player
         double ThreeRatio(Guid id)
         {
             var attended = attendance.GetValueOrDefault(id, 0);
@@ -378,11 +378,8 @@ public class TableAssignmentService
             return attended == 0 ? 0.0 : (double)threeCount / attended;
         }
 
-        // Find the cutoff ratio (the ratio of the last player that would be included
-        // by the simple Take approach)
         var cutoffRatio = ThreeRatio(sortedEligible[slots - 1]);
 
-        // Split into must-include (ratio clearly below cutoff) and borderline (at or near cutoff)
         const double ratioEpsilon = 1e-9;
         var mustInclude = new List<Guid>();
         var borderline = new List<Guid>();
@@ -404,14 +401,78 @@ public class TableAssignmentService
         if (borderline.Count <= remainingSlots)
             return mustInclude.Concat(borderline).Take(slots).ToList();
 
-        // Among borderline: prefer higher attendance (lower post-assignment ratio impact).
-        // Random tiebreak within same attendance gives the multi-attempt loop variety.
-        var sorted = borderline
-            .OrderByDescending(id => attendance.GetValueOrDefault(id, 0))
-            .ThenBy(_ => Random.Shared.Next())
+        // Group borderline by attendance tiers, process highest attendance first (fairness)
+        var tiers = borderline
+            .GroupBy(id => attendance.GetValueOrDefault(id, 0))
+            .OrderByDescending(g => g.Key)
             .ToList();
 
-        return mustInclude.Concat(sorted.Take(remainingSlots)).ToList();
+        var selected = new List<Guid>(mustInclude);
+        var slotsLeft = remainingSlots;
+
+        foreach (var tier in tiers)
+        {
+            if (slotsLeft <= 0) break;
+            var tierPlayers = tier.ToList();
+
+            if (tierPlayers.Count <= slotsLeft)
+            {
+                selected.AddRange(tierPlayers);
+                slotsLeft -= tierPlayers.Count;
+            }
+            else
+            {
+                // Partial tier: greedy selection by meeting score against already-selected
+                var pool = new List<Guid>(tierPlayers);
+                for (int i = 0; i < slotsLeft; i++)
+                {
+                    var bestCandidate = pool[0];
+                    var bestScore = MeetingScoreAgainstGroup(selected, pool[0], meetingCounts, attendance);
+
+                    for (int c = 1; c < pool.Count; c++)
+                    {
+                        var score = MeetingScoreAgainstGroup(selected, pool[c], meetingCounts, attendance);
+                        if (score < bestScore || (Math.Abs(score - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
+                        {
+                            bestScore = score;
+                            bestCandidate = pool[c];
+                        }
+                    }
+
+                    selected.Add(bestCandidate);
+                    pool.Remove(bestCandidate);
+                }
+                slotsLeft = 0;
+            }
+        }
+
+        return selected;
+    }
+
+    /// <summary>
+    /// Sum of meeting ratios between a candidate and each member of a group.
+    /// Lower = candidate has met the group less. Used within attendance tiers
+    /// to pick 3-player candidates with the least meeting overlap.
+    /// </summary>
+    private static double MeetingScoreAgainstGroup(
+        List<Guid> groupMembers, Guid candidate,
+        Dictionary<string, int> meetingCounts,
+        Dictionary<Guid, int> attendance)
+    {
+        double score = 0;
+        var candidateAttendance = attendance.GetValueOrDefault(candidate, 0);
+
+        foreach (var member in groupMembers)
+        {
+            var key = MakeKey(member, candidate);
+            var met = meetingCounts.GetValueOrDefault(key, 0);
+            var memberAttendance = attendance.GetValueOrDefault(member, 0);
+            var coAttendancePossible = Math.Min(candidateAttendance, memberAttendance);
+            if (coAttendancePossible > 0)
+                score += (double)met / coAttendancePossible;
+        }
+
+        return score;
     }
 
     private static void Shuffle(List<Guid> list)

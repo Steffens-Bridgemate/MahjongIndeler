@@ -60,10 +60,12 @@ Console.WriteLine($"{'=',-60}");
 var oldResults = RunSimulation("OLD (simple take)", RUNS, "old");
 var newResults = RunSimulation("NEW (multi-attempt)", RUNS, "new");
 var fixedResults = RunSimulation("FIXED (attendance tiebreak)", RUNS, "fixed");
+var tieredResults = RunSimulation("TIERED (attendance tiers + meetings)", RUNS, "tiered");
 
 PrintResults("OLD (simple take)", oldResults);
 PrintResults("NEW (multi-attempt)", newResults);
 PrintResults("FIXED (attendance tiebreak)", fixedResults);
+PrintResults("TIERED (attendance tiers + meetings)", tieredResults);
 
 // ─── Algorithm implementations ───
 
@@ -77,6 +79,7 @@ List<SimResult> RunSimulation(string label, int runs, string algo)
             "old" => RunOldAlgorithm(),
             "new" => RunNewAlgorithm(),
             "fixed" => RunFixedAlgorithm(),
+            "tiered" => RunTieredAlgorithm(),
             _ => throw new ArgumentException($"Unknown algo: {algo}")
         };
         results.Add(ScoreResult(tables));
@@ -295,6 +298,159 @@ List<Guid> SelectThreePlayerCandidatesFixed(List<Guid> sortedElig, int slots)
         .ToList();
 
     return mustInclude.Concat(sorted.Take(remaining)).ToList();
+}
+
+List<TableResult> RunTieredAlgorithm()
+{
+    // Tiered: attendance tiers for fairness, meeting scoring within partial tiers
+    var idealThreeScore = ComputeIdealThreeFairnessScore();
+
+    List<TableResult>? bestResult = null;
+    double bestCombined = double.MaxValue;
+
+    for (int attempt = 0; attempt < 5; attempt++)
+    {
+        var sortedEligible = eligible
+            .OrderBy(id => {
+                var att = attendance.GetValueOrDefault(id, 0);
+                var tc = threePlayerCounts.GetValueOrDefault(id, 0);
+                return att == 0 ? 0.0 : (double)tc / att;
+            })
+            .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
+            .ThenBy(_ => Random.Shared.Next())
+            .ToList();
+
+        List<Guid> threePool, fourPool;
+        if (sortedEligible.Count >= threePlayerSlots)
+        {
+            threePool = SelectThreePlayerCandidatesTiered(sortedEligible, threePlayerSlots);
+            var threeSet = new HashSet<Guid>(threePool);
+            fourPool = sortedEligible.Where(id => !threeSet.Contains(id)).Concat(excluded).ToList();
+        }
+        else
+        {
+            var sortedExcluded = excluded
+                .OrderBy(id => {
+                    var att = attendance.GetValueOrDefault(id, 0);
+                    var tc = threePlayerCounts.GetValueOrDefault(id, 0);
+                    return att == 0 ? 0.0 : (double)tc / att;
+                })
+                .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
+                .ThenBy(_ => Random.Shared.Next())
+                .ToList();
+            var rem = threePlayerSlots - sortedEligible.Count;
+            threePool = sortedEligible.Concat(sortedExcluded.Take(rem)).ToList();
+            fourPool = sortedExcluded.Skip(rem).ToList();
+        }
+
+        var tables = new List<TableResult>();
+        int num = 1;
+        foreach (var g in FormTablesGreedy(threePool, 3))
+            tables.Add(new TableResult(num++, g));
+        foreach (var g in FormTablesGreedy(fourPool, 4))
+            tables.Add(new TableResult(num++, g));
+
+        double threeScore = ScoreThreePlayerFairness(threePool);
+        double meetScore = ScoreAssignment(tables.Select(t => t.Players).ToList());
+        double combined = 10.0 * threeScore + 1.0 * meetScore;
+
+        if (combined < bestCombined)
+        {
+            bestCombined = combined;
+            bestResult = tables;
+        }
+
+        if (threeScore <= idealThreeScore + 1e-9)
+            break;
+    }
+
+    return bestResult!;
+}
+
+List<Guid> SelectThreePlayerCandidatesTiered(List<Guid> sortedElig, int slots)
+{
+    if (sortedElig.Count <= slots) return sortedElig.ToList();
+
+    double ThreeRatio(Guid id)
+    {
+        var att = attendance.GetValueOrDefault(id, 0);
+        var tc = threePlayerCounts.GetValueOrDefault(id, 0);
+        return att == 0 ? 0.0 : (double)tc / att;
+    }
+
+    var cutoffRatio = ThreeRatio(sortedElig[slots - 1]);
+    const double eps = 1e-9;
+    var mustInclude = new List<Guid>();
+    var borderline = new List<Guid>();
+
+    foreach (var id in sortedElig)
+    {
+        var r = ThreeRatio(id);
+        if (r < cutoffRatio - eps) mustInclude.Add(id);
+        else if (Math.Abs(r - cutoffRatio) <= eps) borderline.Add(id);
+    }
+
+    var remainingSlots = slots - mustInclude.Count;
+    if (remainingSlots <= 0) return mustInclude.Take(slots).ToList();
+    if (borderline.Count <= remainingSlots) return mustInclude.Concat(borderline).Take(slots).ToList();
+
+    // Group borderline by attendance tiers, process highest first
+    var tiers = borderline
+        .GroupBy(id => attendance.GetValueOrDefault(id, 0))
+        .OrderByDescending(g => g.Key)
+        .ToList();
+
+    var selected = new List<Guid>(mustInclude);
+    var slotsLeft = remainingSlots;
+
+    foreach (var tier in tiers)
+    {
+        if (slotsLeft <= 0) break;
+        var tierPlayers = tier.ToList();
+
+        if (tierPlayers.Count <= slotsLeft)
+        {
+            // Entire tier fits — include all
+            selected.AddRange(tierPlayers);
+            slotsLeft -= tierPlayers.Count;
+        }
+        else
+        {
+            // Partial tier — greedy selection by meeting score against already-selected
+            var pool = new List<Guid>(tierPlayers);
+            for (int i = 0; i < slotsLeft; i++)
+            {
+                var best = pool[0];
+                var bestScore = MeetingScoreAgainstSelected(selected, pool[0]);
+                for (int c = 1; c < pool.Count; c++)
+                {
+                    var s = MeetingScoreAgainstSelected(selected, pool[c]);
+                    if (s < bestScore || (Math.Abs(s - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
+                    { bestScore = s; best = pool[c]; }
+                }
+                selected.Add(best);
+                pool.Remove(best);
+            }
+            slotsLeft = 0;
+        }
+    }
+
+    return selected;
+}
+
+double MeetingScoreAgainstSelected(List<Guid> group, Guid candidate)
+{
+    double s = 0;
+    var ca = attendance.GetValueOrDefault(candidate, 0);
+    foreach (var m in group)
+    {
+        var k = MakeKey(m, candidate);
+        var met = meetingCounts.GetValueOrDefault(k, 0);
+        var ma = attendance.GetValueOrDefault(m, 0);
+        var co = Math.Min(ca, ma);
+        if (co > 0) s += (double)met / co;
+    }
+    return s;
 }
 
 List<Guid> SelectThreePlayerCandidates(List<Guid> sortedElig, int slots)

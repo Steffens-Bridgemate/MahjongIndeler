@@ -32,8 +32,11 @@ else
             <tbody>
                 @foreach (var entry in meetingDistribution)
                 {
-                    <tr>
-                        <td class="text-center @GetCellClass(entry.Key)">@entry.Key</td>
+                    var count = entry.Key;
+                    <tr class="@(highlightedMeetingCount == count ? "table-primary" : "")"
+                        style="cursor:pointer;"
+                        @onclick="() => ToggleHighlight(count)">
+                        <td class="text-center @GetCellClass(count)">@count</td>
                         <td class="text-center">@entry.Value</td>
                     </tr>
                 }
@@ -69,7 +72,7 @@ else
                             {
                                 var key = MakeKey(row.Id, col.Id);
                                 var count = matrix.GetValueOrDefault(key, 0);
-                                <td class="text-center @GetCellClass(count)">@count</td>
+                                <td class="text-center @GetMatrixCellClass(count)">@count</td>
                             }
                         }
                     </tr>
@@ -146,6 +149,16 @@ else
     .cell-high {
         background-color: #f8d7da;
     }
+
+    .cell-highlight {
+        background-color: #0d6efd !important;
+        color: #fff !important;
+        font-weight: bold;
+    }
+
+    .cell-dimmed {
+        opacity: 0.25;
+    }
 </style>
 
 @code {
@@ -153,6 +166,7 @@ else
     private List<Member> activePlayers = new();
     private Dictionary<string, int> matrix = new();
     private List<KeyValuePair<int, int>> meetingDistribution = new();
+    private int? highlightedMeetingCount;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -217,6 +231,18 @@ else
         return string.Compare(a.ToString(), b.ToString(), StringComparison.Ordinal) < 0
             ? $"{a}_{b}"
             : $"{b}_{a}";
+    }
+
+    private void ToggleHighlight(int count)
+    {
+        highlightedMeetingCount = highlightedMeetingCount == count ? null : count;
+    }
+
+    private string GetMatrixCellClass(int count)
+    {
+        if (highlightedMeetingCount.HasValue)
+            return count == highlightedMeetingCount.Value ? "cell-highlight" : "cell-dimmed";
+        return GetCellClass(count);
     }
 
     private static string GetCellClass(int count) => count switch
