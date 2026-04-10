@@ -189,25 +189,20 @@ else
     @if (!IsLockedPastSession)
     {
         <div class="mb-3">
-            @if (showRegenerateConfirm)
-            {
-                <div class="alert alert-warning d-inline-block me-2">
-                    @Lang.Get("RegenerateConfirm")
-                    <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
-                    <button class="btn btn-sm btn-secondary" @onclick="CancelRegenerate">@Lang.Get("Cancel")</button>
-                </div>
-            }
-            else
+            @if (tables.Count == 0)
             {
                 <button class="btn btn-primary me-2" @onclick="GenerateTables" disabled="@(presentIds.Count < 3)">
                     @Lang.Get("GenerateTableAssignments")
                 </button>
-                @if (tables.Count == 0 && PreviousHanchanWithTables() != null)
+                @if (PreviousHanchanWithTables() != null)
                 {
                     <button class="btn btn-outline-primary me-2" @onclick="CopyTablesFromPrevious">
                         @Lang.Get("CopyTables")
                     </button>
                 }
+                <button class="btn btn-outline-secondary me-2" @onclick="ShowCopyFromHistory">
+                    <i class="bi bi-clipboard-plus me-1"></i>@Lang.Get("CopyFromHistory")
+                </button>
             }
             <button class="btn save-hanchan-btn icon-btn @(saved ? "btn-outline-secondary" : "btn-success")" @onclick="SaveHanchan" disabled="@(tables.Count == 0)" title="@Lang.Get("SaveHanchan")">
                 <i class="bi bi-floppy"></i>
@@ -223,6 +218,23 @@ else
                     <small class="text-muted ms-2">@Lang.Get("BackToWorkflowHint")</small>
                 }
             }
+            @if (tables.Count > 0)
+            {
+                @if (showRegenerateConfirm)
+                {
+                    <span class="alert alert-warning d-inline-block ms-2 mb-0 py-1">
+                        @Lang.Get("RegenerateConfirm")
+                        <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="CancelRegenerate">@Lang.Get("Cancel")</button>
+                    </span>
+                }
+                else
+                {
+                    <button class="btn btn-outline-primary ms-2" @onclick="RequestRegenerate" disabled="@(presentIds.Count < 3)">
+                        <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Regenerate")
+                    </button>
+                }
+            }
             @if (currentHanchan != null)
             {
                 @if (showDeleteConfirm)
@@ -235,8 +247,8 @@ else
                 }
                 else
                 {
-                    <button class="btn btn-outline-danger icon-btn ms-2" @onclick="RequestDeleteHanchan" title="@Lang.Get("DeleteHanchan")">
-                        <i class="bi bi-trash"></i>
+                    <button class="btn btn-outline-danger ms-2" @onclick="RequestDeleteHanchan">
+                        <i class="bi bi-trash me-1"></i>@Lang.Get("DeleteHanchan")
                     </button>
                 }
             }
@@ -245,6 +257,37 @@ else
                 <span class="text-warning ms-2">@Lang.Get("NeedAtLeast3")</span>
             }
         </div>
+
+        @if (showCopyFromHistory)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center">
+                    <h6 class="mb-0 flex-grow-1">@Lang.Get("SelectSessionToCopy")</h6>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => showCopyFromHistory = false">@Lang.Get("Cancel")</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                    @if (historySessions == null || historySessions.Count == 0)
+                    {
+                        <p class="text-muted p-3 mb-0">@Lang.Get("NoSessionsYet")</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var s in historySessions)
+                            {
+                                var sessionNum = GetHistorySessionNumber(s);
+                                var timeStr = s.StartTime.HasValue ? s.StartTime.Value.ToString(@"hh\:mm") : "";
+                                var tableWord = s.Tables.Count == 1 ? Lang.Get("table") : Lang.Get("tables");
+                                <button class="list-group-item list-group-item-action" @onclick="() => CopyFromHistorySession(s)">
+                                    @Lang.FormatDate(s.Date)@(sessionNum.HasValue ? $" #{sessionNum}" : "")@(timeStr != "" ? $" ({timeStr})" : "")
+                                    &mdash; @s.PresentMemberIds.Count @Lang.Get("present"), @s.Tables.Count @tableWord
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
     }
 
     @if (IsLockedPastSession && currentHanchan != null)
@@ -260,8 +303,8 @@ else
             }
             else
             {
-                <button class="btn btn-outline-danger icon-btn" @onclick="RequestDeleteHanchan" title="@Lang.Get("DeleteHanchan")">
-                    <i class="bi bi-trash"></i>
+                <button class="btn btn-outline-danger" @onclick="RequestDeleteHanchan">
+                    <i class="bi bi-trash me-1"></i>@Lang.Get("DeleteHanchan")
                 </button>
             }
         </div>
@@ -459,6 +502,8 @@ else
     private bool showExportAll;
     private string? workflowStepKey;
     private string activeTab = "tables";
+    private bool showCopyFromHistory;
+    private List<Hanchan>? historySessions;
     private string TabContentKey => $"{currentHanchan?.Id}_{activeTab}";
     private int weeklyStartingPoints = 30000;
     private List<int> uma4Players = new() { 15000, 5000, -5000, -15000 };
@@ -602,6 +647,7 @@ else
         attendanceExpanded = true;
         saved = false;
         showRegenerateConfirm = false;
+        showCopyFromHistory = false;
 
         // Set start time: next scheduled time > previous hanchan + 1h > default
         ClubSettings? settings = await SettingsService.GetAsync();
@@ -641,6 +687,7 @@ else
         if (DateTime.TryParse(e.Value?.ToString(), out var date))
         {
             sessionDate = date;
+            showCopyFromHistory = false;
             await LoadSessionsForDate();
         }
     }
@@ -761,6 +808,12 @@ else
         await DoGenerateTables();
     }
 
+    private void RequestRegenerate()
+    {
+        if (IsLockedPastSession) return;
+        showRegenerateConfirm = true;
+    }
+
     private async Task ConfirmRegenerate()
     {
         showRegenerateConfirm = false;
@@ -793,7 +846,40 @@ else
         }).ToList();
 
         attendanceResetConfirmed = false;
+        showCopyFromHistory = false;
         await SaveHanchan();
+    }
+
+    private async Task ShowCopyFromHistory()
+    {
+        var allSessions = await SessionService.GetAllAsync();
+        historySessions = allSessions
+            .Where(s => s.Date.Date != sessionDate.Date && s.IsFinalized && s.Tables.Count > 0)
+            .OrderByDescending(s => s.Date)
+            .ThenByDescending(s => s.StartTime ?? TimeSpan.Zero)
+            .ToList();
+        showCopyFromHistory = true;
+    }
+
+    private void CopyFromHistorySession(Hanchan selected)
+    {
+        presentIds = new HashSet<Guid>(selected.PresentMemberIds);
+        tables = selected.Tables.Select(t => new TableAssignment
+        {
+            TableNumber = t.TableNumber,
+            PlayerIds = new List<Guid>(t.PlayerIds)
+        }).ToList();
+        attendanceResetConfirmed = false;
+        showCopyFromHistory = false;
+    }
+
+    private int? GetHistorySessionNumber(Hanchan session)
+    {
+        if (historySessions == null) return null;
+        var sameDateSessions = historySessions.Where(s => s.Date.Date == session.Date.Date).ToList();
+        if (sameDateSessions.Count <= 1) return null;
+        var ordered = sameDateSessions.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        return ordered.IndexOf(session) + 1;
     }
 
     private async Task DoGenerateTables()
