@@ -22,7 +22,7 @@ public class TableAssignmentService
     private const double ThreeFairnessWeight = 10.0;
     private const double MeetingSpreadWeight = 1.0;
 
-    public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds)
+    public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds, Guid? currentSessionId = null)
     {
         var playerCount = presentPlayerIds.Count;
         if (playerCount < 3)
@@ -32,7 +32,10 @@ public class TableAssignmentService
         var threePlayerTables = tableNumbers.threePlayerTables;
 
         List<Hanchan> allHistory = await _sessionService.GetAllAsync();
-        List<Hanchan> history = allHistory.Where(s => !s.ExcludeFromOptimization).ToList();
+        // Exclude the current session from history to avoid self-contamination during regeneration
+        List<Hanchan> history = allHistory
+            .Where(s => !s.ExcludeFromOptimization && s.Id != currentSessionId)
+            .ToList();
         List<Member> members = await _memberService.GetAllAsync();
         Dictionary<Guid, int> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
         Dictionary<Guid, int> attendance = CountAttendance(history, presentPlayerIds);

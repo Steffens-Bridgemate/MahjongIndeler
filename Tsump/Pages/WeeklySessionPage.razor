@@ -884,7 +884,7 @@ else
 
     private async Task DoGenerateTables()
     {
-        tables = await TableAssignmentService.AssignTables(presentIds.ToList());
+        tables = await TableAssignmentService.AssignTables(presentIds.ToList(), currentHanchan?.Id);
         attendanceResetConfirmed = false;
         await SaveHanchan();
     }
