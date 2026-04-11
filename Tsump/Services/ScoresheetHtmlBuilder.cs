@@ -37,7 +37,7 @@ public static class ScoresheetHtmlBuilder
             .page-footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center;
                            font-size: 10px; color: #666; padding: 2px 0; }
             .sheet { page-break-inside: avoid; break-inside: avoid; }
-            .sheet table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            .sheet table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
             .sheet th, .sheet td { border: 1px solid #333; padding: 2px 6px; }
             .sheet th { background: #f5f5f5; }
             .sheet .header-3 { background: #ffc107; color: #000; }
@@ -112,7 +112,7 @@ public static class ScoresheetHtmlBuilder
         sb.Append("<tr><th class=\"row-label\"></th>");
         foreach (var name in table.PlayerNames)
         {
-            sb.Append($"<th style=\"text-align:center;\">{name}</th>");
+            sb.Append($"<th style=\"text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">{name}</th>");
         }
         sb.Append("</tr>");
 
