@@ -8,7 +8,7 @@ namespace Tsump.Services;
 /// </summary>
 public static class ScoresheetHtmlBuilder
 {
-    public record ScoresheetTable(int TableNumber, int PlayerCount, List<string> PlayerNames, int DefaultStartingPoints = 30000);
+    public record ScoresheetTable(int TableNumber, int PlayerCount, List<string> PlayerNames, int DefaultStartingPoints = 30000, string? HanchanLabel = null);
 
     /// <summary>
     /// Builds a complete HTML document containing scoresheets for all tables.
@@ -87,13 +87,22 @@ public static class ScoresheetHtmlBuilder
     private static void AppendScoresheet(StringBuilder sb, ScoresheetTable table, Func<string, string> lang)
     {
         var headerClass = table.PlayerCount == 3 ? "header-3" : "header-4";
-        var colCount = table.PlayerNames.Count + 1;
+        var hasHanchan = !string.IsNullOrEmpty(table.HanchanLabel);
+        var colCount = table.PlayerNames.Count + 1 + (hasHanchan ? 1 : 0);
+
+        // Total content rows: header + names + 7 scoring + 4 separator = 13
+        var totalRows = 13;
 
         sb.Append("<div class=\"sheet\">");
         sb.Append("<table>");
 
-        // Header row with table number
-        sb.Append($"<tr><th colspan=\"{colCount}\" class=\"{headerClass}\">");
+        // Header row with table number (and optional hanchan column)
+        sb.Append("<tr>");
+        if (hasHanchan)
+        {
+            sb.Append($"<td rowspan=\"{totalRows}\" style=\"vertical-align:middle;text-align:center;font-size:11px;padding:2px 6px;border:1px solid #333;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);\">{table.HanchanLabel}</td>");
+        }
+        sb.Append($"<th colspan=\"{colCount - (hasHanchan ? 1 : 0)}\" class=\"{headerClass}\">");
         sb.Append($"{lang("Table")} {table.TableNumber} ({table.PlayerCount} {lang("players")})");
         sb.Append("</th></tr>");
 

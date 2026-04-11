@@ -1046,14 +1046,14 @@ else
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, WrapAsHtmlDocument(title, html));
     }
 
-    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(List<TableAssignment> tablesToRender)
+    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(List<TableAssignment> tablesToRender, string? hanchanLabel = null)
     {
         return tablesToRender.Select(t =>
         {
             var names = t.PlayerIds.Select(id => GetPlayerName(id)).ToList();
             if (t.PlayerCount == 3)
                 names.Add(Lang.Get("MrX"));
-            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, weeklyStartingPoints);
+            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, weeklyStartingPoints, hanchanLabel);
         }).ToList();
     }
 
@@ -1062,7 +1062,7 @@ else
         if (tables.Count == 0 || members == null) return;
         var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
         var subtitle = BuildHanchanSubtitle();
-        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables), Lang.Get, includePrintButton: true);
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, subtitle), Lang.Get, includePrintButton: true);
         await JS.InvokeVoidAsync("openHtmlInNewTab", doc);
     }
 
@@ -1071,7 +1071,7 @@ else
         if (tables.Count == 0 || members == null) return;
         var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
         var subtitle = BuildHanchanSubtitle();
-        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables), Lang.Get);
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, subtitle), Lang.Get);
         var filename = $"scoresheets_{sessionDate:yyyy-MM-dd}.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
     }
