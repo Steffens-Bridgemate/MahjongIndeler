@@ -43,7 +43,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>@Lang.Get("StartShort")</td>
+                        <td style="vertical-align:middle;">@Lang.Get("StartShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             var psRef = ps;
@@ -55,39 +55,42 @@
                             </td>
                         }
                     </tr>
-                    @if (showExtras)
-                    {
                     <tr>
-                        <td>@Lang.Get("LoanShort")</td>
-                        @foreach (var ps in score.PlayerScores)
-                        {
-                            var psRef = ps;
-                            <td class="text-center">
-                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
-                                       value="@(psRef.Loan != 0 ? FormatDisplay(psRef.Loan) : "")"
-                                       placeholder="—"
-                                       @onchange="e => OnLoanChanged(psRef, e)"
-                                       style="width:100%;" />
-                            </td>
-                        }
-                    </tr>
-                    }
-                    <tr>
-                        <td>@Lang.Get("EndShort")</td>
+                        <td style="vertical-align:middle;">@Lang.Get("EndShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             var psRef = ps;
                             <td class="text-center">
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                        value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
-                                       placeholder="—"
+                                       placeholder="−"
                                        @onchange="e => OnEndPointsChanged(psRef, e)"
                                        style="width:100%;" />
                             </td>
                         }
                     </tr>
+                    @if (showExtras)
+                    {
+                    <tr>
+                        <td style="vertical-align:middle;">@Lang.Get("LoanShort")</td>
+                        @foreach (var ps in score.PlayerScores)
+                        {
+                            var psRef = ps;
+                            <td class="text-center">
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       value="@FormatLoan(psRef.Loan)"
+                                       placeholder="−"
+                                       @onfocus="e => OnLoanFocus(psRef)"
+                                       @onchange="e => OnLoanChanged(psRef, e)"
+                                       style="width:100%;" />
+                            </td>
+                        }
+                    </tr>
+                    }
+                    <tr style="height:6px;line-height:0;font-size:0;"><td colspan="@(score.PlayerScores.Count + 1)" style="padding:0;border:none;"></td></tr>
+                    <tr style="height:0;line-height:0;font-size:0;"><td style="padding:0 4px;border:none;border-bottom:3px solid #333;font-size:11px;line-height:1;color:#666;vertical-align:bottom;">+</td><td colspan="@score.PlayerScores.Count" style="padding:0;border:none;border-bottom:3px solid #333;"></td></tr>
                     <tr class="@(hasError ? "table-danger" : "")">
-                        <td>
+                        <td style="vertical-align:middle;">
                             @Lang.Get("DifferenceShort")
                             @if (hasError)
                             {
@@ -113,7 +116,7 @@
                         }
                     </tr>
                     <tr>
-                        <td>@Lang.Get("UmaShort")</td>
+                        <td style="vertical-align:middle;">@Lang.Get("UmaShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             <td class="text-center">
@@ -135,7 +138,7 @@
                     @if (showExtras)
                     {
                     <tr>
-                        <td>@Lang.Get("PenaltyShort")</td>
+                        <td style="vertical-align:middle;">@Lang.Get("PenaltyShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             var psRef = ps;
@@ -148,7 +151,7 @@
                                 {
                                     <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                            value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
-                                           placeholder="—"
+                                           placeholder="−"
                                            @onchange="e => OnPenaltyChanged(psRef, e)"
                                            style="width:100%;" />
                                 }
@@ -156,8 +159,10 @@
                         }
                     </tr>
                     }
+                    <tr style="height:6px;line-height:0;font-size:0;"><td colspan="@(score.PlayerScores.Count + 1)" style="padding:0;border:none;"></td></tr>
+                    <tr style="height:0;line-height:0;font-size:0;"><td style="padding:0 4px;border:none;border-bottom:3px solid #333;font-size:11px;line-height:1;color:#666;vertical-align:bottom;">+</td><td colspan="@score.PlayerScores.Count" style="padding:0;border:none;border-bottom:3px solid #333;"></td></tr>
                     <tr class="table-active fw-bold">
-                        <td>@Lang.Get("FinalScoreShort")</td>
+                        <td style="vertical-align:middle;">@Lang.Get("FinalScoreShort")</td>
                         @foreach (var ps in score.PlayerScores)
                         {
                             <td class="text-center">
@@ -218,6 +223,22 @@
         return (value / 1000.0).ToString("+0.0;-0.0;0.0");
     }
 
+    private static string FormatLoan(int loan)
+    {
+        if (loan != 0)
+            return FormatDisplay(loan);
+        return "";
+    }
+
+    private void OnLoanFocus(PlayerScore ps)
+    {
+        // Auto-insert minus prefix when the loan field is empty
+        if (ps.Loan == 0)
+        {
+            ps.Loan = 0; // keep at 0, the placeholder "−" guides the user
+        }
+    }
+
     // Parse: user enters decimal (e.g. "285.0"), store as int × 100
     private static int? ParseInput(string? input)
     {
@@ -238,7 +259,9 @@
 
     private async Task OnLoanChanged(PlayerScore ps, ChangeEventArgs e)
     {
-        ps.Loan = ParseInput(e.Value?.ToString()) ?? 0;
+        var parsed = ParseInput(e.Value?.ToString()) ?? 0;
+        // Loans are always negative — auto-negate if user enters a positive number
+        ps.Loan = parsed > 0 ? -parsed : parsed;
         CalculateUma();
         await CheckAndNotifyComplete();
     }
@@ -252,7 +275,9 @@
 
     private async Task OnPenaltyChanged(PlayerScore ps, ChangeEventArgs e)
     {
-        ps.Penalty = ParseInput(e.Value?.ToString()) ?? 0;
+        var parsed = ParseInput(e.Value?.ToString()) ?? 0;
+        // Penalties are always negative — auto-negate if user enters a positive number
+        ps.Penalty = parsed > 0 ? -parsed : parsed;
         CalculateUma();
         await CheckAndNotifyComplete();
     }

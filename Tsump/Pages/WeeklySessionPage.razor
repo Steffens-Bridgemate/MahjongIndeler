@@ -73,19 +73,19 @@
             @if (showExportAll)
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick="CopyAllHanchansToClipboard">
-                    @(copiedAllToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                    <i class="bi bi-clipboard me-1"></i>@(copiedAllToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="OpenAllHanchans">
-                    @Lang.Get("OpenPrint")
+                    <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadAllHanchans">
-                    @Lang.Get("DownloadHtml")
+                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
                 </button>
             }
             else
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportAll = true">
-                    @Lang.Get("Export")
+                    <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
                 </button>
             }
         }
@@ -335,19 +335,34 @@ else
             @if (showExportSingle)
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick="CopyTablesToClipboard">
-                    @(copiedToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                    <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="OpenSingleHanchan">
-                    @Lang.Get("OpenPrint")
+                    <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadSingleHanchan">
-                    @Lang.Get("DownloadHtml")
+                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
                 </button>
             }
             else
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportSingle = true">
-                    @Lang.Get("Export")
+                    <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
+                </button>
+            }
+            @if (showExportScoresheetsSingle)
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="PrintScoresheetsSingle">
+                    <i class="bi bi-printer me-1"></i>@Lang.Get("PrintScoresheets")
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadScoresheetsSingle">
+                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadScoresheets")
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportScoresheetsSingle = true">
+                    <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
                 </button>
             }
         </div>
@@ -500,6 +515,7 @@ else
     private bool copiedAllToClipboard;
     private bool showExportSingle;
     private bool showExportAll;
+    private bool showExportScoresheetsSingle;
     private string? workflowStepKey;
     private string activeTab = "tables";
     private bool showCopyFromHistory;
@@ -1028,6 +1044,49 @@ else
         var title = $"{Lang.Get("Hanchan")} — {Lang.FormatDate(sessionDate)}";
         var filename = $"hanchan_{sessionDate:yyyy-MM-dd}.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, WrapAsHtmlDocument(title, html));
+    }
+
+    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(List<TableAssignment> tablesToRender)
+    {
+        return tablesToRender.Select(t =>
+        {
+            var names = t.PlayerIds.Select(id => GetPlayerName(id)).ToList();
+            if (t.PlayerCount == 3)
+                names.Add(Lang.Get("MrX"));
+            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, weeklyStartingPoints);
+        }).ToList();
+    }
+
+    private async Task PrintScoresheetsSingle()
+    {
+        if (tables.Count == 0 || members == null) return;
+        var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
+        var subtitle = BuildHanchanSubtitle();
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables), Lang.Get, includePrintButton: true);
+        await JS.InvokeVoidAsync("openHtmlInNewTab", doc);
+    }
+
+    private async Task DownloadScoresheetsSingle()
+    {
+        if (tables.Count == 0 || members == null) return;
+        var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
+        var subtitle = BuildHanchanSubtitle();
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables), Lang.Get);
+        var filename = $"scoresheets_{sessionDate:yyyy-MM-dd}.html";
+        await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
+    }
+
+    private string BuildHanchanSubtitle()
+    {
+        var ordered = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        var hanchanNumber = currentHanchan != null
+            ? ordered.IndexOf(currentHanchan) + 1
+            : ordered.Count + 1;
+        var timeStr = hanchanStartTime.HasValue ? hanchanStartTime.Value.ToString(@"hh\:mm") : "";
+        var subtitle = $"{Lang.Get("Hanchan")} {hanchanNumber}";
+        if (timeStr.Length > 0)
+            subtitle += $" {timeStr}";
+        return subtitle;
     }
 
     private async Task ResetCopiedFlag()
