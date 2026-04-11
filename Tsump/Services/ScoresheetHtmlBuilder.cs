@@ -43,11 +43,13 @@ public static class ScoresheetHtmlBuilder
             .sheet .header-3 { background: #ffc107; color: #000; }
             .sheet .header-4 { background: #198754; color: #000; }
             .sheet .row-label { width: 60px; font-weight: bold; white-space: nowrap; }
-            .sheet .score-cell { height: 30px; min-width: 70px; }
+            .sheet .score-cell { height: 26px; min-width: 70px; }
             .sheet .score-cell-start { height: 18px; min-width: 70px; }
             .sheet .total-row { background: #e9ecef; font-weight: bold; }
+            .sheet .initials-row td { border-color: #aaa; border-bottom: none; height: 22px; }
+            .sheet .initials-row .row-label { color: #666; font-weight: normal; }
             .cut-marks { display: flex; justify-content: space-between; align-items: center;
-                         margin: 12px 0; font-size: 12px; color: #999; }
+                         margin: 11px 0; font-size: 12px; color: #999; }
             .cut-marks span { letter-spacing: 2px; }
             @media print {
                 .no-print { display: none; }
@@ -90,8 +92,8 @@ public static class ScoresheetHtmlBuilder
         var hasHanchan = !string.IsNullOrEmpty(table.HanchanLabel);
         var colCount = table.PlayerNames.Count + 1 + (hasHanchan ? 1 : 0);
 
-        // Total content rows: header + names + 7 scoring + 4 separator = 13
-        var totalRows = 13;
+        // Total content rows: header + names + 7 scoring + 4 separator + initials = 14
+        var totalRows = 14;
 
         sb.Append("<div class=\"sheet\">");
         sb.Append("<table>");
@@ -153,6 +155,15 @@ public static class ScoresheetHtmlBuilder
             }
             sb.Append("</tr>");
         }
+
+        // Initials row
+        sb.Append("<tr class=\"initials-row\">");
+        sb.Append($"<td class=\"row-label\">{lang("InitialsShort")}</td>");
+        for (int i = 0; i < table.PlayerNames.Count; i++)
+        {
+            sb.Append("<td></td>");
+        }
+        sb.Append("</tr>");
 
         sb.Append("</table>");
         sb.Append("</div>");
