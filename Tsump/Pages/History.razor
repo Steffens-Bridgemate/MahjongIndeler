@@ -125,6 +125,9 @@ else
                     <th style="cursor:pointer;" @onclick='() => SetSort("three")'>
                         @Lang.Get("TimesAt3Table") @SortIndicator("three")
                     </th>
+                    <th style="cursor:pointer;" @onclick='() => SetSort("threepct")'>
+                        % @SortIndicator("threepct")
+                    </th>
                     <th style="cursor:pointer;" @onclick='() => SetSort("four")'>
                         @Lang.Get("TimesAt4Table") @SortIndicator("four")
                     </th>
@@ -137,6 +140,7 @@ else
                         <td>@stat.Name</td>
                         <td>@stat.SessionsAttended</td>
                         <td>@stat.ThreePlayerCount</td>
+                        <td>@(stat.SessionsAttended > 0 ? $"{Math.Round(100.0 * stat.ThreePlayerCount / stat.SessionsAttended):0}" : "")</td>
                         <td>@stat.FourPlayerCount</td>
                     </tr>
                 }
@@ -170,6 +174,7 @@ else
     {
         "sessions" => descending ? source.OrderByDescending(s => s.SessionsAttended) : source.OrderBy(s => s.SessionsAttended),
         "three"    => descending ? source.OrderByDescending(s => s.ThreePlayerCount)  : source.OrderBy(s => s.ThreePlayerCount),
+        "threepct" => descending ? source.OrderByDescending(s => ThreePercentage(s))  : source.OrderBy(s => ThreePercentage(s)),
         "four"     => descending ? source.OrderByDescending(s => s.FourPlayerCount)   : source.OrderBy(s => s.FourPlayerCount),
         _          => descending ? source.OrderByDescending(s => s.Name)              : source.OrderBy(s => s.Name),
     };
@@ -178,9 +183,13 @@ else
     {
         "sessions" => descending ? source.ThenByDescending(s => s.SessionsAttended) : source.ThenBy(s => s.SessionsAttended),
         "three"    => descending ? source.ThenByDescending(s => s.ThreePlayerCount)  : source.ThenBy(s => s.ThreePlayerCount),
+        "threepct" => descending ? source.ThenByDescending(s => ThreePercentage(s))  : source.ThenBy(s => ThreePercentage(s)),
         "four"     => descending ? source.ThenByDescending(s => s.FourPlayerCount)   : source.ThenBy(s => s.FourPlayerCount),
         _          => descending ? source.ThenByDescending(s => s.Name)              : source.ThenBy(s => s.Name),
     };
+
+    private static double ThreePercentage(PlayerStat s) =>
+        s.SessionsAttended > 0 ? (double)s.ThreePlayerCount / s.SessionsAttended : 0;
 
     private void SetSort(string column)
     {
