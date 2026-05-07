@@ -368,6 +368,9 @@ public class TableAssignmentService
         Dictionary<Guid, int> attendance,
         Dictionary<string, int> meetingCounts)
     {
+        if (slots <= 0)
+            return new List<Guid>();
+
         if (sortedEligible.Count <= slots)
             return sortedEligible.ToList();
 
