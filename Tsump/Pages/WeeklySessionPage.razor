@@ -634,7 +634,9 @@ else
         hanchanStartTime = hanchan.StartTime ?? defaultStartTime;
         presentIds = new HashSet<Guid>(hanchan.PresentMemberIds);
         tables = hanchan.Tables;
-        excludeFromOptimization = hanchan.ExcludeFromOptimization;
+        // The flag is per-date: if any hanchan on the same date is excluded, the date is excluded.
+        excludeFromOptimization = hanchansOnDate.Any(s => s.ExcludeFromOptimization)
+            || hanchan.ExcludeFromOptimization;
         attendanceExpanded = !hanchan.IsFinalized;
         saved = hanchan.Tables.Count > 0;
         showRegenerateConfirm = false;
@@ -659,7 +661,8 @@ else
 
         currentHanchan = null;
         tables = new();
-        excludeFromOptimization = false;
+        // The exclude flag is per-date — inherit from existing hanchans on this date.
+        excludeFromOptimization = hanchansOnDate.Any(s => s.ExcludeFromOptimization);
         attendanceExpanded = true;
         saved = false;
         showRegenerateConfirm = false;
@@ -900,7 +903,7 @@ else
 
     private async Task DoGenerateTables()
     {
-        tables = await TableAssignmentService.AssignTables(presentIds.ToList(), currentHanchan?.Id);
+        tables = await TableAssignmentService.AssignTables(presentIds.ToList(), currentHanchan?.Id, sessionDate, excludeFromOptimization);
         attendanceResetConfirmed = false;
         await SaveHanchan();
     }
@@ -1263,8 +1266,20 @@ else
         await SessionService.SaveAsync(hanchan);
         currentHanchan = hanchan;
 
-        // Refresh the session list for this date
+        // Propagate the ExcludeFromOptimization flag to all other hanchans on the same date,
+        // so the flag is effectively per-date.
         var allHanchans = await SessionService.GetAllAsync();
+        foreach (var other in allHanchans.Where(s =>
+                     s.Id != hanchan.Id &&
+                     s.Date.Date == sessionDate.Date &&
+                     s.ExcludeFromOptimization != excludeFromOptimization))
+        {
+            other.ExcludeFromOptimization = excludeFromOptimization;
+            await SessionService.SaveAsync(other);
+        }
+
+        // Refresh the session list for this date
+        allHanchans = await SessionService.GetAllAsync();
         hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
 
         saved = true;

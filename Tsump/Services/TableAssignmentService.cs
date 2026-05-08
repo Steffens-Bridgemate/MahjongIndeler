@@ -22,7 +22,7 @@ public class TableAssignmentService
     private const double ThreeFairnessWeight = 10.0;
     private const double MeetingSpreadWeight = 1.0;
 
-    public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds, Guid? currentSessionId = null)
+    public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds, Guid? currentSessionId = null, DateTime? currentDate = null, bool currentDateExcluded = false)
     {
         var playerCount = presentPlayerIds.Count;
         if (playerCount < 3)
@@ -32,9 +32,18 @@ public class TableAssignmentService
         var threePlayerTables = tableNumbers.threePlayerTables;
 
         List<Hanchan> allHistory = await _sessionService.GetAllAsync();
-        // Exclude the current session from history to avoid self-contamination during regeneration
+        // History filter:
+        //  - Drop the current session (avoid self-contamination during regeneration).
+        //  - Same-date prior hanchans always count (this is one event running across multiple hanchans).
+        //  - Other-date hanchans count only if BOTH sides are non-excluded:
+        //    * if the current date is excluded, no other-date history is used at all;
+        //    * if a historical hanchan's date is excluded, it is not used for other dates.
+        var currentDay = currentDate?.Date;
         List<Hanchan> history = allHistory
-            .Where(s => !s.ExcludeFromOptimization && s.Id != currentSessionId)
+            .Where(s => s.Id != currentSessionId)
+            .Where(s =>
+                (currentDay.HasValue && s.Date.Date == currentDay.Value)
+                || (!currentDateExcluded && !s.ExcludeFromOptimization))
             .ToList();
         List<Member> members = await _memberService.GetAllAsync();
         Dictionary<Guid, int> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
