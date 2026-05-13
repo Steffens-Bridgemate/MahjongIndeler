@@ -51,6 +51,14 @@ public class TableAssignmentService
         Dictionary<Guid, int> threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
         Dictionary<string, int> meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
 
+        // Special case: 21 players, second hanchan of a date. Builds tables by rearranging
+        // the prior hanchan so no pair repeats and no one plays a 3-table twice in the day.
+        var specialCase = TryBuildSpecialCase21SecondHanchan(
+            presentPlayerIds, currentSessionId, currentDay, allHistory,
+            meetingCounts, attendance);
+        if (specialCase != null)
+            return specialCase;
+
         // Hard constraint: players who were at a 3-player table in their last attended
         // session cannot be assigned to a 3-player table again
         HashSet<Guid> playedThreeLastTime = FindPlayersAtThreeTableLastSession(history, presentPlayerIds);
@@ -156,6 +164,215 @@ public class TableAssignmentService
             tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
 
         return (tables, threePlayerPool);
+    }
+
+    private static readonly int[][] Perms3 =
+    {
+        new[] {0,1,2}, new[] {0,2,1}, new[] {1,0,2},
+        new[] {1,2,0}, new[] {2,0,1}, new[] {2,1,0},
+    };
+
+    /// <summary>
+    /// Special case for 21 players when generating the second hanchan of a date.
+    /// The prior hanchan must have 3 three-player tables and 3 four-player tables, and the
+    /// same 21 players must be present. Produces a rearrangement guaranteeing:
+    ///   C1: No player plays a 3-player table twice within the day.
+    ///   C2: No pair shares a table twice within the day.
+    /// Among valid configurations, picks the one with the lowest meeting score against
+    /// prior history. Returns null if conditions aren't met.
+    /// </summary>
+    private static List<TableAssignment>? TryBuildSpecialCase21SecondHanchan(
+        List<Guid> presentPlayerIds,
+        Guid? currentSessionId,
+        DateTime? currentDay,
+        List<Hanchan> allHistory,
+        Dictionary<string, int> meetingCounts,
+        Dictionary<Guid, int> attendance)
+    {
+        if (presentPlayerIds.Count != 21 || !currentDay.HasValue)
+            return null;
+
+        // Find the prior hanchan: exactly one other hanchan on this date with tables assigned.
+        var sameDate = allHistory
+            .Where(s => s.Id != currentSessionId
+                        && s.Date.Date == currentDay.Value
+                        && s.Tables.Count > 0)
+            .ToList();
+        if (sameDate.Count != 1) return null;
+
+        var prior = sameDate[0];
+        var priorThree = prior.Tables.Where(t => t.PlayerCount == 3).ToList();
+        var priorFour = prior.Tables.Where(t => t.PlayerCount == 4).ToList();
+        if (priorThree.Count != 3 || priorFour.Count != 3) return null;
+
+        // The same 21 players must be present (no additions/removals since hanchan 1).
+        var priorPlayers = prior.Tables.SelectMany(t => t.PlayerIds).ToHashSet();
+        if (priorPlayers.Count != 21 || !priorPlayers.SetEquals(presentPlayerIds))
+            return null;
+
+        // Index all 21 players into 0..20 and pre-compute a symmetric pair-score matrix.
+        // This is the key optimisation: the inner loops do ~1.6M score lookups, and a
+        // dictionary+string-key path costs ~6M Guid.ToString allocations in WASM (30+ seconds).
+        // Array indexing brings it under 100ms.
+        var idx = new Dictionary<Guid, int>(21);
+        for (int i = 0; i < presentPlayerIds.Count; i++)
+            idx[presentPlayerIds[i]] = i;
+
+        var score = new double[21, 21];
+        for (int i = 0; i < 21; i++)
+        {
+            var idA = presentPlayerIds[i];
+            for (int j = i + 1; j < 21; j++)
+            {
+                var idB = presentPlayerIds[j];
+                var met = meetingCounts.GetValueOrDefault(MakeKey(idA, idB), 0);
+                if (met == 0) continue;
+                var coAtt = Math.Min(
+                    attendance.GetValueOrDefault(idA, 0),
+                    attendance.GetValueOrDefault(idB, 0));
+                var v = coAtt > 0 ? (double)met / coAtt : 0;
+                score[i, j] = v;
+                score[j, i] = v;
+            }
+        }
+
+        // A[i][j]: player-index of player j on prior 3-table i (i=0..2, j=0..2). 9 A-players.
+        // B[i][j]: player-index of player j on prior 4-table i (i=0..2, j=0..3). 12 B-players.
+        var A = new int[3][];
+        for (int i = 0; i < 3; i++)
+            A[i] = priorThree[i].PlayerIds.Select(g => idx[g]).ToArray();
+        var B = new int[3][];
+        for (int i = 0; i < 3; i++)
+            B[i] = priorFour[i].PlayerIds.Select(g => idx[g]).ToArray();
+
+        // For each leftover-B choice (4^3 = 64), the 3-table and 4-table sub-problems
+        // are independent. Decomposing keeps the search at ~97K cheap evaluations.
+        var bestTotal = double.MaxValue;
+        var bestLeftover = new int[3];
+        var bestSigma = new int[3][]; // bestSigma[i][k] = index in B[i] used at new 3-table k
+        var bestPi = new int[3][];    // bestPi[i][k]    = index in A[i] used at new 4-table k
+        var bestRho = new int[3];     // bestRho[k]      = i of the prior 4-table whose leftover sits at new 4-table k
+
+        for (int l0 = 0; l0 < 4; l0++)
+        for (int l1 = 0; l1 < 4; l1++)
+        for (int l2 = 0; l2 < 4; l2++)
+        {
+            int[] leftover = { l0, l1, l2 };
+            // going[i] = the 3 indices in B[i] that aren't leftover (i.e. move to 3-tables)
+            var going = new int[3][];
+            for (int i = 0; i < 3; i++)
+            {
+                var g = new int[3];
+                int gIdx = 0;
+                for (int j = 0; j < 4; j++)
+                    if (j != leftover[i]) g[gIdx++] = j;
+                going[i] = g;
+            }
+
+            // --- 3-tables: pick perms σ_0, σ_1, σ_2 of going[i] across new 3-tables 0..2 ---
+            double best3 = double.MaxValue;
+            int[][] localSigma = new int[3][];
+            for (int s0 = 0; s0 < 6; s0++)
+            for (int s1 = 0; s1 < 6; s1++)
+            for (int s2 = 0; s2 < 6; s2++)
+            {
+                var σ0 = Perms3[s0]; var σ1 = Perms3[s1]; var σ2 = Perms3[s2];
+                double s = 0;
+                for (int k = 0; k < 3; k++)
+                {
+                    var b0 = B[0][going[0][σ0[k]]];
+                    var b1 = B[1][going[1][σ1[k]]];
+                    var b2 = B[2][going[2][σ2[k]]];
+                    s += score[b0, b1] + score[b0, b2] + score[b1, b2];
+                }
+                if (s < best3)
+                {
+                    best3 = s;
+                    localSigma = new[]
+                    {
+                        new[] { going[0][σ0[0]], going[0][σ0[1]], going[0][σ0[2]] },
+                        new[] { going[1][σ1[0]], going[1][σ1[1]], going[1][σ1[2]] },
+                        new[] { going[2][σ2[0]], going[2][σ2[1]], going[2][σ2[2]] },
+                    };
+                }
+            }
+
+            // --- 4-tables: pick perms π_0, π_1, π_2 of A[i] across new 4-tables, plus ρ of leftovers ---
+            double best4 = double.MaxValue;
+            int[][] localPi = new int[3][];
+            int[] localRho = new int[3];
+            for (int p0 = 0; p0 < 6; p0++)
+            for (int p1 = 0; p1 < 6; p1++)
+            for (int p2 = 0; p2 < 6; p2++)
+            for (int r = 0; r < 6; r++)
+            {
+                var π0 = Perms3[p0]; var π1 = Perms3[p1]; var π2 = Perms3[p2];
+                var ρ = Perms3[r];
+                double s = 0;
+                for (int k = 0; k < 3; k++)
+                {
+                    var a0 = A[0][π0[k]];
+                    var a1 = A[1][π1[k]];
+                    var a2 = A[2][π2[k]];
+                    var bLeftover = B[ρ[k]][leftover[ρ[k]]];
+                    s += score[a0, a1] + score[a0, a2] + score[a1, a2];
+                    s += score[bLeftover, a0] + score[bLeftover, a1] + score[bLeftover, a2];
+                }
+                if (s < best4)
+                {
+                    best4 = s;
+                    localPi = new[] { π0.ToArray(), π1.ToArray(), π2.ToArray() };
+                    localRho = ρ.ToArray();
+                }
+            }
+
+            var total = best3 + best4;
+            if (total < bestTotal)
+            {
+                bestTotal = total;
+                bestLeftover = leftover;
+                bestSigma = localSigma;
+                bestPi = localPi;
+                bestRho = localRho;
+                if (bestTotal <= 1e-12)
+                    goto found;
+            }
+        }
+        found:
+
+        var tables = new List<TableAssignment>();
+        int tableNumber = 1;
+        // 3-tables 1, 2, 3
+        for (int k = 0; k < 3; k++)
+        {
+            tables.Add(new TableAssignment
+            {
+                TableNumber = tableNumber++,
+                PlayerIds = new List<Guid>
+                {
+                    presentPlayerIds[B[0][bestSigma[0][k]]],
+                    presentPlayerIds[B[1][bestSigma[1][k]]],
+                    presentPlayerIds[B[2][bestSigma[2][k]]],
+                },
+            });
+        }
+        // 4-tables 4, 5, 6
+        for (int k = 0; k < 3; k++)
+        {
+            var leftoverI = bestRho[k];
+            tables.Add(new TableAssignment
+            {
+                TableNumber = tableNumber++,
+                PlayerIds = new List<Guid>
+                {
+                    presentPlayerIds[A[0][bestPi[0][k]]],
+                    presentPlayerIds[A[1][bestPi[1][k]]],
+                    presentPlayerIds[A[2][bestPi[2][k]]],
+                    presentPlayerIds[B[leftoverI][bestLeftover[leftoverI]]],
+                },
+            });
+        }
+        return tables;
     }
 
     /// <summary>
