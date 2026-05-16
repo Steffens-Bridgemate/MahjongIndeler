@@ -12,6 +12,21 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="manifest" href="manifest.webmanifest" />
     <script type="importmap"></script>
+    <script>
+        // GitHub Pages SPA decoder — restores the original route after 404.html bounced us
+        // back to index.html with the path encoded as a query string.
+        // Pair: see wwwroot/404.html.
+        (function (l) {
+            if (l.search[1] === '/') {
+                var decoded = l.search.slice(1).split('&').map(function (s) {
+                    return s.replace(/~and~/g, '&');
+                }).join('?');
+                window.history.replaceState(null, null,
+                    l.pathname.slice(0, -1) + decoded + l.hash
+                );
+            }
+        })(window.location);
+    </script>
 </head>
 
 <body>

@@ -28,9 +28,10 @@ public class ClubSettings
     public List<int> TournamentUma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };
     public List<int> TournamentUma3Players { get; set; } = new() { 12500, 0, -12500 };
 
-    // URL of the deployed Tsump.Scoring app (used to build "Share scoring link" URLs).
-    // Leave empty to disable the share-link feature.
-    public string ScoringAppUrl { get; set; } = "";
+    // When true, the "Share scoring link" feature is exposed per-table. The scoring app's
+    // URL is hard-coded in Tsump.Scoring.ScoringAppConfig (not user-configurable, since
+    // PWA-installed organizer instances hide the address bar).
+    public bool EnableExternalScoring { get; set; } = false;
 }
 
 public class ScheduleEntry

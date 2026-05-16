@@ -447,16 +447,17 @@ else
                                     </li>
                                 }
                             </ul>
-                            @{
+                            @if (externalScoringEnabled)
+                            {
                                 var tableRef = table;
+                                <div class="card-footer p-2">
+                                    <button class="btn btn-sm btn-outline-secondary w-100"
+                                            @onclick="() => ShareScoringLink(tableRef)"
+                                            title="@Lang.Get("ShareScoringLink")">
+                                        <i class="bi bi-link-45deg me-1"></i>@(sharedScoringLinkTableNumber == tableRef.TableNumber ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
+                                    </button>
+                                </div>
                             }
-                            <div class="card-footer p-2">
-                                <button class="btn btn-sm btn-outline-secondary w-100"
-                                        @onclick="() => ShareScoringLink(tableRef)"
-                                        title="@Lang.Get("ShareScoringLink")">
-                                    <i class="bi bi-link-45deg me-1"></i>@(sharedScoringLinkTableNumber == tableRef.TableNumber ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
-                                </button>
-                            </div>
                         </div>
                     </div>
                 }
@@ -550,7 +551,7 @@ else
     private bool showExportAll;
     private bool showExportScoresheetsSingle;
     private bool showExportRankings;
-    private string scoringAppUrl = "";
+    private bool externalScoringEnabled;
     private int? sharedScoringLinkTableNumber;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
@@ -592,7 +593,7 @@ else
             weeklyStartingPoints = clubSettings.WeeklyStartingPoints;
             uma4Players = new List<int>(clubSettings.WeeklyUma4Players);
             uma3Players = new List<int>(clubSettings.WeeklyUma3Players);
-            scoringAppUrl = clubSettings.ScoringAppUrl ?? "";
+            externalScoringEnabled = clubSettings.EnableExternalScoring;
 
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
@@ -1063,9 +1064,9 @@ else
 
     private async Task ShareScoringLink(TableAssignment table)
     {
-        if (string.IsNullOrWhiteSpace(scoringAppUrl))
+        if (!externalScoringEnabled)
         {
-            // No scoring-app URL configured — send the user to Settings to set it.
+            // External scoring isn't enabled — point the user at Settings to turn it on.
             Nav.NavigateTo("settings");
             return;
         }
@@ -1092,7 +1093,7 @@ else
             organizerOrigin);
 
         var encoded = ScoringPayloadCodec.EncodeInvite(invite);
-        var url = $"{scoringAppUrl.TrimEnd('/')}/score#p={encoded}";
+        var url = $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}";
         var message = $"{title}\n{url}";
 
         await JS.InvokeVoidAsync("copyTextToClipboard", message);
