@@ -1,0 +1,20 @@
+@page "/"
+@inject LanguageService Lang
+@implements IDisposable
+
+<PageTitle>Tsumo! Scoring</PageTitle>
+
+<h1>Tsumo! Scoring</h1>
+
+<p class="text-muted">
+    @Lang.Get("ScoringLandingText")
+</p>
+
+<p class="text-muted">
+    @Lang.Get("ScoringLandingHint")
+</p>
+
+@code {
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+}

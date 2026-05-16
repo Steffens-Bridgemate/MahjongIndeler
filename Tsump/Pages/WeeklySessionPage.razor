@@ -1,6 +1,7 @@
 @page "/session"
 @using Tsump.Models
 @using Tsump.Services
+@using Tsump.Scoring
 @inject MemberService MemberService
 @inject SessionService SessionService
 @inject TableAssignmentService TableAssignmentService
@@ -344,7 +345,8 @@ else
             @foreach (var entry in tableGroup.Entries)
             {
                 <h6 class="text-muted mb-1">@entry.Label</h6>
-                <ScoreTable Table="entry.Table" PlayerNameResolver="GetPlayerName" OnScoresComplete="SaveAllScores"
+                <ScoreTable Table="entry.Table" PlayerNameResolver="GetPlayerName"
+                            OnScoresComplete="SaveAllScores" OnScoresCleared="SaveAllScores"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
         }
@@ -445,6 +447,16 @@ else
                                     </li>
                                 }
                             </ul>
+                            @{
+                                var tableRef = table;
+                            }
+                            <div class="card-footer p-2">
+                                <button class="btn btn-sm btn-outline-secondary w-100"
+                                        @onclick="() => ShareScoringLink(tableRef)"
+                                        title="@Lang.Get("ShareScoringLink")">
+                                    <i class="bi bi-link-45deg me-1"></i>@(sharedScoringLinkTableNumber == tableRef.TableNumber ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
+                                </button>
+                            </div>
                         </div>
                     </div>
                 }
@@ -461,7 +473,8 @@ else
         {
             @foreach (var table in tables)
             {
-                <ScoreTable Table="table" PlayerNameResolver="GetPlayerName" OnScoresComplete="SaveScores"
+                <ScoreTable Table="table" PlayerNameResolver="GetPlayerName"
+                            OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
         }
@@ -537,6 +550,8 @@ else
     private bool showExportAll;
     private bool showExportScoresheetsSingle;
     private bool showExportRankings;
+    private string scoringAppUrl = "";
+    private int? sharedScoringLinkTableNumber;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
     private string activeTab = "tables";
@@ -577,6 +592,7 @@ else
             weeklyStartingPoints = clubSettings.WeeklyStartingPoints;
             uma4Players = new List<int>(clubSettings.WeeklyUma4Players);
             uma3Players = new List<int>(clubSettings.WeeklyUma3Players);
+            scoringAppUrl = clubSettings.ScoringAppUrl ?? "";
 
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
@@ -1043,6 +1059,53 @@ else
                "@media print { .no-print { display:none; } body { padding:0; } }" +
                "</style></head><body>" +
                printBtn + bodyContent + "</body></html>";
+    }
+
+    private async Task ShareScoringLink(TableAssignment table)
+    {
+        if (string.IsNullOrWhiteSpace(scoringAppUrl))
+        {
+            // No scoring-app URL configured — send the user to Settings to set it.
+            Nav.NavigateTo("settings");
+            return;
+        }
+        if (currentHanchan == null)
+        {
+            // Defensive: save the hanchan first so the invite has a stable Id to round-trip.
+            await SaveHanchan();
+            if (currentHanchan == null) return;
+        }
+
+        var names = table.PlayerIds.Select(GetPlayerName).ToList();
+        var uma = table.PlayerCount == 3 ? uma3Players : uma4Players;
+        var title = $"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()} — {Lang.Get("Table")} {table.TableNumber}";
+
+        var organizerOrigin = new Uri(Nav.BaseUri).GetLeftPart(UriPartial.Authority);
+        var invite = new ScoringInvite(
+            currentHanchan.Id,
+            table.TableNumber,
+            names,
+            new List<Guid>(table.PlayerIds),
+            weeklyStartingPoints,
+            new List<int>(uma),
+            title,
+            organizerOrigin);
+
+        var encoded = ScoringPayloadCodec.EncodeInvite(invite);
+        var url = $"{scoringAppUrl.TrimEnd('/')}/score#p={encoded}";
+        var message = $"{title}\n{url}";
+
+        await JS.InvokeVoidAsync("copyTextToClipboard", message);
+        sharedScoringLinkTableNumber = table.TableNumber;
+        StateHasChanged();
+        _ = ResetScoringLinkCopiedFlag();
+    }
+
+    private async Task ResetScoringLinkCopiedFlag()
+    {
+        await Task.Delay(2000);
+        sharedScoringLinkTableNumber = null;
+        StateHasChanged();
     }
 
     private async Task CopyTablesToClipboard()

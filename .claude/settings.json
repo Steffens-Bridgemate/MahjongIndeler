@@ -4,7 +4,9 @@
       "Bash(where magick:*)",
       "Bash(where convert:*)",
       "Read(//tmp/tsumo-publish/wwwroot/**)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "Bash(git mv *)",
+      "Bash(dotnet sln *)"
     ]
   }
 }

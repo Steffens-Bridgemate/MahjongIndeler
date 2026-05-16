@@ -84,6 +84,9 @@
             var item = new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob });
             return navigator.clipboard.write([item]);
         };
+        window.copyTextToClipboard = function (plainText) {
+            return navigator.clipboard.writeText(plainText);
+        };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script>

@@ -13,8 +13,24 @@
 }
 
 <div class="card mb-3 @(Table.PlayerCount == 3 ? "border-warning" : "border-success")">
-    <div class="card-header @(Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white") py-1">
-        @Lang.Get("Table") @Table.TableNumber (@Table.PlayerCount @Lang.Get("players"))
+    <div class="card-header @(Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white") py-1 d-flex align-items-center">
+        <span class="flex-grow-1">@Lang.Get("Table") @Table.TableNumber (@Table.PlayerCount @Lang.Get("players"))</span>
+        @if (showClearConfirm)
+        {
+            <span class="me-2 small">@Lang.Get("ClearScoresConfirm")</span>
+            <button class="btn btn-sm btn-danger py-0 px-2 me-1" style="line-height:1;"
+                    @onclick="ConfirmClear">@Lang.Get("YesClear")</button>
+            <button class="btn btn-sm btn-secondary py-0 px-2" style="line-height:1;"
+                    @onclick="() => showClearConfirm = false">@Lang.Get("Cancel")</button>
+        }
+        else
+        {
+            <button class="btn btn-sm bg-white py-0 px-1 border" style="line-height:1;"
+                    @onclick="() => showClearConfirm = true"
+                    title="@Lang.Get("ClearScores")">
+                <i class="bi bi-trash text-danger" style="font-size:1.15rem;"></i>
+            </button>
+        }
     </div>
     <div class="card-body p-2">
         <div class="table-responsive">
@@ -198,6 +214,9 @@
     public EventCallback OnScoresComplete { get; set; }
 
     [Parameter]
+    public EventCallback OnScoresCleared { get; set; }
+
+    [Parameter]
     public int DefaultStartingPoints { get; set; } = 30000;
 
     [Parameter]
@@ -207,8 +226,27 @@
     public List<int> Uma3Players { get; set; } = new() { 12500, 0, -12500 };
 
     private bool showExtras;
+    private bool showClearConfirm;
 
     private void ToggleExtras() => showExtras = !showExtras;
+
+    private async Task ConfirmClear()
+    {
+        showClearConfirm = false;
+        var score = Table.Score;
+        if (score == null) return;
+
+        foreach (var ps in score.PlayerScores)
+        {
+            ps.StartingPoints = DefaultStartingPoints;
+            ps.EndPoints = null;
+            ps.Loan = 0;
+            ps.Penalty = 0;
+            ps.Uma = 0;
+        }
+        showExtras = false;
+        await OnScoresCleared.InvokeAsync();
+    }
 
     private string GetPlayerName(Guid id) => PlayerNameResolver(id);
 

@@ -253,6 +253,17 @@
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">@Lang.Get("ScoringAppSection")</h5></div>
+    <div class="card-body">
+        <label class="form-label">@Lang.Get("ScoringAppUrlLabel")</label>
+        <input type="url" class="form-control" placeholder="https://scoring.example.com"
+               value="@scoringAppUrl"
+               @onchange="async e => { scoringAppUrl = e.Value?.ToString() ?? string.Empty; await Save(); }" />
+        <div class="form-text">@Lang.Get("ScoringAppUrlHint")</div>
+    </div>
+</div>
+
 
 @code {
     private string competitionPeriod = "";
@@ -271,6 +282,7 @@
     private int tournamentStartingPoints = 30000;
     private List<int> tournamentUma4Players = new() { 15000, 5000, -5000, -15000 };
     private List<int> tournamentUma3Players = new() { 12500, 0, -12500 };
+    private string scoringAppUrl = "";
     private static readonly DayOfWeek[] allDays = new[]
     {
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
@@ -300,6 +312,7 @@
             tournamentStartingPoints = settings.TournamentStartingPoints;
             tournamentUma4Players = new List<int>(settings.TournamentUma4Players);
             tournamentUma3Players = new List<int>(settings.TournamentUma3Players);
+            scoringAppUrl = settings.ScoringAppUrl ?? "";
             StateHasChanged();
         }
     }
@@ -408,7 +421,8 @@
             WeeklyUma3Players = new List<int>(weeklyUma3Players),
             TournamentStartingPoints = tournamentStartingPoints,
             TournamentUma4Players = new List<int>(tournamentUma4Players),
-            TournamentUma3Players = new List<int>(tournamentUma3Players)
+            TournamentUma3Players = new List<int>(tournamentUma3Players),
+            ScoringAppUrl = (scoringAppUrl ?? "").Trim()
         };
         await SettingsService.SaveAsync(settings);
     }

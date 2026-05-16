@@ -1,0 +1,169 @@
+@page "/import-score"
+@using Tsump.Models
+@using Tsump.Services
+@using Tsump.Scoring
+@inject NavigationManager Nav
+@inject LanguageService Lang
+@inject SessionService SessionService
+@inject MemberService MemberService
+@inject SettingsService SettingsService
+@implements IDisposable
+
+<PageTitle>@Lang.Get("ImportScoreTitle") - Tsumo!</PageTitle>
+
+<h1><i class="bi bi-box-arrow-in-down me-2"></i>@Lang.Get("ImportScoreTitle")</h1>
+
+@if (decodeError)
+{
+    <div class="alert alert-danger">
+        <strong>@Lang.Get("ScoringInvalidLink")</strong>
+        <div class="small mt-1">@Lang.Get("ScoringInvalidLinkHint")</div>
+    </div>
+}
+else if (result == null || matchingHanchan == null || matchingTable == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else if (applied)
+{
+    <div class="alert alert-success">@Lang.Get("ImportScoreApplied")</div>
+    <a href="session" class="btn btn-primary">&larr; @Lang.Get("BackToSession")</a>
+}
+else
+{
+    <h5 class="text-muted mb-2">
+        @Lang.FormatDate(matchingHanchan.Date)
+        @if (matchingHanchan.StartTime.HasValue)
+        {
+            <span> &middot; @matchingHanchan.StartTime.Value.ToString(@"hh\:mm")</span>
+        }
+        &middot; @Lang.Get("Table") @matchingTable.TableNumber
+    </h5>
+
+    <p>@Lang.Get("ImportScoreConfirm")</p>
+
+    <table class="table table-sm table-bordered" style="max-width:500px;">
+        <thead>
+            <tr>
+                <th>@Lang.Get("Player")</th>
+                <th class="text-end">@Lang.Get("EndShort")</th>
+                <th class="text-end">@Lang.Get("LoanShort")</th>
+                <th class="text-end">@Lang.Get("PenaltyShort")</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in result.Scores)
+            {
+                <tr>
+                    <td>@ResolveName(s.PlayerId)</td>
+                    <td class="text-end">@FormatPoints(s.EndPoints)</td>
+                    <td class="text-end">@(s.Loan != 0 ? FormatPoints(s.Loan) : "")</td>
+                    <td class="text-end">@(s.Penalty != 0 ? FormatPoints(s.Penalty) : "")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button class="btn btn-success" @onclick="Apply">
+        <i class="bi bi-check2 me-1"></i>@Lang.Get("ImportScoreApply")
+    </button>
+}
+
+@code {
+    private ScoringResult? result;
+    private Hanchan? matchingHanchan;
+    private TableAssignment? matchingTable;
+    private List<Member> members = new();
+    private bool decodeError;
+    private bool applied;
+    private int weeklyStartingPoints = 30000;
+    private List<int> weeklyUma4 = new();
+    private List<int> weeklyUma3 = new();
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        DecodeFragment();
+        if (decodeError || result == null)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        var settings = await SettingsService.GetAsync();
+        weeklyStartingPoints = settings.WeeklyStartingPoints;
+        weeklyUma4 = new List<int>(settings.WeeklyUma4Players);
+        weeklyUma3 = new List<int>(settings.WeeklyUma3Players);
+
+        members = await MemberService.GetAllAsync();
+        var allHanchans = await SessionService.GetAllAsync();
+        matchingHanchan = allHanchans.FirstOrDefault(h => h.Id == result.HanchanId);
+        matchingTable = matchingHanchan?.Tables.FirstOrDefault(t => t.TableNumber == result.TableNumber);
+
+        if (matchingHanchan == null || matchingTable == null)
+            decodeError = true; // surface using the same banner — the link references something we no longer have
+
+        StateHasChanged();
+    }
+
+    private void DecodeFragment()
+    {
+        var uri = new Uri(Nav.Uri);
+        var fragment = uri.Fragment.TrimStart('#');
+        if (string.IsNullOrEmpty(fragment))
+        {
+            decodeError = true;
+            return;
+        }
+        var prefix = "r=";
+        var payload = fragment.StartsWith(prefix, StringComparison.Ordinal) ? fragment.Substring(prefix.Length) : fragment;
+        result = ScoringPayloadCodec.DecodeResult(payload);
+        if (result == null || result.Scores == null || result.Scores.Count < 3 || result.Scores.Count > 4)
+            decodeError = true;
+    }
+
+    private string ResolveName(Guid id)
+        => members.FirstOrDefault(m => m.Id == id)?.Name ?? id.ToString();
+
+    private static string FormatPoints(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
+
+    private async Task Apply()
+    {
+        if (matchingHanchan == null || matchingTable == null || result == null) return;
+
+        // Ensure the TableScore exists with the right player roster (initialize like the main UI does).
+        ScoreTable.InitializeScores(new List<TableAssignment> { matchingTable }, Lang.Get, weeklyStartingPoints);
+
+        var score = matchingTable.Score!;
+        foreach (var entry in result.Scores)
+        {
+            var ps = score.PlayerScores.FirstOrDefault(p => p.PlayerId == entry.PlayerId);
+            if (ps == null) continue;
+            ps.EndPoints = entry.EndPoints;
+            ps.Loan = entry.Loan;
+            ps.Penalty = entry.Penalty;
+        }
+
+        // 3-player table: derive Mr. X's EndPoints from the three real players so the
+        // sum of differences is zero (which the scoring app already validated).
+        //   Difference = (EndPoints - StartingPoints) + Loan
+        //   Mr. X has Loan = 0, so MrX.EndPoints = MrX.StartingPoints - sum(realDifferences)
+        var mrX = score.PlayerScores.FirstOrDefault(p => p.IsVirtual);
+        if (mrX != null)
+        {
+            var realDiff = score.PlayerScores
+                .Where(p => !p.IsVirtual && p.EndPoints.HasValue)
+                .Sum(p => (p.EndPoints!.Value - p.StartingPoints) + p.Loan);
+            mrX.EndPoints = mrX.StartingPoints - realDiff;
+        }
+
+        // Uma is recomputed by ScoreTable's CalculateUma when the Scores tab is opened.
+        await SessionService.SaveAsync(matchingHanchan);
+        applied = true;
+        StateHasChanged();
+    }
+}

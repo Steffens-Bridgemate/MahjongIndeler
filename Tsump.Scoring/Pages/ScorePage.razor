@@ -1,0 +1,206 @@
+@page "/score"
+@using System.Text.Json
+@inject NavigationManager Nav
+@inject LanguageService Lang
+@inject LocalStorageService Storage
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Tsumo! Scoring</PageTitle>
+
+@if (decodeError)
+{
+    <div class="alert alert-danger">
+        <strong>@Lang.Get("ScoringInvalidLink")</strong>
+        <div class="small mt-1">@Lang.Get("ScoringInvalidLinkHint")</div>
+    </div>
+}
+else if (invite == null || tableAssignment == null)
+{
+    <p>@Lang.Get("Loading")</p>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(invite.Title))
+    {
+        <h5 class="text-muted mb-2">@invite.Title</h5>
+    }
+    <h1 class="mb-3">@Lang.Get("Table") @invite.TableNumber</h1>
+
+    <ScoreTable @key="clearVersion"
+                Table="tableAssignment"
+                PlayerNameResolver="ResolveName"
+                OnScoresComplete="OnScoresComplete"
+                OnScoresCleared="OnScoresCleared"
+                DefaultStartingPoints="invite.StartingPoints"
+                Uma4Players="uma4"
+                Uma3Players="uma3" />
+
+    <div class="mt-3 d-flex align-items-center flex-wrap gap-2">
+        @if (resultReady)
+        {
+            <button class="btn btn-success" @onclick="CopyResultLink">
+                <i class="bi bi-clipboard me-1"></i>@(copied ? Lang.Get("Copied") : Lang.Get("CopyResultLink"))
+            </button>
+            <span class="text-muted small">@Lang.Get("ResultReadyHint")</span>
+        }
+        else
+        {
+            <span class="text-muted">@Lang.Get("FillInScoresHint")</span>
+        }
+    </div>
+}
+
+@code {
+    private ScoringInvite? invite;
+    private TableAssignment? tableAssignment;
+    private List<int> uma3 = new();
+    private List<int> uma4 = new();
+    private bool decodeError;
+    private bool resultReady;
+    private bool copied;
+    private int clearVersion;
+    private string StorageKey => invite == null ? "" : $"tsump_scoring_{invite.HanchanId}_{invite.TableNumber}";
+
+    protected override void OnInitialized()
+    {
+        Lang.OnLanguageChanged += StateHasChanged;
+        DecodePayloadFromUrl();
+    }
+
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    private void DecodePayloadFromUrl()
+    {
+        var uri = new Uri(Nav.Uri);
+        var fragment = uri.Fragment.TrimStart('#');
+        if (string.IsNullOrEmpty(fragment))
+        {
+            decodeError = true;
+            return;
+        }
+
+        // fragment may be "p=<payload>" or just "<payload>"
+        var payload = fragment;
+        var prefix = "p=";
+        if (fragment.StartsWith(prefix, StringComparison.Ordinal))
+            payload = fragment.Substring(prefix.Length);
+
+        invite = ScoringPayloadCodec.DecodeInvite(payload);
+        if (invite == null
+            || invite.PlayerIds == null || invite.PlayerNames == null
+            || invite.PlayerIds.Count != invite.PlayerNames.Count
+            || invite.PlayerIds.Count < 3 || invite.PlayerIds.Count > 4)
+        {
+            decodeError = true;
+            return;
+        }
+
+        // Split Uma into 3/4 buckets based on the table size — the other one stays empty.
+        if (invite.PlayerIds.Count == 3)
+            uma3 = new List<int>(invite.Uma);
+        else
+            uma4 = new List<int>(invite.Uma);
+
+        tableAssignment = new TableAssignment
+        {
+            TableNumber = invite.TableNumber,
+            PlayerIds = new List<Guid>(invite.PlayerIds),
+            Score = new TableScore(),
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && invite != null && tableAssignment != null)
+        {
+            // Restore in-progress scores from localStorage (resilience to refresh).
+            var saved = await Storage.GetAsync<SavedScore>(StorageKey);
+            if (saved != null)
+            {
+                foreach (var ps in tableAssignment.Score!.PlayerScores)
+                {
+                    var entry = saved.Entries.FirstOrDefault(e => e.PlayerId == ps.PlayerId);
+                    if (entry != null)
+                    {
+                        ps.EndPoints = entry.EndPoints;
+                        ps.Loan = entry.Loan;
+                        ps.Penalty = entry.Penalty;
+                    }
+                }
+                StateHasChanged();
+            }
+
+            // Initialize starting points + Mr. X if needed via the same helper the main app uses.
+            ScoreTable.InitializeScores(new() { tableAssignment }, Lang.Get, invite.StartingPoints);
+            StateHasChanged();
+        }
+    }
+
+    private string ResolveName(Guid id)
+    {
+        if (invite == null) return id.ToString();
+        var idx = invite.PlayerIds.IndexOf(id);
+        return idx >= 0 ? invite.PlayerNames[idx] : id.ToString();
+    }
+
+    private async Task OnScoresComplete()
+    {
+        resultReady = true;
+        await PersistInProgress();
+    }
+
+    private async Task OnScoresCleared()
+    {
+        // ScoreTable has already reset the model. We just need to drop the cached progress,
+        // hide the "Copy result" button, and force a clean re-render of the inputs.
+        resultReady = false;
+        copied = false;
+        await Storage.RemoveAsync(StorageKey);
+        clearVersion++;
+        StateHasChanged();
+    }
+
+    private async Task PersistInProgress()
+    {
+        if (invite == null || tableAssignment?.Score == null) return;
+        var saved = new SavedScore(tableAssignment.Score.PlayerScores
+            .Where(p => !p.IsVirtual)
+            .Select(p => new SavedEntry(p.PlayerId, p.EndPoints, p.Loan, p.Penalty))
+            .ToList());
+        await Storage.SetAsync(StorageKey, saved);
+    }
+
+    private async Task CopyResultLink()
+    {
+        if (invite == null || tableAssignment?.Score == null) return;
+
+        var scores = tableAssignment.Score.PlayerScores
+            .Where(p => !p.IsVirtual && p.EndPoints.HasValue)
+            .Select(p => new PlayerResultEntry(p.PlayerId, p.EndPoints!.Value, p.Loan, p.Penalty))
+            .ToList();
+
+        var result = new ScoringResult(invite.HanchanId, invite.TableNumber, scores);
+        var encoded = ScoringPayloadCodec.EncodeResult(result);
+
+        // Build the return URL. The organizer's app lives at a different origin than this
+        // scoring app, so use the OrganizerUrl carried by the invite. Fall back to this
+        // app's own origin only if the invite didn't include one.
+        var organizerBase = !string.IsNullOrWhiteSpace(invite.OrganizerUrl)
+            ? invite.OrganizerUrl!.TrimEnd('/')
+            : Nav.BaseUri.TrimEnd('/');
+        var importUrl = $"{organizerBase}/import-score#r={encoded}";
+
+        var label = invite.Title ?? $"Table {invite.TableNumber}";
+        var message = $"{label}\n{importUrl}";
+        await JS.InvokeVoidAsync("copyTextToClipboard", message);
+        copied = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        copied = false;
+        StateHasChanged();
+    }
+
+    private record SavedScore(List<SavedEntry> Entries);
+    private record SavedEntry(Guid PlayerId, int? EndPoints, int Loan, int Penalty);
+}

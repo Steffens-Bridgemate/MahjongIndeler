@@ -1,0 +1,10 @@
+{
+  "name": "Tsumo! Scoring",
+  "short_name": "Tsumo Score",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0d6efd",
+  "prefer_related_applications": false,
+  "icons": []
+}
