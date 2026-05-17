@@ -554,7 +554,8 @@ else
                                 }
                                 else if (importStatus == ImportStatus.NotResultLink
                                          || importStatus == ImportStatus.NoResult
-                                         || importStatus == ImportStatus.NoMatchingTable)
+                                         || importStatus == ImportStatus.NoMatchingTable
+                                         || importStatus == ImportStatus.ScanError)
                                 {
                                     @if (importStatus == ImportStatus.NotResultLink)
                                     {
@@ -564,13 +565,28 @@ else
                                     {
                                         <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
                                     }
+                                    else if (importStatus == ImportStatus.ScanError)
+                                    {
+                                        <div class="alert alert-danger py-2 mb-2">@(scanErrorMessage ?? Lang.Get("ScanCameraError"))</div>
+                                    }
                                     else
                                     {
                                         <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
                                     }
 
-                                    <button class="btn btn-outline-primary" @onclick="TryImportFromClipboard">
+                                    <button class="btn btn-outline-primary me-2" @onclick="TryImportFromClipboard">
                                         <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
+                                    </button>
+                                    <button class="btn btn-outline-primary" @onclick="StartQrScan">
+                                        <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
+                                    </button>
+                                }
+                                else if (importStatus == ImportStatus.Scanning)
+                                {
+                                    <p class="text-muted small mb-2">@Lang.Get("ScanQrHint")</p>
+                                    <div id="qr-scanner-view" style="max-width:480px; width:100%; margin:0 auto;"></div>
+                                    <button class="btn btn-outline-secondary mt-2" @onclick="CancelQrScan">
+                                        <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
                                     </button>
                                 }
                                 else if (importStatus == ImportStatus.Applied)
@@ -578,6 +594,9 @@ else
                                     <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
                                     <button class="btn btn-primary me-2" @onclick="TryImportFromClipboard">
                                         <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
+                                    </button>
+                                    <button class="btn btn-outline-primary me-2" @onclick="StartQrScan">
+                                        <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
                                     </button>
                                     <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
                                 }
@@ -689,10 +708,15 @@ else
         NotResultLink,     // clipboard holds an invite link (#p=), not a result link
         NoResult,          // clipboard is empty, or contents don't look like a result link
         NoMatchingTable,   // decoded fine but no Hanchan/Table found locally
+        Scanning,          // camera scanner is live
+        ScanError,         // camera failed to start (permission denied, no camera, ...)
         Preview,           // decoded + found, awaiting user confirmation
         AlreadyScored,     // matching table already has scores; preview + ask before overwriting
         Applied,           // success
     }
+
+    private DotNetObjectReference<WeeklySessionPage>? qrScannerRef;
+    private string? scanErrorMessage;
 
     private static string FormatImportScore(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
     private int? sharedScoringLinkTableNumber;
@@ -713,7 +737,14 @@ else
         sessionDate.Date < DateTime.Today && currentHanchan is { IsFinalized: true };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
-    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+        // Fire-and-forget: stop the scanner if it's still running (e.g. user navigated away
+        // while in the Scanning state). Errors are swallowed inside StopQrScannerIfRunning.
+        _ = StopQrScannerIfRunning();
+        qrScannerRef?.Dispose();
+    }
 
     private IEnumerable<Member> FilteredMembers()
     {
@@ -1235,12 +1266,59 @@ else
         await ProcessClipboardText(clip);
     }
 
-    private void CancelImportResult()
+    private async Task CancelImportResult()
     {
+        await StopQrScannerIfRunning();
         showImportResult = false;
         importStatus = ImportStatus.Reading;
         pendingImportResult = null;
         pendingImportLookup = null;
+    }
+
+    // --- QR-camera scanning, mirrors the clipboard path ---
+
+    private async Task StartQrScan()
+    {
+        scanErrorMessage = null;
+        importStatus = ImportStatus.Scanning;
+        StateHasChanged();
+
+        // Wait one render tick so the #qr-scanner-view div is in the DOM before html5-qrcode
+        // tries to attach to it.
+        await Task.Yield();
+
+        qrScannerRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("startQrScanner", "qr-scanner-view", qrScannerRef);
+        }
+        catch (Exception ex)
+        {
+            scanErrorMessage = ex.Message;
+            importStatus = ImportStatus.ScanError;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CancelQrScan()
+    {
+        await StopQrScannerIfRunning();
+        importStatus = ImportStatus.NoResult;
+        StateHasChanged();
+    }
+
+    private async Task StopQrScannerIfRunning()
+    {
+        try { await JS.InvokeVoidAsync("stopQrScanner"); }
+        catch { /* nothing to stop */ }
+    }
+
+    [JSInvokable]
+    public async Task OnQrScanned(string decodedText)
+    {
+        // The scanner has already stopped itself on first decode. Route the decoded text
+        // through the same pipeline as the clipboard path.
+        await ProcessClipboardText(decodedText);
     }
 
     private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex

@@ -50,6 +50,7 @@
         <span class="dismiss">🗙</span>
     </div>
     <script src="lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="lib/html5-qrcode/html5-qrcode.min.js"></script>
     <script>
         window.downloadFile = async function (filename, contentBase64) {
             var bytes = Uint8Array.from(atob(contentBase64), c => c.charCodeAt(0));
@@ -114,6 +115,40 @@
                 }
             } catch (_) { /* permission denied or insecure context */ }
             return null;
+        };
+
+        // Camera-based QR scanner backed by html5-qrcode. The caller supplies a div id
+        // to render the camera preview in and a DotNet object reference whose
+        // [JSInvokable] OnQrScanned(string) is fired on the first successful decode.
+        // Resolves on successful start (which means the camera is live), or throws on
+        // failure (permission denied, no camera, etc).
+        window._qrScanner = null;
+        window.startQrScanner = async function (elementId, dotNetRef) {
+            if (window._qrScanner) {
+                try { await window._qrScanner.stop(); } catch (_) { }
+                window._qrScanner = null;
+            }
+            const scanner = new Html5Qrcode(elementId, { verbose: false });
+            window._qrScanner = scanner;
+            await scanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 240, height: 240 } },
+                async function (decodedText) {
+                    try { await scanner.stop(); } catch (_) { }
+                    window._qrScanner = null;
+                    dotNetRef.invokeMethodAsync('OnQrScanned', decodedText);
+                },
+                function (_errorMessage) {
+                    // Per-frame "not found yet" errors. Swallow.
+                }
+            );
+        };
+        window.stopQrScanner = async function () {
+            if (window._qrScanner) {
+                try { await window._qrScanner.stop(); } catch (_) { }
+                try { window._qrScanner.clear(); } catch (_) { }
+                window._qrScanner = null;
+            }
         };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
