@@ -5,6 +5,7 @@
 @inject MemberService MemberService
 @inject SessionService SessionService
 @inject TableAssignmentService TableAssignmentService
+@inject ScoreImportService ScoreImport
 @inject LanguageService Lang
 @inject SettingsService SettingsService
 @inject IJSRuntime JS
@@ -253,11 +254,65 @@ else
                     </button>
                 }
             }
+            @if (externalScoringEnabled)
+            {
+                <button class="btn btn-outline-secondary ms-2" @onclick="OpenImportResult">
+                    <i class="bi bi-box-arrow-in-down me-1"></i>@Lang.Get("ImportResult")
+                </button>
+            }
             @if (presentIds.Count < 3)
             {
                 <span class="text-warning ms-2">@Lang.Get("NeedAtLeast3")</span>
             }
         </div>
+
+        @if (showImportResult)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center">
+                    <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-2">@Lang.Get("ImportResultPanelHint")</p>
+                    <textarea class="form-control mb-2" rows="3" placeholder="@Lang.Get("ImportResultPlaceholder")"
+                              @bind="importPasteText" @bind:event="oninput"></textarea>
+
+                    @if (importStatus == ImportStatus.NotResultLink)
+                    {
+                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
+                    }
+                    else if (importStatus == ImportStatus.InvalidPayload)
+                    {
+                        <div class="alert alert-danger py-2 mb-2">@Lang.Get("ScoringInvalidLink")</div>
+                    }
+                    else if (importStatus == ImportStatus.NoMatchingTable)
+                    {
+                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
+                    }
+                    else if (importStatus == ImportStatus.AlreadyScored)
+                    {
+                        <div class="alert alert-warning py-2 mb-2">
+                            @Lang.Get("ImportResultOverwritePrompt")
+                            <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmImportOverwrite">@Lang.Get("YesOverwrite")</button>
+                            <button class="btn btn-sm btn-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
+                        </div>
+                    }
+                    else if (importStatus == ImportStatus.Applied)
+                    {
+                        <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
+                    }
+
+                    @if (importStatus != ImportStatus.AlreadyScored && importStatus != ImportStatus.Applied)
+                    {
+                        <button class="btn btn-primary" @onclick="() => ApplyImportResult(confirmOverwrite: false)"
+                                disabled="@(string.IsNullOrWhiteSpace(importPasteText))">
+                            <i class="bi bi-check2 me-1"></i>@Lang.Get("ImportScoreApply")
+                        </button>
+                    }
+                </div>
+            </div>
+        }
 
         @if (showCopyFromHistory)
         {
@@ -552,6 +607,22 @@ else
     private bool showExportScoresheetsSingle;
     private bool showExportRankings;
     private bool externalScoringEnabled;
+
+    // In-app "Import result" paste flow
+    private bool showImportResult;
+    private string importPasteText = "";
+    private ImportStatus importStatus = ImportStatus.Idle;
+    private ScoringResult? pendingImportResult;
+
+    private enum ImportStatus
+    {
+        Idle,
+        NotResultLink,     // user pasted an invite link, not a result link
+        InvalidPayload,    // payload didn't decode
+        NoMatchingTable,   // decoded fine but no Hanchan/Table found locally
+        AlreadyScored,     // matching table already has scores; ask before overwriting
+        Applied,           // success
+    }
     private int? sharedScoringLinkTableNumber;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
@@ -1062,6 +1133,99 @@ else
                printBtn + bodyContent + "</body></html>";
     }
 
+    private async Task OpenImportResult()
+    {
+        showImportResult = true;
+        importPasteText = "";
+        importStatus = ImportStatus.Idle;
+        pendingImportResult = null;
+        StateHasChanged();
+
+        // Auto-fill from clipboard if we can — saves a tap. Fail silently otherwise.
+        try
+        {
+            var clip = await JS.InvokeAsync<string?>("readClipboardText");
+            if (!string.IsNullOrWhiteSpace(clip))
+            {
+                importPasteText = clip;
+                StateHasChanged();
+            }
+        }
+        catch { /* permission denied or unsupported */ }
+    }
+
+    private void CancelImportResult()
+    {
+        showImportResult = false;
+        importPasteText = "";
+        importStatus = ImportStatus.Idle;
+        pendingImportResult = null;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
+        = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private async Task ApplyImportResult(bool confirmOverwrite)
+    {
+        var raw = (importPasteText ?? "").Trim();
+        if (raw.Length == 0) return;
+
+        // URL-decode in case the user pasted something with %23 (encoded #) etc.
+        var decoded = Uri.UnescapeDataString(raw);
+
+        // Reject scoring-invite URLs (they have #p=…) with a clear message instead of a generic decode error.
+        if (decoded.Contains("#p=", StringComparison.Ordinal) || decoded.Contains("?p=", StringComparison.Ordinal))
+        {
+            importStatus = ImportStatus.NotResultLink;
+            pendingImportResult = null;
+            StateHasChanged();
+            return;
+        }
+
+        // Extract the payload: try `r=<base64url>` first, then fall back to treating the whole string as the bare payload.
+        string payload;
+        var match = ResultPayloadRegex.Match(decoded);
+        if (match.Success)
+            payload = match.Groups[1].Value;
+        else
+            payload = decoded;
+
+        var parsed = ScoringPayloadCodec.DecodeResult(payload);
+        if (parsed == null || parsed.Scores == null || parsed.Scores.Count < 3 || parsed.Scores.Count > 4)
+        {
+            importStatus = ImportStatus.InvalidPayload;
+            pendingImportResult = null;
+            StateHasChanged();
+            return;
+        }
+
+        pendingImportResult = parsed;
+        var outcome = await ScoreImport.ApplyAsync(parsed, Lang.Get, confirmOverwrite);
+        importStatus = outcome.Reason switch
+        {
+            ScoreImportService.FailureReason.NoMatchingHanchan => ImportStatus.NoMatchingTable,
+            ScoreImportService.FailureReason.NoMatchingTable => ImportStatus.NoMatchingTable,
+            ScoreImportService.FailureReason.AlreadyScored => ImportStatus.AlreadyScored,
+            _ => outcome.Success ? ImportStatus.Applied : ImportStatus.InvalidPayload,
+        };
+
+        if (outcome.Success)
+        {
+            // Refresh local view so Rankings/Scores tabs reflect the imported values.
+            var allHanchans = await SessionService.GetAllAsync();
+            hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
+            if (currentHanchan != null && outcome.Hanchan?.Id == currentHanchan.Id)
+                currentHanchan = outcome.Hanchan;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ConfirmImportOverwrite()
+    {
+        await ApplyImportResult(confirmOverwrite: true);
+    }
+
     private async Task ShareScoringLink(TableAssignment table)
     {
         if (!externalScoringEnabled)
@@ -1096,7 +1260,7 @@ else
 
         var encoded = ScoringPayloadCodec.EncodeInvite(invite);
         var url = $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}";
-        var message = $"{title}\n{url}";
+        var message = $"📋 {title}\n{Lang.Get("ShareScoringLinkInstruction")}\n{url}";
 
         await JS.InvokeVoidAsync("copyTextToClipboard", message);
         sharedScoringLinkTableNumber = table.TableNumber;

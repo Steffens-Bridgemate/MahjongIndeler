@@ -5,6 +5,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tsumo!</title>
+    <meta property="og:title" content="Tsumo!" />
+    <meta property="og:description" content="Mahjongclub: aanwezigheid, tafelindeling en scores." />
+    <meta property="og:type" content="website" />
     <base href="/" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -101,6 +104,16 @@
         };
         window.copyTextToClipboard = function (plainText) {
             return navigator.clipboard.writeText(plainText);
+        };
+        window.readClipboardText = async function () {
+            // Returns the clipboard's text content, or null if the API is unavailable
+            // or the user denied permission. Caller should treat null/throw as "no auto-fill".
+            try {
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    return await navigator.clipboard.readText();
+                }
+            } catch (_) { /* permission denied or insecure context */ }
+            return null;
         };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>

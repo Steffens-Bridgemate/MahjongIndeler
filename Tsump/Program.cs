@@ -12,6 +12,7 @@ builder.Services.AddScoped<LocalStorageService>();
 builder.Services.AddScoped<MemberService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<TableAssignmentService>();
+builder.Services.AddScoped<ScoreImportService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<TournamentService>();
 builder.Services.AddScoped<TournamentAssignmentService>();

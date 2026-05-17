@@ -4,9 +4,8 @@
 @using Tsump.Scoring
 @inject NavigationManager Nav
 @inject LanguageService Lang
-@inject SessionService SessionService
 @inject MemberService MemberService
-@inject SettingsService SettingsService
+@inject ScoreImportService ScoreImport
 @implements IDisposable
 
 <PageTitle>@Lang.Get("ImportScoreTitle") - Tsumo!</PageTitle>
@@ -20,7 +19,14 @@
         <div class="small mt-1">@Lang.Get("ScoringInvalidLinkHint")</div>
     </div>
 }
-else if (result == null || matchingHanchan == null || matchingTable == null)
+else if (lookupError)
+{
+    <div class="alert alert-warning">
+        <strong>@Lang.Get("ImportScoreNoMatch")</strong>
+    </div>
+    <a href="session" class="btn btn-secondary">&larr; @Lang.Get("BackToSession")</a>
+}
+else if (result == null || lookup == null)
 {
     <p>@Lang.Get("Loading")</p>
 }
@@ -32,15 +38,20 @@ else if (applied)
 else
 {
     <h5 class="text-muted mb-2">
-        @Lang.FormatDate(matchingHanchan.Date)
-        @if (matchingHanchan.StartTime.HasValue)
+        @Lang.FormatDate(lookup.Hanchan.Date)
+        @if (lookup.Hanchan.StartTime.HasValue)
         {
-            <span> &middot; @matchingHanchan.StartTime.Value.ToString(@"hh\:mm")</span>
+            <span> &middot; @lookup.Hanchan.StartTime.Value.ToString(@"hh\:mm")</span>
         }
-        &middot; @Lang.Get("Table") @matchingTable.TableNumber
+        &middot; @Lang.Get("Table") @lookup.Table.TableNumber
     </h5>
 
     <p>@Lang.Get("ImportScoreConfirm")</p>
+
+    @if (alreadyScoredWarning)
+    {
+        <div class="alert alert-warning">@Lang.Get("ImportScoreOverwriteWarning")</div>
+    }
 
     <table class="table table-sm table-bordered" style="max-width:500px;">
         <thead>
@@ -71,14 +82,12 @@ else
 
 @code {
     private ScoringResult? result;
-    private Hanchan? matchingHanchan;
-    private TableAssignment? matchingTable;
+    private ScoreImportService.Lookup? lookup;
     private List<Member> members = new();
     private bool decodeError;
+    private bool lookupError;
+    private bool alreadyScoredWarning;
     private bool applied;
-    private int weeklyStartingPoints = 30000;
-    private List<int> weeklyUma4 = new();
-    private List<int> weeklyUma3 = new();
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -94,18 +103,17 @@ else
             return;
         }
 
-        var settings = await SettingsService.GetAsync();
-        weeklyStartingPoints = settings.WeeklyStartingPoints;
-        weeklyUma4 = new List<int>(settings.WeeklyUma4Players);
-        weeklyUma3 = new List<int>(settings.WeeklyUma3Players);
-
         members = await MemberService.GetAllAsync();
-        var allHanchans = await SessionService.GetAllAsync();
-        matchingHanchan = allHanchans.FirstOrDefault(h => h.Id == result.HanchanId);
-        matchingTable = matchingHanchan?.Tables.FirstOrDefault(t => t.TableNumber == result.TableNumber);
-
-        if (matchingHanchan == null || matchingTable == null)
-            decodeError = true; // surface using the same banner — the link references something we no longer have
+        lookup = await ScoreImport.FindAsync(result);
+        if (lookup == null)
+        {
+            lookupError = true;
+        }
+        else if (lookup.Table.Score != null
+                 && lookup.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue))
+        {
+            alreadyScoredWarning = true;
+        }
 
         StateHasChanged();
     }
@@ -133,37 +141,13 @@ else
 
     private async Task Apply()
     {
-        if (matchingHanchan == null || matchingTable == null || result == null) return;
+        if (result == null || lookup == null) return;
 
-        // Ensure the TableScore exists with the right player roster (initialize like the main UI does).
-        ScoreTable.InitializeScores(new List<TableAssignment> { matchingTable }, Lang.Get, weeklyStartingPoints);
-
-        var score = matchingTable.Score!;
-        foreach (var entry in result.Scores)
+        var outcome = await ScoreImport.ApplyAsync(result, Lang.Get, confirmOverwrite: true);
+        if (outcome.Success)
         {
-            var ps = score.PlayerScores.FirstOrDefault(p => p.PlayerId == entry.PlayerId);
-            if (ps == null) continue;
-            ps.EndPoints = entry.EndPoints;
-            ps.Loan = entry.Loan;
-            ps.Penalty = entry.Penalty;
+            applied = true;
+            StateHasChanged();
         }
-
-        // 3-player table: derive Mr. X's EndPoints from the three real players so the
-        // sum of differences is zero (which the scoring app already validated).
-        //   Difference = (EndPoints - StartingPoints) + Loan
-        //   Mr. X has Loan = 0, so MrX.EndPoints = MrX.StartingPoints - sum(realDifferences)
-        var mrX = score.PlayerScores.FirstOrDefault(p => p.IsVirtual);
-        if (mrX != null)
-        {
-            var realDiff = score.PlayerScores
-                .Where(p => !p.IsVirtual && p.EndPoints.HasValue)
-                .Sum(p => (p.EndPoints!.Value - p.StartingPoints) + p.Loan);
-            mrX.EndPoints = mrX.StartingPoints - realDiff;
-        }
-
-        // Uma is recomputed by ScoreTable's CalculateUma when the Scores tab is opened.
-        await SessionService.SaveAsync(matchingHanchan);
-        applied = true;
-        StateHasChanged();
     }
 }

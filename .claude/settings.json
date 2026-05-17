@@ -6,7 +6,31 @@
       "Read(//tmp/tsumo-publish/wwwroot/**)",
       "Bash(git log *)",
       "Bash(git mv *)",
-      "Bash(dotnet sln *)"
+      "Bash(dotnet sln *)",
+      "Bash(mkdir -p \"c:/Users/aners/source/repos/MahjongScoring/.github/workflows\")",
+      "Bash(cp -r \"c:/Users/aners/source/repos/Player registration app/Tsump.Scoring\" \"c:/Users/aners/source/repos/MahjongScoring/Tsump.Scoring\")",
+      "Bash(rm -rf \"c:/Users/aners/source/repos/MahjongScoring/Tsump.Scoring/bin\" \"c:/Users/aners/source/repos/MahjongScoring/Tsump.Scoring/obj\")",
+      "Read(//c/Users/aners/source/repos/MahjongScoring/Tsump.Scoring/**)",
+      "Read(//c/Users/aners/source/repos/MahjongScoring/**)",
+      "Bash(dotnet new *)",
+      "PowerShell(cmd /c mklink /J \"C:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongScoring\\\\external\\\\MahjongIndeler\" \"C:\\\\Users\\\\aners\\\\source\\\\repos\\\\Player registration app\")",
+      "Bash(git rm *)",
+      "Bash(git status *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git submodule *)",
+      "Bash(git -C external/MahjongIndeler log -1 --oneline)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\aners\\source\\repos\\MahjongScoring\\Tsump.Scoring",
+      "c:\\Users\\aners\\source\\repos\\MahjongScoring\\.github\\workflows",
+      "c:\\Users\\aners\\source\\repos\\MahjongScoring"
     ]
   }
 }
