@@ -132,7 +132,10 @@
             window._qrScanner = scanner;
             await scanner.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 240, height: 240 } },
+                // No qrbox => scan the whole frame. fps 15 = more decode attempts per
+                // second, which helps when the camera autofocus is sluggish (typical
+                // for laptop front cameras).
+                { fps: 15 },
                 async function (decodedText) {
                     try { await scanner.stop(); } catch (_) { }
                     window._qrScanner = null;

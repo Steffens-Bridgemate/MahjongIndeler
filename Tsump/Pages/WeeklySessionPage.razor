@@ -585,7 +585,36 @@ else
                                 {
                                     <p class="text-muted small mb-2">@Lang.Get("ScanQrHint")</p>
                                     <div id="qr-scanner-view" style="max-width:480px; width:100%; margin:0 auto;"></div>
-                                    <button class="btn btn-outline-secondary mt-2" @onclick="CancelQrScan">
+
+                                    <div class="d-flex align-items-center mt-2 small">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+                                        <span class="text-muted">
+                                            @Lang.Get("ScanLooking")
+                                            @if (scanElapsedSeconds >= 1)
+                                            {
+                                                <span class="ms-1">(@scanElapsedSeconds s)</span>
+                                            }
+                                        </span>
+                                    </div>
+
+                                    @if (scanElapsedSeconds >= 8)
+                                    {
+                                        <div class="alert alert-info py-2 mt-2 mb-2 small">
+                                            @Lang.Get("ScanStillLooking")
+                                        </div>
+                                    }
+
+                                    <ul class="text-muted small mt-2 mb-2 ps-3">
+                                        <li>@Lang.Get("ScanTipFraming")</li>
+                                        <li>@Lang.Get("ScanTipFocus")</li>
+                                        <li>@Lang.Get("ScanTipLight")</li>
+                                        @if (scanElapsedSeconds >= 8)
+                                        {
+                                            <li>@Lang.Get("ScanTipLaptop")</li>
+                                        }
+                                    </ul>
+
+                                    <button class="btn btn-outline-secondary" @onclick="CancelQrScan">
                                         <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
                                     </button>
                                 }
@@ -717,6 +746,8 @@ else
 
     private DotNetObjectReference<WeeklySessionPage>? qrScannerRef;
     private string? scanErrorMessage;
+    private int scanElapsedSeconds;
+    private System.Threading.CancellationTokenSource? scanTimerCts;
 
     private static string FormatImportScore(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
     private int? sharedScoringLinkTableNumber;
@@ -1280,6 +1311,7 @@ else
     private async Task StartQrScan()
     {
         scanErrorMessage = null;
+        scanElapsedSeconds = 0;
         importStatus = ImportStatus.Scanning;
         StateHasChanged();
 
@@ -1291,6 +1323,7 @@ else
         try
         {
             await JS.InvokeVoidAsync("startQrScanner", "qr-scanner-view", qrScannerRef);
+            StartScanTimer();
         }
         catch (Exception ex)
         {
@@ -1298,6 +1331,23 @@ else
             importStatus = ImportStatus.ScanError;
             StateHasChanged();
         }
+    }
+
+    private void StartScanTimer()
+    {
+        scanTimerCts?.Cancel();
+        scanTimerCts = new System.Threading.CancellationTokenSource();
+        var token = scanTimerCts.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested && importStatus == ImportStatus.Scanning)
+            {
+                try { await Task.Delay(1000, token); } catch { break; }
+                if (importStatus != ImportStatus.Scanning) break;
+                scanElapsedSeconds++;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
     }
 
     private async Task CancelQrScan()
@@ -1309,6 +1359,8 @@ else
 
     private async Task StopQrScannerIfRunning()
     {
+        scanTimerCts?.Cancel();
+        scanTimerCts = null;
         try { await JS.InvokeVoidAsync("stopQrScanner"); }
         catch { /* nothing to stop */ }
     }
@@ -1318,6 +1370,8 @@ else
     {
         // The scanner has already stopped itself on first decode. Route the decoded text
         // through the same pipeline as the clipboard path.
+        scanTimerCts?.Cancel();
+        scanTimerCts = null;
         await ProcessClipboardText(decodedText);
     }
 
