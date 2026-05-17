@@ -123,9 +123,11 @@
                                             </td>
                                         </tr>
                                     }
-                                    <tr class="table-active fw-bold">
-                                        <td style="vertical-align:middle;">@Lang.Get("FinalScoreShort")</td>
-                                        <td></td>
+                                    <tr class="fw-bold">
+                                        @* "border-style: hidden" beats neighbouring borders under
+                                           border-collapse, so this empty cell renders invisibly. *@
+                                        <td style="border-style:hidden; background:transparent;"></td>
+                                        <td class="text-end table-active" style="vertical-align:middle;">@Lang.Get("FinalScoreShort")</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -166,7 +168,9 @@
                                         }
                                     </span>
                                 </div>
-                                <div class="text-end fw-bold" style="font-size:1.15em;">
+                                @* Same background as the .table-active Total row in col 1+2,
+                                   so the bottom of the card reads as a single Total band. *@
+                                <div class="text-end fw-bold px-1" style="font-size:1.15em; background-color: rgba(0,0,0,0.075);">
                                     @if (ps.IsVirtual)
                                     {
                                         <span class="text-muted">—</span>
