@@ -48,7 +48,12 @@
             // small enough for our ~300–500 char payloads.
             var data = gen.CreateQrCode(Url, QRCodeGenerator.ECCLevel.M);
             var renderer = new SvgQRCode(data);
-            svgMarkup = renderer.GetGraphic(4);
+            var rawSvg = renderer.GetGraphic(4);
+            // QRCoder hard-codes width/height pixel attributes on the root <svg>. Strip
+            // them so our CSS (which sets a vmin-based size) is what actually applies.
+            svgMarkup = System.Text.RegularExpressions.Regex.Replace(
+                rawSvg, @"\s(width|height)=""[^""]*""", "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             renderedFor = Url;
         }
         else if (!IsOpen)

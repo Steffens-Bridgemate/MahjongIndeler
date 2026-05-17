@@ -638,7 +638,7 @@ else
     }
 </style>
 
-<QrCodeModal IsOpen="showScoringQr" Url="scoringQrUrl" Title="scoringQrTitle"
+<QrCodeModal IsOpen="showScoringQr" Url="@scoringQrUrl" Title="@scoringQrTitle"
              Subtitle="@Lang.Get("QrCodeScoringSubtitle")"
              OnClose="CloseScoringQr" />
 
@@ -1372,7 +1372,9 @@ else
         var built = await BuildScoringInviteUrl(table);
         if (built == null) return;
         scoringQrUrl = built.Value.url;
-        scoringQrTitle = built.Value.title;
+        // Short title for the modal: "Hanchan N — Table M" (the full date/title lives in
+        // the WhatsApp message; on a QR modal it's just visual noise).
+        scoringQrTitle = $"{BuildHanchanSubtitle()} — {Lang.Get("Table")} {table.TableNumber}";
         showScoringQr = true;
         StateHasChanged();
     }
