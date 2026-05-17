@@ -14,7 +14,8 @@ public record ScoringInvite(
     int StartingPoints,
     List<int> Uma,
     string? Title,
-    string? OrganizerUrl);
+    string? OrganizerUrl,
+    int HanchanNumber = 1);
 
 /// <summary>
 /// Inbound payload: scoring app → organizer. Encoded into the URL fragment of an /import-score link.

@@ -1555,7 +1555,8 @@ else
             weeklyStartingPoints,
             new List<int>(uma),
             title,
-            organizerOrigin);
+            organizerOrigin,
+            CurrentHanchanNumber());
 
         var encoded = ScoringPayloadCodec.EncodeInvite(invite);
         var url = $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}";
@@ -1656,14 +1657,23 @@ else
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
     }
 
-    private string BuildHanchanSubtitle()
+    private int CurrentHanchanNumber()
     {
         var ordered = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
-        var hanchanNumber = currentHanchan != null
-            ? ordered.IndexOf(currentHanchan) + 1
-            : ordered.Count + 1;
+        if (currentHanchan == null)
+            return ordered.Count + 1;
+
+        // hanchansOnDate is reloaded from storage after Save, so the in-memory currentHanchan
+        // is a different instance than what's in `ordered`. Look up by ID, and fall back to
+        // "next slot" if for some reason the saved hanchan isn't in the list yet.
+        var idx = ordered.FindIndex(h => h.Id == currentHanchan.Id);
+        return idx >= 0 ? idx + 1 : ordered.Count + 1;
+    }
+
+    private string BuildHanchanSubtitle()
+    {
         var timeStr = hanchanStartTime.HasValue ? hanchanStartTime.Value.ToString(@"hh\:mm") : "";
-        var subtitle = $"{Lang.Get("Hanchan")} {hanchanNumber}";
+        var subtitle = $"{Lang.Get("Hanchan")} {CurrentHanchanNumber()}";
         if (timeStr.Length > 0)
             subtitle += $" {timeStr}";
         return subtitle;
