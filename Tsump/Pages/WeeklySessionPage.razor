@@ -490,42 +490,25 @@ else
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
                             </div>
                             <div class="card-body">
-                                @if (importStatus == ImportStatus.Idle || importStatus == ImportStatus.NotResultLink || importStatus == ImportStatus.InvalidPayload || importStatus == ImportStatus.NoMatchingTable)
+                                @if (importStatus == ImportStatus.Reading)
                                 {
-                                    <p class="text-muted small mb-2">@Lang.Get("ImportResultPanelHint")</p>
-                                    <textarea class="form-control mb-2" rows="3" placeholder="@Lang.Get("ImportResultPlaceholder")"
-                                              @bind="importPasteText" @bind:event="oninput"></textarea>
-
-                                    @if (importStatus == ImportStatus.NotResultLink)
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
-                                    }
-                                    else if (importStatus == ImportStatus.InvalidPayload)
-                                    {
-                                        <div class="alert alert-danger py-2 mb-2">@Lang.Get("ScoringInvalidLink")</div>
-                                    }
-                                    else if (importStatus == ImportStatus.NoMatchingTable)
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
-                                    }
-
-                                    <button class="btn btn-primary" @onclick="DecodeImportPaste"
-                                            disabled="@(string.IsNullOrWhiteSpace(importPasteText))">
-                                        <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Preview")
-                                    </button>
+                                    <p class="text-muted small mb-0">@Lang.Get("ImportResultReading")</p>
                                 }
                                 else if (importStatus == ImportStatus.Preview || importStatus == ImportStatus.AlreadyScored)
                                 {
                                     @if (pendingImportLookup != null)
                                     {
-                                        <h6 class="text-muted mb-2">
-                                            @Lang.FormatDate(pendingImportLookup.Hanchan.Date)
-                                            @if (pendingImportLookup.Hanchan.StartTime.HasValue)
+                                        var pl = pendingImportLookup;
+                                        var headerClass = pl.Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white";
+                                        <div class="@headerClass py-1 px-2 mb-2 rounded">
+                                            @Lang.FormatDate(pl.Hanchan.Date)
+                                            @if (pl.Hanchan.StartTime.HasValue)
                                             {
-                                                <span> &middot; @pendingImportLookup.Hanchan.StartTime.Value.ToString(@"hh\:mm")</span>
+                                                <span> &middot; @pl.Hanchan.StartTime.Value.ToString(@"hh\:mm")</span>
                                             }
-                                            &middot; @Lang.Get("Table") @pendingImportLookup.Table.TableNumber
-                                        </h6>
+                                            &middot; @Lang.Get("Table") @pl.Table.TableNumber
+                                            <span class="ms-1">(@pl.Table.PlayerCount @Lang.Get("players"))</span>
+                                        </div>
                                     }
                                     <p>@Lang.Get("ImportScoreConfirm")</p>
 
@@ -561,10 +544,34 @@ else
                                     </button>
                                     <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
                                 }
+                                else if (importStatus == ImportStatus.NotResultLink
+                                         || importStatus == ImportStatus.NoResult
+                                         || importStatus == ImportStatus.NoMatchingTable)
+                                {
+                                    @if (importStatus == ImportStatus.NotResultLink)
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
+                                    }
+                                    else if (importStatus == ImportStatus.NoMatchingTable)
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
+                                    }
+
+                                    <button class="btn btn-outline-primary" @onclick="TryImportFromClipboard">
+                                        <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
+                                    </button>
+                                }
                                 else if (importStatus == ImportStatus.Applied)
                                 {
                                     <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
-                                    <button class="btn btn-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
+                                    <button class="btn btn-primary me-2" @onclick="TryImportFromClipboard">
+                                        <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
+                                    </button>
+                                    <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
                                 }
                             </div>
                         </div>
@@ -653,10 +660,11 @@ else
     private bool showExportRankings;
     private bool externalScoringEnabled;
 
-    // In-app "Import result" paste flow
+    // In-app "Import result" flow. The panel auto-reads the clipboard on open
+    // and jumps straight to a preview if the clipboard contains a valid result link,
+    // or shows one of the diagnostic banners otherwise.
     private bool showImportResult;
-    private string importPasteText = "";
-    private ImportStatus importStatus = ImportStatus.Idle;
+    private ImportStatus importStatus = ImportStatus.Reading;
     private ScoringResult? pendingImportResult;
     private ScoreImportService.Lookup? pendingImportLookup;
     // Bumped on each successful import; included in @key on ScoreTable so Blazor
@@ -665,16 +673,16 @@ else
 
     private enum ImportStatus
     {
-        Idle,
-        NotResultLink,     // user pasted an invite link, not a result link
-        InvalidPayload,    // payload didn't decode
+        Reading,           // initial / transient state while we read the clipboard
+        NotResultLink,     // clipboard holds an invite link (#p=), not a result link
+        NoResult,          // clipboard is empty, or contents don't look like a result link
         NoMatchingTable,   // decoded fine but no Hanchan/Table found locally
         Preview,           // decoded + found, awaiting user confirmation
         AlreadyScored,     // matching table already has scores; preview + ask before overwriting
         Applied,           // success
     }
 
-    private static string FormatImportScore(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
+    private static string FormatImportScore(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
     private int? sharedScoringLinkTableNumber;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
@@ -1188,30 +1196,34 @@ else
     private async Task OpenImportResult()
     {
         showImportResult = true;
-        importPasteText = "";
-        importStatus = ImportStatus.Idle;
+        importStatus = ImportStatus.Reading;
+        pendingImportResult = null;
+        pendingImportLookup = null;
+        StateHasChanged();
+        await TryImportFromClipboard();
+    }
+
+    private async Task TryImportFromClipboard()
+    {
+        importStatus = ImportStatus.Reading;
         pendingImportResult = null;
         pendingImportLookup = null;
         StateHasChanged();
 
-        // Auto-fill from clipboard if we can — saves a tap. Fail silently otherwise.
+        string? clip = null;
         try
         {
-            var clip = await JS.InvokeAsync<string?>("readClipboardText");
-            if (!string.IsNullOrWhiteSpace(clip))
-            {
-                importPasteText = clip;
-                StateHasChanged();
-            }
+            clip = await JS.InvokeAsync<string?>("readClipboardText");
         }
-        catch { /* permission denied or unsupported */ }
+        catch { /* permission denied or unsupported — fall through to NoResult */ }
+
+        await ProcessClipboardText(clip);
     }
 
     private void CancelImportResult()
     {
         showImportResult = false;
-        importPasteText = "";
-        importStatus = ImportStatus.Idle;
+        importStatus = ImportStatus.Reading;
         pendingImportResult = null;
         pendingImportLookup = null;
     }
@@ -1219,34 +1231,37 @@ else
     private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
         = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    private async Task DecodeImportPaste()
+    private async Task ProcessClipboardText(string? text)
     {
-        var raw = (importPasteText ?? "").Trim();
-        if (raw.Length == 0) return;
-
-        // URL-decode in case the user pasted something with %23 (encoded #) etc.
-        var decoded = Uri.UnescapeDataString(raw);
-
-        // Reject scoring-invite URLs (they have #p=…) with a clear message instead of a generic decode error.
-        if (decoded.Contains("#p=", StringComparison.Ordinal) || decoded.Contains("?p=", StringComparison.Ordinal))
+        var raw = (text ?? "").Trim();
+        if (raw.Length == 0)
         {
-            importStatus = ImportStatus.NotResultLink;
-            pendingImportResult = null;
-            pendingImportLookup = null;
+            importStatus = ImportStatus.NoResult;
             StateHasChanged();
             return;
         }
 
-        // Extract the payload: try `r=<base64url>` first, then fall back to treating the whole string as the bare payload.
+        // URL-decode in case the user copied something with %23 (encoded #) etc.
+        var decoded = Uri.UnescapeDataString(raw);
+
+        // Detect scoring-invite URLs (they have #p=…) so we can show a clear message instead
+        // of generic "no result link".
+        if (decoded.Contains("#p=", StringComparison.Ordinal) || decoded.Contains("?p=", StringComparison.Ordinal))
+        {
+            importStatus = ImportStatus.NotResultLink;
+            StateHasChanged();
+            return;
+        }
+
+        // Extract the payload: try `r=<base64url>` first, then fall back to treating the
+        // whole string as the bare payload (for users who copied just the fragment).
         var match = ResultPayloadRegex.Match(decoded);
         var payload = match.Success ? match.Groups[1].Value : decoded;
 
         var parsed = ScoringPayloadCodec.DecodeResult(payload);
         if (parsed == null || parsed.Scores == null || parsed.Scores.Count < 3 || parsed.Scores.Count > 4)
         {
-            importStatus = ImportStatus.InvalidPayload;
-            pendingImportResult = null;
-            pendingImportLookup = null;
+            importStatus = ImportStatus.NoResult;
             StateHasChanged();
             return;
         }
@@ -1256,7 +1271,6 @@ else
         {
             importStatus = ImportStatus.NoMatchingTable;
             pendingImportResult = parsed;
-            pendingImportLookup = null;
             StateHasChanged();
             return;
         }

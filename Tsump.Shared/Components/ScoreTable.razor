@@ -33,7 +33,156 @@
         }
     </div>
     <div class="card-body p-2">
-        <div class="table-responsive">
+        @* Narrow layout (smartphone portrait): one card per player, with a per-player
+           Advanced toggle that reveals Loan / Penalty rows for that player only. *@
+        <div class="d-md-none">
+            @if (hasError)
+            {
+                <div class="alert alert-danger py-2 mb-2 small">
+                    @(sumDiff < 0 ? Lang.Get("Deficit") : Lang.Get("Surplus")): @Math.Abs(sumDiff) @Lang.Get("Points")
+                </div>
+            }
+            @for (int idxLoop = 0; idxLoop < score.PlayerScores.Count; idxLoop++)
+            {
+                var idx = idxLoop;
+                var ps = score.PlayerScores[idx];
+                var psRef = ps;
+                var extras = IsExtrasShownFor(idx);
+                <div class="card mb-2 @(ps.IsVirtual ? "bg-light" : "")">
+                    <div class="card-header py-1 d-flex align-items-center">
+                        <strong class="flex-grow-1">
+                            @if (ps.IsVirtual)
+                            {
+                                <em>@ps.VirtualName</em>
+                            }
+                            else
+                            {
+                                @GetPlayerName(ps.PlayerId)
+                            }
+                        </strong>
+                        @if (!ps.IsVirtual)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                    style="font-size:1.1rem;line-height:1;min-width:2rem;"
+                                    @onclick="() => ToggleExtrasFor(idx)"
+                                    title="@Lang.Get("Advanced")">
+                                @(extras ? "−" : "+")
+                            </button>
+                        }
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm table-bordered mb-0">
+                            <tbody>
+                                <tr>
+                                    <td style="width:35%;vertical-align:middle;">@Lang.Get("StartShort")</td>
+                                    <td class="text-center">
+                                        @* Start is pre-filled and rarely edited — skip in tab order so Tab
+                                           on End goes straight to the next card's End. *@
+                                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                               tabindex="-1"
+                                               value="@FormatDisplay(psRef.StartingPoints)"
+                                               @onchange="e => OnStartingPointsChanged(psRef, e)" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="vertical-align:middle;">@Lang.Get("EndShort")</td>
+                                    <td class="text-center">
+                                        @* All End inputs share tabindex=1 → they come first in tab order
+                                           (in source order, i.e. top-to-bottom across all player cards). *@
+                                        <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                               tabindex="1"
+                                               value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
+                                               placeholder="−"
+                                               @onchange="e => OnEndPointsChanged(psRef, e)" />
+                                    </td>
+                                </tr>
+                                @if (extras && !ps.IsVirtual)
+                                {
+                                    <tr>
+                                        <td style="vertical-align:middle;">@Lang.Get("LoanShort")</td>
+                                        <td class="text-center">
+                                            <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                                   value="@FormatLoan(psRef.Loan)"
+                                                   placeholder="−"
+                                                   @onfocus="e => OnLoanFocus(psRef)"
+                                                   @onchange="e => OnLoanChanged(psRef, e)"
+                                                   style="@(psRef.Loan != 0 ? "background-color:#ffe5e5;" : "")" />
+                                        </td>
+                                    </tr>
+                                }
+                                <tr class="@(hasError ? "table-danger" : "")">
+                                    <td style="vertical-align:middle;">@Lang.Get("DifferenceShort")</td>
+                                    <td class="text-center fw-bold">
+                                        @if (ps.IsVirtual)
+                                        {
+                                            @* Mr. X: no computed values *@
+                                        }
+                                        else if (ps.EndPoints.HasValue)
+                                        {
+                                            @FormatDisplaySigned(ps.Difference)
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="vertical-align:middle;">@Lang.Get("UmaShort")</td>
+                                    <td class="text-center">
+                                        @if (ps.IsVirtual)
+                                        {
+                                            @* Mr. X: no Uma *@
+                                        }
+                                        else if (allEndPointsFilled && sumDiff == 0)
+                                        {
+                                            @FormatDisplaySigned(ps.Uma)
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                </tr>
+                                @if (extras && !ps.IsVirtual)
+                                {
+                                    <tr>
+                                        <td style="vertical-align:middle;">@Lang.Get("PenaltyShort")</td>
+                                        <td class="text-center">
+                                            <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                                   value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
+                                                   placeholder="−"
+                                                   @onchange="e => OnPenaltyChanged(psRef, e)"
+                                                   style="@(psRef.Penalty != 0 ? "background-color:#ffe5e5;" : "")" />
+                                        </td>
+                                    </tr>
+                                }
+                                <tr class="table-active fw-bold">
+                                    <td style="vertical-align:middle;">@Lang.Get("FinalScoreShort")</td>
+                                    <td class="text-center">
+                                        @if (ps.IsVirtual)
+                                        {
+                                            @* Mr. X: no final score *@
+                                        }
+                                        else if (allEndPointsFilled && sumDiff == 0)
+                                        {
+                                            @FormatDisplaySigned(ps.Total)
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* Wide layout (tablets and up): the original 5-column table. *@
+        <div class="d-none d-md-block">
             <table class="table table-sm table-bordered mb-0">
                 <thead>
                     <tr>
@@ -98,7 +247,7 @@
                                        placeholder="−"
                                        @onfocus="e => OnLoanFocus(psRef)"
                                        @onchange="e => OnLoanChanged(psRef, e)"
-                                       style="width:100%;" />
+                                       style="width:100%;@(psRef.Loan != 0 ? "background-color:#ffe5e5;" : "")" />
                             </td>
                         }
                     </tr>
@@ -169,7 +318,7 @@
                                            value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
                                            placeholder="−"
                                            @onchange="e => OnPenaltyChanged(psRef, e)"
-                                           style="width:100%;" />
+                                           style="width:100%;@(psRef.Penalty != 0 ? "background-color:#ffe5e5;" : "")" />
                                 }
                             </td>
                         }
@@ -227,8 +376,34 @@
 
     private bool showExtras;
     private bool showClearConfirm;
+    // Per-player advanced toggle for the narrow (smartphone-portrait) layout.
+    // Keyed by player index inside Table.Score.PlayerScores.
+    private HashSet<int> expandedPlayers = new();
 
     private void ToggleExtras() => showExtras = !showExtras;
+
+    private void ToggleExtrasFor(int index)
+    {
+        if (!expandedPlayers.Remove(index))
+            expandedPlayers.Add(index);
+    }
+
+    /// <summary>
+    /// True when the Loan/Penalty rows should render for the player at <paramref name="index"/>
+    /// in the narrow layout. Auto-shows when there is non-zero Loan or Penalty data so the
+    /// user always sees their existing entries.
+    /// </summary>
+    private bool IsExtrasShownFor(int index)
+    {
+        if (expandedPlayers.Contains(index)) return true;
+        var s = Table.Score;
+        if (s != null && index >= 0 && index < s.PlayerScores.Count)
+        {
+            var ps = s.PlayerScores[index];
+            if (ps.Loan != 0 || ps.Penalty != 0) return true;
+        }
+        return false;
+    }
 
     private async Task ConfirmClear()
     {
@@ -245,6 +420,7 @@
             ps.Uma = 0;
         }
         showExtras = false;
+        expandedPlayers.Clear();
         await OnScoresCleared.InvokeAsync();
     }
 
