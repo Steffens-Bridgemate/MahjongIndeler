@@ -106,19 +106,39 @@
         window.copyTextToClipboard = function (plainText) {
             return navigator.clipboard.writeText(plainText);
         };
-        window.copyQrImageToClipboard = async function (svgMarkup, size) {
-            // Renders an SVG string to a square PNG on an offscreen canvas, then writes
-            // it to the clipboard as image/png. Must be called from a user-gesture
-            // handler (e.g. a button click) on most browsers.
-            // Returns true on success, false on any failure (logs are console-only).
+        window.copyQrImageToClipboard = async function (svgMarkup, qrSize, title) {
+            // Renders an SVG string to a square PNG on an offscreen canvas (with an
+            // optional title band above the QR), then writes the result to the clipboard
+            // as image/png. Must be called from a user-gesture handler.
+            // The QR's own quiet zone is preserved, so a title band above doesn't
+            // impede scanning.
             if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) return false;
             try {
+                var titleHeight = title ? 56 : 0;
+                var width = qrSize;
+                var height = qrSize + titleHeight;
+
                 var canvas = document.createElement('canvas');
-                canvas.width = size;
-                canvas.height = size;
+                canvas.width = width;
+                canvas.height = height;
                 var ctx = canvas.getContext('2d');
                 ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, size, size);
+                ctx.fillRect(0, 0, width, height);
+
+                if (title) {
+                    ctx.fillStyle = 'black';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    // Auto-shrink the font so the title fits within 90% of the QR width.
+                    var maxWidth = width * 0.9;
+                    var fontSize = 28;
+                    ctx.font = 'bold ' + fontSize + 'px sans-serif';
+                    while (ctx.measureText(title).width > maxWidth && fontSize > 12) {
+                        fontSize -= 1;
+                        ctx.font = 'bold ' + fontSize + 'px sans-serif';
+                    }
+                    ctx.fillText(title, width / 2, titleHeight / 2);
+                }
 
                 var svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
                 var url = URL.createObjectURL(svgBlob);
@@ -129,7 +149,7 @@
                         img.onerror = reject;
                         img.src = url;
                     });
-                    ctx.drawImage(img, 0, 0, size, size);
+                    ctx.drawImage(img, 0, titleHeight, qrSize, qrSize);
                 } finally {
                     URL.revokeObjectURL(url);
                 }
