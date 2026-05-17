@@ -297,7 +297,7 @@ else
                 {
                     @foreach (var table in session.Tables)
                     {
-                        <ScoreTable Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores" OnScoresChanged="OnScoresChangedHandler"
+                        <ScoreTable Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
                                     DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                     }
                 }
@@ -311,7 +311,7 @@ else
                 @foreach (var entry in tableGroup.Entries)
                 {
                     <h6 class="text-muted mb-1">@entry.Label</h6>
-                    <ScoreTable Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores" OnScoresChanged="OnScoresChangedHandler"
+                    <ScoreTable Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
                                 DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                 }
             }
@@ -448,10 +448,6 @@ else
 
 @code {
     private string? statusExplanation;
-
-    // Fires from ScoreTable on every input change so this component re-renders
-    // (refreshes the Scores / All-Scores tab status classes).
-    private void OnScoresChangedHandler() { }
 
     private ScoreStatusHelper.Status AllSessionsScoreStatus()
     {
