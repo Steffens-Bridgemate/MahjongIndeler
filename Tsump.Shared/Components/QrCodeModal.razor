@@ -51,9 +51,24 @@
             var rawSvg = renderer.GetGraphic(4);
             // QRCoder hard-codes width/height pixel attributes on the root <svg>. Strip
             // them so our CSS (which sets a vmin-based size) is what actually applies.
-            svgMarkup = System.Text.RegularExpressions.Regex.Replace(
-                rawSvg, @"\s(width|height)=""[^""]*""", "",
+            // Restrict to the opening <svg ...> tag — inner <rect> elements also have
+            // width/height and we must NOT touch those (every QR module is a rect).
+            var openTag = System.Text.RegularExpressions.Regex.Match(
+                rawSvg, @"<svg\b[^>]*>",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (openTag.Success)
+            {
+                var cleaned = System.Text.RegularExpressions.Regex.Replace(
+                    openTag.Value, @"\s+(width|height)=""[^""]*""", "",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                svgMarkup = rawSvg.Substring(0, openTag.Index)
+                            + cleaned
+                            + rawSvg.Substring(openTag.Index + openTag.Length);
+            }
+            else
+            {
+                svgMarkup = rawSvg;
+            }
             renderedFor = Url;
         }
         else if (!IsOpen)
