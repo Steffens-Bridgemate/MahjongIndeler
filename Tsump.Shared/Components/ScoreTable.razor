@@ -376,6 +376,9 @@
     public EventCallback OnScoresCleared { get; set; }
 
     [Parameter]
+    public EventCallback OnScoresChanged { get; set; }
+
+    [Parameter]
     public int DefaultStartingPoints { get; set; } = 30000;
 
     [Parameter]
@@ -479,6 +482,7 @@
         ps.StartingPoints = ParseInput(e.Value?.ToString()) ?? DefaultStartingPoints;
         DeriveVirtualEnd(Table);
         CalculateUma();
+        await OnScoresChanged.InvokeAsync();
         await CheckAndNotifyComplete();
     }
 
@@ -489,6 +493,7 @@
         ps.Loan = parsed > 0 ? -parsed : parsed;
         DeriveVirtualEnd(Table);
         CalculateUma();
+        await OnScoresChanged.InvokeAsync();
         await CheckAndNotifyComplete();
     }
 
@@ -497,6 +502,7 @@
         ps.EndPoints = ParseInput(e.Value?.ToString());
         DeriveVirtualEnd(Table);
         CalculateUma();
+        await OnScoresChanged.InvokeAsync();
         await CheckAndNotifyComplete();
     }
 
@@ -507,6 +513,7 @@
         ps.Penalty = parsed > 0 ? -parsed : parsed;
         DeriveVirtualEnd(Table);
         CalculateUma();
+        await OnScoresChanged.InvokeAsync();
         await CheckAndNotifyComplete();
     }
 

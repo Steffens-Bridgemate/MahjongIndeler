@@ -359,6 +359,7 @@ else
                 <h6 class="text-muted mb-1">@entry.Label</h6>
                 <ScoreTable Table="entry.Table" PlayerNameResolver="GetPlayerName"
                             OnScoresComplete="SaveAllScores" OnScoresCleared="SaveAllScores"
+                            OnScoresChanged="OnScoresChangedHandler"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
         }
@@ -695,6 +696,7 @@ else
                 <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
                             Table="table" PlayerNameResolver="GetPlayerName"
                             OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                            OnScoresChanged="OnScoresChangedHandler"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
         }
@@ -748,6 +750,11 @@ else
 
 @code {
     private string? statusExplanation;
+
+    // Fires from ScoreTable on every input change (not just on completion). Blazor
+    // automatically re-renders this component after an EventCallback handler returns,
+    // which is what refreshes the colored Scores / All-Scores tab classes.
+    private void OnScoresChangedHandler() { }
 
     private ScoreStatusHelper.Status CurrentHanchanScoreStatus()
     {
