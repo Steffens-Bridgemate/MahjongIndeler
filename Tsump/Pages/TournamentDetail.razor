@@ -84,16 +84,44 @@ else
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateScoresTab">
+                @{
+                    var scoresStatus = AllSessionsScoreStatus();
+                    var scoresClass = ScoreStatusHelper.TabClass(scoresStatus);
+                    var scoresExplain = scoresStatus == ScoreStatusHelper.Status.Partial || scoresStatus == ScoreStatusHelper.Status.Stale;
+                }
+                <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "") @scoresClass" href="javascript:void(0)" @onclick="ActivateScoresTab">
                     @Lang.Get("Scores")
+                    @if (scoresExplain)
+                    {
+                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
+                           @onclick:stopPropagation="true"
+                           @onclick="() => ShowStatusExplanation(scoresStatus, isAggregated: true)"></i>
+                    }
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateAllScoresTab">
+                @{
+                    var allClass = ScoreStatusHelper.TabClass(scoresStatus);
+                    var allExplain = scoresExplain;
+                }
+                <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "") @allClass" href="javascript:void(0)" @onclick="ActivateAllScoresTab">
                     @Lang.Get("AllScores")
+                    @if (allExplain)
+                    {
+                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
+                           @onclick:stopPropagation="true"
+                           @onclick="() => ShowStatusExplanation(scoresStatus, isAggregated: true)"></i>
+                    }
                 </a>
             </li>
         </ul>
+        @if (statusExplanation != null)
+        {
+            <div class="alert alert-info alert-dismissible py-2 small">
+                @statusExplanation
+                <button type="button" class="btn-close" @onclick="() => statusExplanation = null"></button>
+            </div>
+        }
 
         @if (tournamentActiveTab == "tables")
         {
@@ -419,6 +447,30 @@ else
 </style>
 
 @code {
+    private string? statusExplanation;
+
+    private ScoreStatusHelper.Status AllSessionsScoreStatus()
+    {
+        if (tournament == null || tournament.Sessions.Count == 0)
+            return ScoreStatusHelper.Status.Normal;
+        var ordered = tournament.Sessions.OrderBy(s => s.SessionNumber).ToList();
+        var perEntry = ordered.Select((s, i) =>
+            ScoreStatusHelper.Classify(s.Tables, ordered.Skip(i + 1).Select(o => o.Tables)));
+        return ScoreStatusHelper.Aggregate(perEntry);
+    }
+
+    private void ShowStatusExplanation(ScoreStatusHelper.Status status, bool isAggregated)
+    {
+        statusExplanation = (status, isAggregated) switch
+        {
+            (ScoreStatusHelper.Status.Partial, false) => Lang.Get("StatusExpl_Partial"),
+            (ScoreStatusHelper.Status.Stale, false) => Lang.Get("StatusExpl_Stale"),
+            (ScoreStatusHelper.Status.Partial, true) => Lang.Get("StatusExpl_PartialAll"),
+            (ScoreStatusHelper.Status.Stale, true) => Lang.Get("StatusExpl_StaleAll"),
+            _ => null,
+        };
+    }
+
     [Parameter] public Guid Id { get; set; }
 
     private Tournament? tournament;
