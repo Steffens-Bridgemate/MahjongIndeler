@@ -1,0 +1,27 @@
+/*
+ * Layout switch for ScoreTable: narrow when the viewport is "phone-sized" in
+ * EITHER dimension, wide only when both width and height are at least 500px.
+ *
+ * Width alone (Bootstrap's md=768px) is wrong for foldables: a Samsung Fold
+ * cover screen in landscape is wider than 768px but only ~376px tall, and a
+ * regular phone in landscape is wider than 768px but only ~390px tall — both
+ * benefit from the narrow stacked layout.
+ */
+
+.score-table-narrow {
+    display: block;
+}
+
+.score-table-wide {
+    display: none;
+}
+
+@media (min-width: 500px) and (min-height: 500px) {
+    .score-table-narrow {
+        display: none;
+    }
+
+    .score-table-wide {
+        display: block;
+    }
+}

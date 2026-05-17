@@ -33,9 +33,11 @@
         }
     </div>
     <div class="card-body p-2">
-        @* Narrow layout (smartphone portrait): one card per player, with a per-player
-           Advanced toggle that reveals Loan / Penalty rows for that player only. *@
-        <div class="d-md-none">
+        @* Narrow layout (any viewport with width or height under 500px — covers phones
+           in either orientation and foldables in their compact state). One card per
+           player, with a per-player Advanced toggle that reveals Loan / Penalty rows
+           for that player only. *@
+        <div class="score-table-narrow">
             @if (hasError)
             {
                 <div class="alert alert-danger py-2 mb-2 small">
@@ -181,8 +183,8 @@
             }
         </div>
 
-        @* Wide layout (tablets and up): the original 5-column table. *@
-        <div class="d-none d-md-block">
+        @* Wide layout (viewport with both dimensions ≥ 500px): the original 5-column table. *@
+        <div class="score-table-wide">
             <table class="table table-sm table-bordered mb-0">
                 <thead>
                     <tr>
