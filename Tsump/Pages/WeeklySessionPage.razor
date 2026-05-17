@@ -555,7 +555,8 @@ else
                                 else if (importStatus == ImportStatus.NotResultLink
                                          || importStatus == ImportStatus.NoResult
                                          || importStatus == ImportStatus.NoMatchingTable
-                                         || importStatus == ImportStatus.ScanError)
+                                         || importStatus == ImportStatus.ScanError
+                                         || importStatus == ImportStatus.FileScanFailed)
                                 {
                                     @if (importStatus == ImportStatus.NotResultLink)
                                     {
@@ -569,17 +570,33 @@ else
                                     {
                                         <div class="alert alert-danger py-2 mb-2">@(scanErrorMessage ?? Lang.Get("ScanCameraError"))</div>
                                     }
+                                    else if (importStatus == ImportStatus.FileScanFailed)
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("FileScanNoQr")</div>
+                                    }
                                     else
                                     {
                                         <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
                                     }
 
-                                    <button class="btn btn-outline-primary me-2" @onclick="TryImportFromClipboard">
-                                        <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
-                                    </button>
-                                    <button class="btn btn-outline-primary" @onclick="StartQrScan">
-                                        <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
-                                    </button>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-outline-primary" @onclick="TryImportFromClipboard">
+                                            <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
+                                        </button>
+                                        <button class="btn btn-outline-primary" @onclick="StartQrScan">
+                                            <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
+                                        </button>
+                                        <button class="btn btn-outline-primary" @onclick="PickQrImage">
+                                            <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
+                                        </button>
+                                    </div>
+                                }
+                                else if (importStatus == ImportStatus.FileDecoding)
+                                {
+                                    <div class="d-flex align-items-center small">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+                                        <span class="text-muted">@Lang.Get("FileDecoding")</span>
+                                    </div>
                                 }
                                 else if (importStatus == ImportStatus.Scanning)
                                 {
@@ -621,14 +638,24 @@ else
                                 else if (importStatus == ImportStatus.Applied)
                                 {
                                     <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
-                                    <button class="btn btn-primary me-2" @onclick="TryImportFromClipboard">
-                                        <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
-                                    </button>
-                                    <button class="btn btn-outline-primary me-2" @onclick="StartQrScan">
-                                        <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
-                                    </button>
-                                    <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-primary" @onclick="TryImportFromClipboard">
+                                            <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
+                                        </button>
+                                        <button class="btn btn-outline-primary" @onclick="StartQrScan">
+                                            <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
+                                        </button>
+                                        <button class="btn btn-outline-primary" @onclick="PickQrImage">
+                                            <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
+                                        </button>
+                                        <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
+                                    </div>
                                 }
+
+                                @* Hidden file input + workspace div for the file-decode path.
+                                   Always rendered while the panel is open so the JS picker can find them. *@
+                                <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
+                                <div id="qr-file-decode-tmp" style="display:none;"></div>
                             </div>
                         </div>
                     }
@@ -739,6 +766,8 @@ else
         NoMatchingTable,   // decoded fine but no Hanchan/Table found locally
         Scanning,          // camera scanner is live
         ScanError,         // camera failed to start (permission denied, no camera, ...)
+        FileDecoding,      // user picked an image, html5-qrcode is decoding it
+        FileScanFailed,    // decode finished but no QR was found in the image
         Preview,           // decoded + found, awaiting user confirmation
         AlreadyScored,     // matching table already has scores; preview + ask before overwriting
         Applied,           // success
@@ -1373,6 +1402,40 @@ else
         scanTimerCts?.Cancel();
         scanTimerCts = null;
         await ProcessClipboardText(decodedText);
+    }
+
+    [JSInvokable]
+    public Task OnQrFileScanFailed(string _error)
+    {
+        // html5-qrcode couldn't find a QR in the picked image (no match, or unreadable).
+        importStatus = ImportStatus.FileScanFailed;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task PickQrImage()
+    {
+        // JS opens the file picker. We don't transition state here — if the user cancels
+        // the picker we'd be stuck. Instead JS calls OnQrFileSelected once a file is
+        // actually picked, which is when we flip to FileDecoding.
+        qrScannerRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("pickQrImage", "qrFileInput", "qr-file-decode-tmp", qrScannerRef);
+        }
+        catch
+        {
+            importStatus = ImportStatus.FileScanFailed;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public Task OnQrFileSelected()
+    {
+        importStatus = ImportStatus.FileDecoding;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex

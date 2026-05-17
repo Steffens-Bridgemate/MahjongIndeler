@@ -153,6 +153,33 @@
                 window._qrScanner = null;
             }
         };
+
+        // File-based QR decoding via html5-qrcode's scanFile(). Triggers the hidden
+        // <input type="file">; when the user picks an image, decodes it once and
+        // routes the decoded text (or the error) back to Blazor.
+        window.pickQrImage = function (inputId, workElementId, dotNetRef) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.onchange = async function (e) {
+                const file = e.target.files && e.target.files[0];
+                input.value = ''; // allow picking the same file again later
+                if (!file) return;
+                // Signal the C# side now — picker has produced a file. (We don't flip
+                // state before this point because the user might cancel the picker.)
+                try { await dotNetRef.invokeMethodAsync('OnQrFileSelected'); } catch (_) { }
+                let decoder = null;
+                try {
+                    decoder = new Html5Qrcode(workElementId, { verbose: false });
+                    const result = await decoder.scanFile(file, /* showImage */ false);
+                    dotNetRef.invokeMethodAsync('OnQrScanned', result);
+                } catch (err) {
+                    dotNetRef.invokeMethodAsync('OnQrFileScanFailed', (err && err.toString) ? err.toString() : 'Unknown error');
+                } finally {
+                    if (decoder) { try { decoder.clear(); } catch (_) { } }
+                }
+            };
+            input.click();
+        };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script>
