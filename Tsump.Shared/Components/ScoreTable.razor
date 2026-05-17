@@ -335,8 +335,17 @@
     }
 
     private void CalculateUma()
+        => CalculateUma(Table, Uma3Players, Uma4Players);
+
+    /// <summary>
+    /// Assigns Uma values to each non-virtual PlayerScore on <paramref name="table"/> based on
+    /// difference ranking. Tied differences get the averaged Uma. Only applies when all
+    /// EndPoints are filled and the differences sum to zero. Static so non-UI callers
+    /// (e.g. ScoreImportService) can reuse it.
+    /// </summary>
+    public static void CalculateUma(TableAssignment table, List<int> uma3Players, List<int> uma4Players)
     {
-        var score = Table.Score;
+        var score = table.Score;
         if (score == null) return;
 
         foreach (var ps in score.PlayerScores)
@@ -355,9 +364,9 @@
 
         if (ranked.Count == 0) return;
 
-        int[] umaValues = Table.PlayerCount == 3
-            ? Uma3Players.ToArray()
-            : Uma4Players.ToArray();
+        int[] umaValues = table.PlayerCount == 3
+            ? uma3Players.ToArray()
+            : uma4Players.ToArray();
 
         // Group tied players and assign average Uma
         int i = 0;

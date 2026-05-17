@@ -96,6 +96,9 @@ public class ScoreImportService
             mrX.EndPoints = mrX.StartingPoints - realDiff;
         }
 
+        // Compute Uma using the same logic the in-app ScoreTable uses on edit.
+        ScoreTable.CalculateUma(matchingTable, settings.WeeklyUma3Players, settings.WeeklyUma4Players);
+
         await _sessions.SaveAsync(matchingHanchan);
         return new ApplyOutcome(true, FailureReason.None, matchingHanchan, matchingTable);
     }

@@ -254,65 +254,11 @@ else
                     </button>
                 }
             }
-            @if (externalScoringEnabled)
-            {
-                <button class="btn btn-outline-secondary ms-2" @onclick="OpenImportResult">
-                    <i class="bi bi-box-arrow-in-down me-1"></i>@Lang.Get("ImportResult")
-                </button>
-            }
             @if (presentIds.Count < 3)
             {
                 <span class="text-warning ms-2">@Lang.Get("NeedAtLeast3")</span>
             }
         </div>
-
-        @if (showImportResult)
-        {
-            <div class="card mb-3">
-                <div class="card-header d-flex align-items-center">
-                    <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted small mb-2">@Lang.Get("ImportResultPanelHint")</p>
-                    <textarea class="form-control mb-2" rows="3" placeholder="@Lang.Get("ImportResultPlaceholder")"
-                              @bind="importPasteText" @bind:event="oninput"></textarea>
-
-                    @if (importStatus == ImportStatus.NotResultLink)
-                    {
-                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
-                    }
-                    else if (importStatus == ImportStatus.InvalidPayload)
-                    {
-                        <div class="alert alert-danger py-2 mb-2">@Lang.Get("ScoringInvalidLink")</div>
-                    }
-                    else if (importStatus == ImportStatus.NoMatchingTable)
-                    {
-                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
-                    }
-                    else if (importStatus == ImportStatus.AlreadyScored)
-                    {
-                        <div class="alert alert-warning py-2 mb-2">
-                            @Lang.Get("ImportResultOverwritePrompt")
-                            <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmImportOverwrite">@Lang.Get("YesOverwrite")</button>
-                            <button class="btn btn-sm btn-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
-                        </div>
-                    }
-                    else if (importStatus == ImportStatus.Applied)
-                    {
-                        <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
-                    }
-
-                    @if (importStatus != ImportStatus.AlreadyScored && importStatus != ImportStatus.Applied)
-                    {
-                        <button class="btn btn-primary" @onclick="() => ApplyImportResult(confirmOverwrite: false)"
-                                disabled="@(string.IsNullOrWhiteSpace(importPasteText))">
-                            <i class="bi bi-check2 me-1"></i>@Lang.Get("ImportScoreApply")
-                        </button>
-                    }
-                </div>
-            </div>
-        }
 
         @if (showCopyFromHistory)
         {
@@ -527,9 +473,108 @@ else
         }
         else if (activeTab == "scores")
         {
+            @if (externalScoringEnabled)
+            {
+                <div class="mb-3">
+                    @if (!showImportResult)
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="OpenImportResult">
+                            <i class="bi bi-box-arrow-in-down me-1"></i>@Lang.Get("ImportResult")
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="card">
+                            <div class="card-header d-flex align-items-center">
+                                <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
+                            </div>
+                            <div class="card-body">
+                                @if (importStatus == ImportStatus.Idle || importStatus == ImportStatus.NotResultLink || importStatus == ImportStatus.InvalidPayload || importStatus == ImportStatus.NoMatchingTable)
+                                {
+                                    <p class="text-muted small mb-2">@Lang.Get("ImportResultPanelHint")</p>
+                                    <textarea class="form-control mb-2" rows="3" placeholder="@Lang.Get("ImportResultPlaceholder")"
+                                              @bind="importPasteText" @bind:event="oninput"></textarea>
+
+                                    @if (importStatus == ImportStatus.NotResultLink)
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
+                                    }
+                                    else if (importStatus == ImportStatus.InvalidPayload)
+                                    {
+                                        <div class="alert alert-danger py-2 mb-2">@Lang.Get("ScoringInvalidLink")</div>
+                                    }
+                                    else if (importStatus == ImportStatus.NoMatchingTable)
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
+                                    }
+
+                                    <button class="btn btn-primary" @onclick="DecodeImportPaste"
+                                            disabled="@(string.IsNullOrWhiteSpace(importPasteText))">
+                                        <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Preview")
+                                    </button>
+                                }
+                                else if (importStatus == ImportStatus.Preview || importStatus == ImportStatus.AlreadyScored)
+                                {
+                                    @if (pendingImportLookup != null)
+                                    {
+                                        <h6 class="text-muted mb-2">
+                                            @Lang.FormatDate(pendingImportLookup.Hanchan.Date)
+                                            @if (pendingImportLookup.Hanchan.StartTime.HasValue)
+                                            {
+                                                <span> &middot; @pendingImportLookup.Hanchan.StartTime.Value.ToString(@"hh\:mm")</span>
+                                            }
+                                            &middot; @Lang.Get("Table") @pendingImportLookup.Table.TableNumber
+                                        </h6>
+                                    }
+                                    <p>@Lang.Get("ImportScoreConfirm")</p>
+
+                                    @if (importStatus == ImportStatus.AlreadyScored)
+                                    {
+                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportScoreOverwriteWarning")</div>
+                                    }
+
+                                    <table class="table table-sm table-bordered" style="max-width:500px;">
+                                        <thead>
+                                            <tr>
+                                                <th>@Lang.Get("Player")</th>
+                                                <th class="text-end">@Lang.Get("EndShort")</th>
+                                                <th class="text-end">@Lang.Get("LoanShort")</th>
+                                                <th class="text-end">@Lang.Get("PenaltyShort")</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var s in pendingImportResult!.Scores)
+                                            {
+                                                <tr>
+                                                    <td>@GetPlayerName(s.PlayerId)</td>
+                                                    <td class="text-end">@FormatImportScore(s.EndPoints)</td>
+                                                    <td class="text-end">@(s.Loan != 0 ? FormatImportScore(s.Loan) : "")</td>
+                                                    <td class="text-end">@(s.Penalty != 0 ? FormatImportScore(s.Penalty) : "")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+
+                                    <button class="btn btn-success me-2" @onclick="() => ApplyImportPreview(confirmOverwrite: true)">
+                                        <i class="bi bi-check2 me-1"></i>@(importStatus == ImportStatus.AlreadyScored ? Lang.Get("YesOverwrite") : Lang.Get("ImportScoreApply"))
+                                    </button>
+                                    <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
+                                }
+                                else if (importStatus == ImportStatus.Applied)
+                                {
+                                    <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
+                                    <button class="btn btn-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
             @foreach (var table in tables)
             {
-                <ScoreTable Table="table" PlayerNameResolver="GetPlayerName"
+                <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
+                            Table="table" PlayerNameResolver="GetPlayerName"
                             OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
                             DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
             }
@@ -613,6 +658,10 @@ else
     private string importPasteText = "";
     private ImportStatus importStatus = ImportStatus.Idle;
     private ScoringResult? pendingImportResult;
+    private ScoreImportService.Lookup? pendingImportLookup;
+    // Bumped on each successful import; included in @key on ScoreTable so Blazor
+    // disposes the stale instance and re-renders with the freshly written model.
+    private int scoreTableVersion;
 
     private enum ImportStatus
     {
@@ -620,9 +669,12 @@ else
         NotResultLink,     // user pasted an invite link, not a result link
         InvalidPayload,    // payload didn't decode
         NoMatchingTable,   // decoded fine but no Hanchan/Table found locally
-        AlreadyScored,     // matching table already has scores; ask before overwriting
+        Preview,           // decoded + found, awaiting user confirmation
+        AlreadyScored,     // matching table already has scores; preview + ask before overwriting
         Applied,           // success
     }
+
+    private static string FormatImportScore(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
     private int? sharedScoringLinkTableNumber;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
@@ -1139,6 +1191,7 @@ else
         importPasteText = "";
         importStatus = ImportStatus.Idle;
         pendingImportResult = null;
+        pendingImportLookup = null;
         StateHasChanged();
 
         // Auto-fill from clipboard if we can — saves a tap. Fail silently otherwise.
@@ -1160,12 +1213,13 @@ else
         importPasteText = "";
         importStatus = ImportStatus.Idle;
         pendingImportResult = null;
+        pendingImportLookup = null;
     }
 
     private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
         = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    private async Task ApplyImportResult(bool confirmOverwrite)
+    private async Task DecodeImportPaste()
     {
         var raw = (importPasteText ?? "").Trim();
         if (raw.Length == 0) return;
@@ -1178,52 +1232,74 @@ else
         {
             importStatus = ImportStatus.NotResultLink;
             pendingImportResult = null;
+            pendingImportLookup = null;
             StateHasChanged();
             return;
         }
 
         // Extract the payload: try `r=<base64url>` first, then fall back to treating the whole string as the bare payload.
-        string payload;
         var match = ResultPayloadRegex.Match(decoded);
-        if (match.Success)
-            payload = match.Groups[1].Value;
-        else
-            payload = decoded;
+        var payload = match.Success ? match.Groups[1].Value : decoded;
 
         var parsed = ScoringPayloadCodec.DecodeResult(payload);
         if (parsed == null || parsed.Scores == null || parsed.Scores.Count < 3 || parsed.Scores.Count > 4)
         {
             importStatus = ImportStatus.InvalidPayload;
             pendingImportResult = null;
+            pendingImportLookup = null;
+            StateHasChanged();
+            return;
+        }
+
+        var lookup = await ScoreImport.FindAsync(parsed);
+        if (lookup == null)
+        {
+            importStatus = ImportStatus.NoMatchingTable;
+            pendingImportResult = parsed;
+            pendingImportLookup = null;
             StateHasChanged();
             return;
         }
 
         pendingImportResult = parsed;
-        var outcome = await ScoreImport.ApplyAsync(parsed, Lang.Get, confirmOverwrite);
-        importStatus = outcome.Reason switch
-        {
-            ScoreImportService.FailureReason.NoMatchingHanchan => ImportStatus.NoMatchingTable,
-            ScoreImportService.FailureReason.NoMatchingTable => ImportStatus.NoMatchingTable,
-            ScoreImportService.FailureReason.AlreadyScored => ImportStatus.AlreadyScored,
-            _ => outcome.Success ? ImportStatus.Applied : ImportStatus.InvalidPayload,
-        };
-
-        if (outcome.Success)
-        {
-            // Refresh local view so Rankings/Scores tabs reflect the imported values.
-            var allHanchans = await SessionService.GetAllAsync();
-            hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
-            if (currentHanchan != null && outcome.Hanchan?.Id == currentHanchan.Id)
-                currentHanchan = outcome.Hanchan;
-        }
-
+        pendingImportLookup = lookup;
+        // If the target already has scores, surface that in the preview view so the user
+        // knows the Apply button overwrites.
+        importStatus = lookup.Table.Score != null
+                       && lookup.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
+            ? ImportStatus.AlreadyScored
+            : ImportStatus.Preview;
         StateHasChanged();
     }
 
-    private async Task ConfirmImportOverwrite()
+    private async Task ApplyImportPreview(bool confirmOverwrite)
     {
-        await ApplyImportResult(confirmOverwrite: true);
+        if (pendingImportResult == null) return;
+
+        var outcome = await ScoreImport.ApplyAsync(pendingImportResult, Lang.Get, confirmOverwrite);
+        if (!outcome.Success)
+        {
+            importStatus = outcome.Reason == ScoreImportService.FailureReason.AlreadyScored
+                ? ImportStatus.AlreadyScored
+                : ImportStatus.NoMatchingTable;
+            StateHasChanged();
+            return;
+        }
+
+        importStatus = ImportStatus.Applied;
+
+        // Refresh local view so the Scores/Rankings tabs reflect the imported values.
+        var allHanchans = await SessionService.GetAllAsync();
+        hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
+        if (currentHanchan != null && outcome.Hanchan?.Id == currentHanchan.Id)
+        {
+            currentHanchan = outcome.Hanchan;
+            tables = currentHanchan.Tables;
+            // Bump the @key so each rendered ScoreTable rebuilds with the fresh model.
+            scoreTableVersion++;
+        }
+
+        StateHasChanged();
     }
 
     private async Task ShareScoringLink(TableAssignment table)
