@@ -981,6 +981,10 @@ else
         saved = hanchan.Tables.Count > 0;
         showRegenerateConfirm = false;
         activeTab = "tables";
+        // Cross-hanchan tab statuses depend on every sibling's Tables. Once another hanchan
+        // has been edited in-memory, navigating here needs a re-render so the Scores tab
+        // class is re-classified with the latest state of all siblings.
+        StateHasChanged();
     }
 
     private void SelectHanchan(Hanchan hanchan)
@@ -1876,6 +1880,7 @@ else
     {
         activeTab = "scores";
         ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
+        StateHasChanged();
     }
 
     private void ActivateAllScoresTab()
@@ -1883,6 +1888,7 @@ else
         activeTab = "allscores";
         foreach (var h in hanchansOnDate.Where(h => h.Tables.Count > 0))
             ScoreTable.InitializeScores(h.Tables, Lang.Get, weeklyStartingPoints);
+        StateHasChanged();
     }
 
     private void ActivateRankingsTab()
