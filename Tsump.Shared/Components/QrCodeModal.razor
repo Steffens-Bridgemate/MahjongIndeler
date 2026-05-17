@@ -1,0 +1,65 @@
+@using QRCoder
+@inject LanguageService Lang
+
+@if (IsOpen && !string.IsNullOrEmpty(Url))
+{
+    <div class="qr-backdrop" @onclick="OnCloseHandler">
+        <div class="qr-popup" @onclick:stopPropagation="true">
+            <div class="qr-header">
+                <h6 class="mb-0 flex-grow-1">@(Title ?? Lang.Get("QrCodeTitle"))</h6>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="OnCloseHandler" aria-label="@Lang.Get("Close")">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="qr-body">
+                @if (svgMarkup != null)
+                {
+                    @((MarkupString)svgMarkup)
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <div class="qr-footer">
+                    <small class="text-muted">@Subtitle</small>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string? Url { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string? svgMarkup;
+    private string? renderedFor;
+
+    protected override void OnParametersSet()
+    {
+        // Re-render the SVG only when the URL actually changes — building a QR is cheap
+        // but not free (a few ms for our payload sizes).
+        if (IsOpen && !string.IsNullOrEmpty(Url) && Url != renderedFor)
+        {
+            using var gen = new QRCodeGenerator();
+            // ECCLevel.M = 15% recovery. Plenty for screen scanning and keeps the QR
+            // small enough for our ~300–500 char payloads.
+            var data = gen.CreateQrCode(Url, QRCodeGenerator.ECCLevel.M);
+            var renderer = new SvgQRCode(data);
+            svgMarkup = renderer.GetGraphic(4);
+            renderedFor = Url;
+        }
+        else if (!IsOpen)
+        {
+            renderedFor = null;
+        }
+    }
+
+    private async Task OnCloseHandler()
+    {
+        if (OnClose.HasDelegate)
+            await OnClose.InvokeAsync();
+    }
+}

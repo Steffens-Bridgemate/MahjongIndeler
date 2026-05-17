@@ -452,11 +452,19 @@ else
                             {
                                 var tableRef = table;
                                 <div class="card-footer p-2">
-                                    <button class="btn btn-sm btn-outline-secondary w-100"
-                                            @onclick="() => ShareScoringLink(tableRef)"
-                                            title="@Lang.Get("ShareScoringLink")">
-                                        <i class="bi bi-link-45deg me-1"></i>@(sharedScoringLinkTableNumber == tableRef.TableNumber ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
-                                    </button>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-secondary flex-grow-1"
+                                                @onclick="() => ShareScoringLink(tableRef)"
+                                                title="@Lang.Get("ShareScoringLink")">
+                                            <i class="bi bi-link-45deg me-1"></i>@(sharedScoringLinkTableNumber == tableRef.TableNumber ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                                @onclick="() => ShowScoringQrFor(tableRef)"
+                                                title="@Lang.Get("ShowQrCode")"
+                                                aria-label="@Lang.Get("ShowQrCode")">
+                                            <i class="bi bi-qr-code"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             }
                         </div>
@@ -630,6 +638,10 @@ else
     }
 </style>
 
+<QrCodeModal IsOpen="showScoringQr" Url="scoringQrUrl" Title="scoringQrTitle"
+             Subtitle="@Lang.Get("QrCodeScoringSubtitle")"
+             OnClose="CloseScoringQr" />
+
 @code {
     private List<Member>? members;
     private List<Member> activeMembers = new();
@@ -684,6 +696,9 @@ else
 
     private static string FormatImportScore(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
     private int? sharedScoringLinkTableNumber;
+    private bool showScoringQr;
+    private string? scoringQrUrl;
+    private string? scoringQrTitle;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
     private string activeTab = "tables";
@@ -1316,19 +1331,18 @@ else
         StateHasChanged();
     }
 
-    private async Task ShareScoringLink(TableAssignment table)
+    private async Task<(string url, string title)?> BuildScoringInviteUrl(TableAssignment table)
     {
         if (!externalScoringEnabled)
         {
-            // External scoring isn't enabled — point the user at Settings to turn it on.
             Nav.NavigateTo("settings");
-            return;
+            return null;
         }
         if (currentHanchan == null)
         {
             // Defensive: save the hanchan first so the invite has a stable Id to round-trip.
             await SaveHanchan();
-            if (currentHanchan == null) return;
+            if (currentHanchan == null) return null;
         }
 
         var names = table.PlayerIds.Select(GetPlayerName).ToList();
@@ -1350,7 +1364,31 @@ else
 
         var encoded = ScoringPayloadCodec.EncodeInvite(invite);
         var url = $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}";
-        var message = $"📋 {title}\n{Lang.Get("ShareScoringLinkInstruction")}\n{url}";
+        return (url, title);
+    }
+
+    private async Task ShowScoringQrFor(TableAssignment table)
+    {
+        var built = await BuildScoringInviteUrl(table);
+        if (built == null) return;
+        scoringQrUrl = built.Value.url;
+        scoringQrTitle = built.Value.title;
+        showScoringQr = true;
+        StateHasChanged();
+    }
+
+    private void CloseScoringQr()
+    {
+        showScoringQr = false;
+        scoringQrUrl = null;
+        scoringQrTitle = null;
+    }
+
+    private async Task ShareScoringLink(TableAssignment table)
+    {
+        var built = await BuildScoringInviteUrl(table);
+        if (built == null) return;
+        var message = $"📋 {built.Value.title}\n{Lang.Get("ShareScoringLinkInstruction")}\n{built.Value.url}";
 
         await JS.InvokeVoidAsync("copyTextToClipboard", message);
         sharedScoringLinkTableNumber = table.TableNumber;
