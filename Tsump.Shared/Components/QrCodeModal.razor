@@ -1,4 +1,4 @@
-@using QRCoder
+@using Tsump.Scoring
 @inject LanguageService Lang
 
 @if (IsOpen && !string.IsNullOrEmpty(Url))
@@ -43,32 +43,7 @@
         // but not free (a few ms for our payload sizes).
         if (IsOpen && !string.IsNullOrEmpty(Url) && Url != renderedFor)
         {
-            using var gen = new QRCodeGenerator();
-            // ECCLevel.M = 15% recovery. Plenty for screen scanning and keeps the QR
-            // small enough for our ~300–500 char payloads.
-            var data = gen.CreateQrCode(Url, QRCodeGenerator.ECCLevel.M);
-            var renderer = new SvgQRCode(data);
-            var rawSvg = renderer.GetGraphic(4);
-            // QRCoder hard-codes width/height pixel attributes on the root <svg>. Strip
-            // them so our CSS (which sets a vmin-based size) is what actually applies.
-            // Restrict to the opening <svg ...> tag — inner <rect> elements also have
-            // width/height and we must NOT touch those (every QR module is a rect).
-            var openTag = System.Text.RegularExpressions.Regex.Match(
-                rawSvg, @"<svg\b[^>]*>",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (openTag.Success)
-            {
-                var cleaned = System.Text.RegularExpressions.Regex.Replace(
-                    openTag.Value, @"\s+(width|height)=""[^""]*""", "",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                svgMarkup = rawSvg.Substring(0, openTag.Index)
-                            + cleaned
-                            + rawSvg.Substring(openTag.Index + openTag.Length);
-            }
-            else
-            {
-                svgMarkup = rawSvg;
-            }
+            svgMarkup = QrCodeRenderer.ToSvg(Url);
             renderedFor = Url;
         }
         else if (!IsOpen)

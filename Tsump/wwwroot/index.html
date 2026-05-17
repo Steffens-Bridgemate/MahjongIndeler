@@ -106,6 +106,44 @@
         window.copyTextToClipboard = function (plainText) {
             return navigator.clipboard.writeText(plainText);
         };
+        window.copyQrImageToClipboard = async function (svgMarkup, size) {
+            // Renders an SVG string to a square PNG on an offscreen canvas, then writes
+            // it to the clipboard as image/png. Must be called from a user-gesture
+            // handler (e.g. a button click) on most browsers.
+            // Returns true on success, false on any failure (logs are console-only).
+            if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) return false;
+            try {
+                var canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, size, size);
+
+                var svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+                var url = URL.createObjectURL(svgBlob);
+                try {
+                    var img = new Image();
+                    await new Promise(function (resolve, reject) {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = url;
+                    });
+                    ctx.drawImage(img, 0, 0, size, size);
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+
+                var pngBlob = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/png'); });
+                if (!pngBlob) return false;
+
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+                return true;
+            } catch (e) {
+                console.warn('copyQrImageToClipboard failed:', e);
+                return false;
+            }
+        };
         window.readClipboardText = async function () {
             // Returns the clipboard's text content, or null if the API is unavailable
             // or the user denied permission. Caller should treat null/throw as "no auto-fill".

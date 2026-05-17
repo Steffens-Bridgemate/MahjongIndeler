@@ -714,7 +714,7 @@ else
 </style>
 
 <QrCodeModal IsOpen="showScoringQr" Url="@scoringQrUrl" Title="@scoringQrTitle"
-             Subtitle="@Lang.Get("QrCodeScoringSubtitle")"
+             Subtitle="@(scoringQrCopied ? Lang.Get("QrCopiedToClipboard") : Lang.Get("QrCodeScoringSubtitle"))"
              OnClose="CloseScoringQr" />
 
 @code {
@@ -783,6 +783,7 @@ else
     private bool showScoringQr;
     private string? scoringQrUrl;
     private string? scoringQrTitle;
+    private bool scoringQrCopied;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
     private string activeTab = "tables";
@@ -1572,7 +1573,23 @@ else
         // the WhatsApp message; on a QR modal it's just visual noise).
         scoringQrTitle = $"{BuildHanchanSubtitle()} — {Lang.Get("Table")} {table.TableNumber}";
         showScoringQr = true;
+        scoringQrCopied = false;
         StateHasChanged();
+
+        // Auto-copy the QR as a PNG image so the organizer can immediately paste it
+        // into WhatsApp without using the camera-share flow. The click on the QR button
+        // is the user gesture clipboard.write needs.
+        try
+        {
+            var svg = Tsump.Scoring.QrCodeRenderer.ToSvg(scoringQrUrl);
+            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480);
+            if (ok)
+            {
+                scoringQrCopied = true;
+                StateHasChanged();
+            }
+        }
+        catch { /* unsupported / blocked — silent fall-back */ }
     }
 
     private void CloseScoringQr()
