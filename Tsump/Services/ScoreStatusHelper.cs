@@ -37,16 +37,19 @@ public static class ScoreStatusHelper
             && t.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue));
 
     /// <summary>
-    /// Status for one entry given its later siblings (used to detect the "stale" case
-    /// where a later one has scores but this earlier one is empty).
+    /// Status for one entry given its later siblings.
+    /// Stale (red) wins over Partial (yellow): once a later sibling has scores, any earlier
+    /// not-yet-complete entry is "stale" — it should have been completed first, regardless
+    /// of whether it already has some scores or is still empty.
     /// </summary>
     public static Status Classify(
         List<TableAssignment> currentTables,
         IEnumerable<List<TableAssignment>> laterSiblingsTables)
     {
         if (TablesAreComplete(currentTables)) return Status.Complete;
+        if (laterSiblingsTables.Any(TablesHaveAnyScore)) return Status.Stale;
         if (TablesHaveAnyScore(currentTables)) return Status.Partial;
-        return laterSiblingsTables.Any(TablesHaveAnyScore) ? Status.Stale : Status.Normal;
+        return Status.Normal;
     }
 
     /// <summary>Aggregates a set of per-entry statuses into one cross-entry status.</summary>
