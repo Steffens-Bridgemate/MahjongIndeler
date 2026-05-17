@@ -1081,7 +1081,9 @@ else
         var uma = table.PlayerCount == 3 ? uma3Players : uma4Players;
         var title = $"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()} — {Lang.Get("Table")} {table.TableNumber}";
 
-        var organizerOrigin = new Uri(Nav.BaseUri).GetLeftPart(UriPartial.Authority);
+        // Carry the full base (origin + subpath, e.g. "https://example.com/MahjongIndeler/")
+        // so the scoring app's return URL hits this organizer deployment, not the host root.
+        var organizerOrigin = Nav.BaseUri.TrimEnd('/');
         var invite = new ScoringInvite(
             currentHanchan.Id,
             table.TableNumber,
