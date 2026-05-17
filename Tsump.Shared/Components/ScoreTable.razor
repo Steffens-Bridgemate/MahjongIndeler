@@ -477,6 +477,7 @@
     private async Task OnStartingPointsChanged(PlayerScore ps, ChangeEventArgs e)
     {
         ps.StartingPoints = ParseInput(e.Value?.ToString()) ?? DefaultStartingPoints;
+        DeriveVirtualEnd(Table);
         CalculateUma();
         await CheckAndNotifyComplete();
     }
@@ -486,6 +487,7 @@
         var parsed = ParseInput(e.Value?.ToString()) ?? 0;
         // Loans are always negative — auto-negate if user enters a positive number
         ps.Loan = parsed > 0 ? -parsed : parsed;
+        DeriveVirtualEnd(Table);
         CalculateUma();
         await CheckAndNotifyComplete();
     }
@@ -493,6 +495,7 @@
     private async Task OnEndPointsChanged(PlayerScore ps, ChangeEventArgs e)
     {
         ps.EndPoints = ParseInput(e.Value?.ToString());
+        DeriveVirtualEnd(Table);
         CalculateUma();
         await CheckAndNotifyComplete();
     }
@@ -502,8 +505,34 @@
         var parsed = ParseInput(e.Value?.ToString()) ?? 0;
         // Penalties are always negative — auto-negate if user enters a positive number
         ps.Penalty = parsed > 0 ? -parsed : parsed;
+        DeriveVirtualEnd(Table);
         CalculateUma();
         await CheckAndNotifyComplete();
+    }
+
+    /// <summary>
+    /// For 3-player tables, the virtual player (Mr. X) doesn't have an end-points input;
+    /// his value is derived so the sum of differences across all four PlayerScores is zero.
+    /// Idempotent: if there is no virtual player, or if any real player still has a null
+    /// EndPoints, this sets the virtual player's EndPoints to null (waiting on more input).
+    /// Static so non-UI callers (e.g. score-import / restore flows) can reuse it.
+    /// </summary>
+    public static void DeriveVirtualEnd(TableAssignment table)
+    {
+        var score = table.Score;
+        if (score == null) return;
+        var mrX = score.PlayerScores.FirstOrDefault(p => p.IsVirtual);
+        if (mrX == null) return;
+
+        var realPlayers = score.PlayerScores.Where(p => !p.IsVirtual).ToList();
+        if (realPlayers.Count == 0 || !realPlayers.All(p => p.EndPoints.HasValue))
+        {
+            mrX.EndPoints = null;
+            return;
+        }
+
+        var realDiff = realPlayers.Sum(p => (p.EndPoints!.Value - p.StartingPoints) + p.Loan);
+        mrX.EndPoints = mrX.StartingPoints - realDiff;
     }
 
     private async Task CheckAndNotifyComplete()

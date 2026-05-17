@@ -83,18 +83,10 @@ public class ScoreImportService
             ps.Penalty = entry.Penalty;
         }
 
-        // 3-player table: derive Mr. X's EndPoints from the three real players so the sum of
-        // differences is zero (the scoring app already validated this).
-        //   Difference = (EndPoints - StartingPoints) + Loan
-        //   Mr. X has Loan = 0, so MrX.EndPoints = MrX.StartingPoints - sum(realDifferences)
-        var mrX = score.PlayerScores.FirstOrDefault(p => p.IsVirtual);
-        if (mrX != null)
-        {
-            var realDiff = score.PlayerScores
-                .Where(p => !p.IsVirtual && p.EndPoints.HasValue)
-                .Sum(p => (p.EndPoints!.Value - p.StartingPoints) + p.Loan);
-            mrX.EndPoints = mrX.StartingPoints - realDiff;
-        }
+        // 3-player table: derive Mr. X's EndPoints so the sum of differences is zero.
+        // Same helper that ScoreTable runs on edit, so manual entry and imported results
+        // produce identical Mr. X values.
+        ScoreTable.DeriveVirtualEnd(matchingTable);
 
         // Compute Uma using the same logic the in-app ScoreTable uses on edit.
         ScoreTable.CalculateUma(matchingTable, settings.WeeklyUma3Players, settings.WeeklyUma4Players);
