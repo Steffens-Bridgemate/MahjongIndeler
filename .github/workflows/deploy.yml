@@ -47,26 +47,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Publish organizer
+      - name: Publish
         run: dotnet publish Tsump/Tsump.csproj -c Release -o release
 
-      - name: Publish scoring app
-        run: dotnet publish Tsump.Scoring/Tsump.Scoring.csproj -c Release -o release-scoring
-
-      - name: Merge scoring app into /scoring/
-        run: |
-          mkdir -p release/wwwroot/scoring
-          cp -r release-scoring/wwwroot/. release/wwwroot/scoring/
-
       - name: Set base path for GitHub Pages
-        run: |
-          sed -i 's|<base href="/" />|<base href="/MahjongIndeler/" />|' release/wwwroot/index.html
-          sed -i 's|<base href="/" />|<base href="/MahjongIndeler/scoring/" />|' release/wwwroot/scoring/index.html
+        run: sed -i 's|<base href="/" />|<base href="/MahjongIndeler/" />|' release/wwwroot/index.html
 
       - name: Add .nojekyll
-        run: |
-          touch release/wwwroot/.nojekyll
-          touch release/wwwroot/scoring/.nojekyll
+        run: touch release/wwwroot/.nojekyll
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

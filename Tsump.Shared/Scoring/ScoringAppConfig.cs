@@ -12,5 +12,5 @@ public static class ScoringAppConfig
     /// Public URL of the deployed Tsump.Scoring app (no trailing slash).
     /// Replace this with the production URL before publishing the organizer app.
     /// </summary>
-    public const string DeployedUrl = "https://steffens-bridgemate.github.io/MahjongIndeler/scoring";
+    public const string DeployedUrl = "https://steffens-bridgemate.github.io/MahjongScoring";
 }

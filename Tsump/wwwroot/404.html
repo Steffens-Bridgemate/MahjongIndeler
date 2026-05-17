@@ -6,13 +6,9 @@
     <script>
         // GitHub Pages SPA redirect: converts the path to a query string
         // so index.html can pick it up and restore the route.
-        // GitHub Pages serves this single 404.html for any 404 anywhere on the site,
-        // so we have to dispatch ourselves: paths under /MahjongIndeler/scoring/ bounce
-        // off the scoring app's index.html; everything else bounces off the organizer's.
+        // The matching decoder runs early in index.html.
+        var pathSegmentsToKeep = 1; // keep /MahjongIndeler/
         var l = window.location;
-        var pathSegmentsToKeep = l.pathname.indexOf('/MahjongIndeler/scoring/') === 0
-            ? 2  // keep /MahjongIndeler/scoring/
-            : 1; // keep /MahjongIndeler/
         l.replace(
             l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
             l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
