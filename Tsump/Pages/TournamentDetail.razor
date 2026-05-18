@@ -665,10 +665,12 @@ else
 
     /// <summary>Re-reads the tournament from storage and bumps the ScoreTable @key so
     /// the Scores tab reflects an imported result without stale references hanging around.
-    /// Invoked by ScoreImportPanel.OnApplied.</summary>
+    /// Re-initialises Score on every table — the import only writes the matching table,
+    /// and ScoreTable renders nothing when Score is null. Invoked by ScoreImportPanel.OnApplied.</summary>
     private async Task ReloadTournament()
     {
         tournament = await TournamentService.GetByIdAsync(Id);
+        InitializeAllTournamentScores();
         scoreTableVersion++;
         StateHasChanged();
     }

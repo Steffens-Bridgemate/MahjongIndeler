@@ -1601,6 +1601,10 @@ else
         {
             currentHanchan = importedHanchan;
             tables = currentHanchan.Tables;
+            // Re-initialise Score on every table — the import only writes the matching
+            // table, and ScoreTable renders nothing when Score is null, so unscored tables
+            // would otherwise vanish until the user flips tabs and back.
+            ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
             // Bump the @key so each rendered ScoreTable rebuilds with the fresh model.
             scoreTableVersion++;
         }
