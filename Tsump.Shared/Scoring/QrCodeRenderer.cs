@@ -19,16 +19,18 @@ public static class QrCodeRenderer
 
     public static class Overlays
     {
-        // Blue circle + white pencil. "This QR opens the scoring page so the player can enter scores."
-        // Glyph: Bootstrap Icons bi-pencil-fill (MIT licence).
+        // Blue circle + white clipboard. "This QR opens the scoring page — fill the scores in."
+        // Glyph: Bootstrap Icons bi-clipboard-fill (MIT licence). Two filled paths, no stroke.
         public static readonly CenterOverlay Organizer = new(
-            GlyphSvg: "<path d=\"M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 6 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.5-.5z\"/>",
+            GlyphSvg: "<path fill-rule=\"evenodd\" d=\"M10 1.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-1z\"/><path d=\"M4.085 1H3.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1h-.585c.055.156.085.325.085.5V2a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 2v-.5c0-.175.03-.344.085-.5z\"/>",
             BackgroundColor: "#0d6efd");
 
         // Green circle + white check. "This QR carries completed scores back to the organizer."
-        // Glyph: Bootstrap Icons bi-check (MIT licence), scaled up so the tick fills the badge.
+        // Drawn as a 3-point polyline with rounded joins/caps so the stroke can't miter-spike
+        // out of the badge — the earlier filled bi-check glyph's stroked sharp corners broke
+        // QR decode by extending into the surrounding modules.
         public static readonly CenterOverlay ScoringResult = new(
-            GlyphSvg: "<path d=\"M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z\" stroke=\"white\" stroke-width=\"1.5\"/>",
+            GlyphSvg: "<path d=\"M4 8.5 L7 11.5 L12.5 5\" fill=\"none\" stroke=\"white\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
             BackgroundColor: "#198754");
     }
 
@@ -84,7 +86,7 @@ public static class QrCodeRenderer
             $"<circle cx=\"{center.ToString(inv)}\" cy=\"{center.ToString(inv)}\" " +
             $"r=\"{bgRadius.ToString(inv)}\" fill=\"{overlay.BackgroundColor}\" />" +
             $"<g transform=\"translate({glyphOffset.ToString(inv)},{glyphOffset.ToString(inv)}) " +
-            $"scale({glyphScale.ToString(inv)})\" fill=\"white\" stroke=\"white\">{overlay.GlyphSvg}</g>";
+            $"scale({glyphScale.ToString(inv)})\" fill=\"white\">{overlay.GlyphSvg}</g>";
 
         var closeIdx = svg.LastIndexOf("</svg>", StringComparison.OrdinalIgnoreCase);
         return closeIdx > 0
