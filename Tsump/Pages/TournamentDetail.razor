@@ -79,7 +79,12 @@ else
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
-                <a class="nav-link @(tournamentActiveTab == "tables" ? "active" : "")" href="javascript:void(0)" @onclick='() => tournamentActiveTab = "tables"'>
+                @{
+                    var tablesActive = tournamentActiveTab == "tables";
+                }
+                <a class="nav-link bg-primary text-white @(tablesActive ? "active" : "")"
+                   style="@ScoreStatusHelper.TabStyle(tablesActive)"
+                   href="javascript:void(0)" @onclick='() => tournamentActiveTab = "tables"'>
                     @Lang.Get("TableAssignments")
                 </a>
             </li>
@@ -89,7 +94,9 @@ else
                     var scoresClass = ScoreStatusHelper.TabClass(scoresStatus);
                     var scoresExplain = scoresStatus == ScoreStatusHelper.Status.Partial || scoresStatus == ScoreStatusHelper.Status.Stale;
                 }
-                <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "") @scoresClass" href="javascript:void(0)" @onclick="ActivateScoresTab">
+                <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "") @scoresClass"
+                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "scores")"
+                   href="javascript:void(0)" @onclick="ActivateScoresTab">
                     @Lang.Get("Scores")
                     @if (scoresExplain)
                     {
@@ -104,7 +111,9 @@ else
                     var allClass = ScoreStatusHelper.TabClass(scoresStatus);
                     var allExplain = scoresExplain;
                 }
-                <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "") @allClass" href="javascript:void(0)" @onclick="ActivateAllScoresTab">
+                <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "") @allClass"
+                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "allscores")"
+                   href="javascript:void(0)" @onclick="ActivateAllScoresTab">
                     @Lang.Get("AllScores")
                     @if (allExplain)
                     {

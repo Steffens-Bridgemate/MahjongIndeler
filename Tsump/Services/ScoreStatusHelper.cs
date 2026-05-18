@@ -71,4 +71,18 @@ public static class ScoreStatusHelper
         Status.Stale => "bg-danger text-white",
         _ => "",
     };
+
+    /// <summary>Background opacity applied to unselected colored tab headers so they
+    /// are visually distinct from the (full-opacity) selected tab.</summary>
+    public const double UnselectedTabBgOpacity = 0.4;
+
+    /// <summary>Inline style that dims the bg-* utility on a Bootstrap nav-link when
+    /// the tab is not the active one. Bootstrap 5.2+ honors <c>--bs-bg-opacity</c>
+    /// on its bg-* utilities without affecting the foreground color.</summary>
+    public static readonly string UnselectedTabBgStyle =
+        $"--bs-bg-opacity: {UnselectedTabBgOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture)};";
+
+    /// <summary>Returns the bg-opacity inline style for a nav-link tab, or an empty
+    /// string when the tab is active (full opacity).</summary>
+    public static string TabStyle(bool isActive) => isActive ? "" : UnselectedTabBgStyle;
 }
