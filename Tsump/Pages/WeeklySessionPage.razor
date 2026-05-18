@@ -93,12 +93,20 @@
         }
     </div>
     <ul class="nav nav-tabs mb-0">
-        @foreach (var s in hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero))
+        @{
+            var orderedHanchans = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        }
+        @for (int i = 0; i < orderedHanchans.Count; i++)
         {
+            var s = orderedHanchans[i];
             var isActive = currentHanchan?.Id == s.Id && activeTab != "rankings" && activeTab != "allscores";
             var sessionLabel = GetSessionLabel(s);
+            var hanchanStatus = ScoreStatusHelper.Classify(s.Tables, orderedHanchans.Skip(i + 1).Select(h => h.Tables));
+            var hanchanStatusClass = ScoreStatusHelper.TabClass(hanchanStatus);
             <li class="nav-item">
-                <a class="nav-link @(isActive ? "active" : "")" href="javascript:void(0)" @onclick="() => SelectHanchan(s)">
+                <a class="nav-link @(isActive ? "active" : "") @hanchanStatusClass"
+                   style="@ScoreStatusHelper.TabStyle(isActive)"
+                   href="javascript:void(0)" @onclick="() => SelectHanchan(s)">
                     @sessionLabel
                 </a>
             </li>
