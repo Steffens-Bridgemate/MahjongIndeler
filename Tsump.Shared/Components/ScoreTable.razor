@@ -223,7 +223,10 @@
                         {
                             var psRef = ps;
                             <td class="text-center">
+                                @* Start is pre-filled and rarely edited — skip in tab order so Tab
+                                   on the last End cell jumps to the next ScoreTable's first End. *@
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       tabindex="-1"
                                        value="@FormatDisplay(psRef.StartingPoints)"
                                        @onchange="e => OnStartingPointsChanged(psRef, e)"
                                        style="width:100%;" />
@@ -236,7 +239,9 @@
                         {
                             var psRef = ps;
                             <td class="text-center">
+                                @* All End inputs share tabindex=1 → tabbed first across the page in source order. *@
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       tabindex="1"
                                        value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
                                        placeholder="−"
                                        @onchange="e => OnEndPointsChanged(psRef, e)"
