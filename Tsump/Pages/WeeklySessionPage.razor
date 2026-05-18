@@ -552,15 +552,10 @@ else
                                 {
                                     @if (pendingImportLookup != null)
                                     {
-                                        var pl = pendingImportLookup;
+                                        var pl = pendingImportLookup.Context;
                                         var headerClass = pl.Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white";
                                         <div class="@headerClass py-1 px-2 mb-2 rounded">
-                                            @Lang.FormatDate(pl.Hanchan.Date)
-                                            @if (pl.Hanchan.StartTime.HasValue)
-                                            {
-                                                <span> &middot; @pl.Hanchan.StartTime.Value.ToString(@"hh\:mm")</span>
-                                            }
-                                            &middot; @Lang.Get("Table") @pl.Table.TableNumber
+                                            @pl.DisplayLabel
                                             <span class="ms-1">(@pl.Table.PlayerCount @Lang.Get("players"))</span>
                                         </div>
                                     }
@@ -1574,8 +1569,8 @@ else
         pendingImportLookup = lookup;
         // If the target already has scores, surface that in the preview view so the user
         // knows the Apply button overwrites.
-        importStatus = lookup.Table.Score != null
-                       && lookup.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
+        importStatus = lookup.Context.Table.Score != null
+                       && lookup.Context.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
             ? ImportStatus.AlreadyScored
             : ImportStatus.Preview;
         StateHasChanged();
@@ -1600,9 +1595,11 @@ else
         // Refresh local view so the Scores/Rankings tabs reflect the imported values.
         var allHanchans = await SessionService.GetAllAsync();
         hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
-        if (currentHanchan != null && outcome.Hanchan?.Id == currentHanchan.Id)
+        if (currentHanchan != null
+            && outcome.Context?.Container is Hanchan importedHanchan
+            && importedHanchan.Id == currentHanchan.Id)
         {
-            currentHanchan = outcome.Hanchan;
+            currentHanchan = importedHanchan;
             tables = currentHanchan.Tables;
             // Bump the @key so each rendered ScoreTable rebuilds with the fresh model.
             scoreTableVersion++;

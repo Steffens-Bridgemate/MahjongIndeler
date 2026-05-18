@@ -37,14 +37,7 @@ else if (applied)
 }
 else
 {
-    <h5 class="text-muted mb-2">
-        @Lang.FormatDate(lookup.Hanchan.Date)
-        @if (lookup.Hanchan.StartTime.HasValue)
-        {
-            <span> &middot; @lookup.Hanchan.StartTime.Value.ToString(@"hh\:mm")</span>
-        }
-        &middot; @Lang.Get("Table") @lookup.Table.TableNumber
-    </h5>
+    <h5 class="text-muted mb-2">@lookup.Context.DisplayLabel</h5>
 
     <p>@Lang.Get("ImportScoreConfirm")</p>
 
@@ -109,8 +102,8 @@ else
         {
             lookupError = true;
         }
-        else if (lookup.Table.Score != null
-                 && lookup.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue))
+        else if (lookup.Context.Table.Score != null
+                 && lookup.Context.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue))
         {
             alreadyScoredWarning = true;
         }

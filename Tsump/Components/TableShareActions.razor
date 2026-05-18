@@ -1,0 +1,92 @@
+@using Tsump.Models
+@using Tsump.Scoring
+@using Tsump.Services
+@inject ScoreInviteService Invites
+@inject LanguageService Lang
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<div class="card-footer p-2">
+    <div class="d-flex gap-1">
+        <button class="btn btn-sm btn-outline-secondary flex-grow-1"
+                @onclick="OnShareClick"
+                title="@Lang.Get("ShareScoringLink")">
+            <i class="bi bi-link-45deg me-1"></i>@(copied ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
+        </button>
+        <button class="btn btn-sm btn-outline-secondary"
+                @onclick="OnQrClick"
+                title="@Lang.Get("ShowQrCode")"
+                aria-label="@Lang.Get("ShowQrCode")">
+            <i class="bi bi-qr-code"></i>
+        </button>
+    </div>
+</div>
+
+<QrCodeModal IsOpen="showQr" Url="@qrUrl" Title="@ShortQrTitle"
+             Subtitle="@(qrCopied ? Lang.Get("QrCopiedToClipboard") : Lang.Get("QrCodeScoringSubtitle"))"
+             OnClose="CloseQr" />
+
+@code {
+    [Parameter, EditorRequired] public Guid ContextId { get; set; }
+    [Parameter, EditorRequired] public int SessionNumber { get; set; }
+    [Parameter, EditorRequired] public TableAssignment Table { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<Guid, string> PlayerNameResolver { get; set; } = default!;
+    [Parameter, EditorRequired] public int StartingPoints { get; set; }
+    [Parameter, EditorRequired] public List<int> Uma { get; set; } = new();
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? ShortQrTitle { get; set; }
+
+    private bool copied;
+    private bool showQr;
+    private string? qrUrl;
+    private bool qrCopied;
+
+    private string BuildUrl() => Invites.BuildInviteUrl(
+        ContextId, SessionNumber, Table, PlayerNameResolver,
+        StartingPoints, Uma, Title, Nav.BaseUri);
+
+    private async Task OnShareClick()
+    {
+        var url = BuildUrl();
+        var message = Invites.BuildShareMessage(Title, url);
+        await JS.InvokeVoidAsync("copyTextToClipboard", message);
+        copied = true;
+        StateHasChanged();
+        _ = ResetCopiedFlag();
+    }
+
+    private async Task ResetCopiedFlag()
+    {
+        await Task.Delay(2000);
+        copied = false;
+        StateHasChanged();
+    }
+
+    private async Task OnQrClick()
+    {
+        qrUrl = BuildUrl();
+        showQr = true;
+        qrCopied = false;
+        StateHasChanged();
+
+        // Auto-copy the QR as a PNG so the user can paste straight into WhatsApp.
+        // The button click is the user gesture clipboard.write needs.
+        try
+        {
+            var svg = QrCodeRenderer.ToSvg(qrUrl);
+            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, ShortQrTitle ?? Title);
+            if (ok)
+            {
+                qrCopied = true;
+                StateHasChanged();
+            }
+        }
+        catch { /* clipboard write unsupported / blocked — silent fall-back */ }
+    }
+
+    private void CloseQr()
+    {
+        showQr = false;
+        qrUrl = null;
+    }
+}

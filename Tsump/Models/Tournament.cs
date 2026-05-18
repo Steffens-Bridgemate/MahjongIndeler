@@ -26,6 +26,7 @@ public class TournamentParticipant
 
 public class TournamentSession
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public int SessionNumber { get; set; }
     public TimeSpan? StartTime { get; set; }
     public List<TableAssignment> Tables { get; set; } = new();

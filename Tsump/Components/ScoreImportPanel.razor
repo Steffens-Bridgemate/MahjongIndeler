@@ -1,0 +1,436 @@
+@using Tsump.Models
+@using Tsump.Scoring
+@using Tsump.Services
+@inject ScoreImportService ScoreImport
+@inject LanguageService Lang
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (IsEnabled)
+{
+    <div class="mb-3">
+        @if (!showPanel)
+        {
+            <button class="btn btn-outline-secondary" @onclick="OpenPanel">
+                <i class="bi bi-box-arrow-in-down me-1"></i>@Lang.Get("ImportResult")
+            </button>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-header d-flex align-items-center">
+                    <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Cancel")</button>
+                </div>
+                <div class="card-body">
+                    @if (status == ImportStatus.Reading)
+                    {
+                        <p class="text-muted small mb-0">@Lang.Get("ImportResultReading")</p>
+                    }
+                    else if (status == ImportStatus.Preview || status == ImportStatus.AlreadyScored)
+                    {
+                        @if (pendingLookup != null)
+                        {
+                            var pl = pendingLookup.Context;
+                            var headerClass = pl.Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white";
+                            <div class="@headerClass py-1 px-2 mb-2 rounded">
+                                @pl.DisplayLabel
+                                <span class="ms-1">(@pl.Table.PlayerCount @Lang.Get("players"))</span>
+                            </div>
+                        }
+                        <p>@Lang.Get("ImportScoreConfirm")</p>
+
+                        @if (status == ImportStatus.AlreadyScored)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportScoreOverwriteWarning")</div>
+                        }
+
+                        <table class="table table-sm table-bordered" style="max-width:500px;">
+                            <thead>
+                                <tr>
+                                    <th>@Lang.Get("Player")</th>
+                                    <th class="text-end">@Lang.Get("EndShort")</th>
+                                    <th class="text-end">@Lang.Get("LoanShort")</th>
+                                    <th class="text-end">@Lang.Get("PenaltyShort")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in pendingResult!.Scores)
+                                {
+                                    <tr>
+                                        <td>@ResolveName(s.PlayerId)</td>
+                                        <td class="text-end">@FormatPoints(s.EndPoints)</td>
+                                        <td class="text-end">@(s.Loan != 0 ? FormatPoints(s.Loan) : "")</td>
+                                        <td class="text-end">@(s.Penalty != 0 ? FormatPoints(s.Penalty) : "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        <button class="btn btn-success me-2" @onclick="() => Apply(confirmOverwrite: true)">
+                            <i class="bi bi-check2 me-1"></i>@(status == ImportStatus.AlreadyScored ? Lang.Get("YesOverwrite") : Lang.Get("ImportScoreApply"))
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Cancel")</button>
+                    }
+                    else if (status == ImportStatus.NotResultLink
+                             || status == ImportStatus.NoResult
+                             || status == ImportStatus.NoMatchingTable
+                             || status == ImportStatus.ScanError
+                             || status == ImportStatus.FileScanFailed)
+                    {
+                        @if (status == ImportStatus.NotResultLink)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
+                        }
+                        else if (status == ImportStatus.NoMatchingTable)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
+                        }
+                        else if (status == ImportStatus.ScanError)
+                        {
+                            <div class="alert alert-danger py-2 mb-2">@(scanErrorMessage ?? Lang.Get("ScanCameraError"))</div>
+                        }
+                        else if (status == ImportStatus.FileScanFailed)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("FileScanNoQr")</div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
+                        }
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary" @onclick="TryClipboard">
+                                <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
+                            </button>
+                            <button class="btn btn-outline-primary" @onclick="StartQrScan">
+                                <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
+                            </button>
+                            <button class="btn btn-outline-primary" @onclick="PickQrImage">
+                                <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
+                            </button>
+                        </div>
+                    }
+                    else if (status == ImportStatus.FileDecoding)
+                    {
+                        <div class="d-flex align-items-center small">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+                            <span class="text-muted">@Lang.Get("FileDecoding")</span>
+                        </div>
+                    }
+                    else if (status == ImportStatus.Scanning)
+                    {
+                        <p class="text-muted small mb-2">@Lang.Get("ScanQrHint")</p>
+                        <div id="qr-scanner-view" style="max-width:480px; width:100%; margin:0 auto;"></div>
+
+                        <div class="d-flex align-items-center mt-2 small">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+                            <span class="text-muted">
+                                @Lang.Get("ScanLooking")
+                                @if (scanElapsedSeconds >= 1)
+                                {
+                                    <span class="ms-1">(@scanElapsedSeconds s)</span>
+                                }
+                            </span>
+                        </div>
+
+                        @if (scanElapsedSeconds >= 8)
+                        {
+                            <div class="alert alert-info py-2 mt-2 mb-2 small">@Lang.Get("ScanStillLooking")</div>
+                        }
+
+                        <ul class="text-muted small mt-2 mb-2 ps-3">
+                            <li>@Lang.Get("ScanTipFraming")</li>
+                            <li>@Lang.Get("ScanTipFocus")</li>
+                            <li>@Lang.Get("ScanTipLight")</li>
+                            @if (scanElapsedSeconds >= 8)
+                            {
+                                <li>@Lang.Get("ScanTipLaptop")</li>
+                            }
+                        </ul>
+
+                        <button class="btn btn-outline-secondary" @onclick="CancelQrScan">
+                            <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
+                        </button>
+                    }
+                    else if (status == ImportStatus.Applied)
+                    {
+                        <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary" @onclick="TryClipboard">
+                                <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
+                            </button>
+                            <button class="btn btn-outline-primary" @onclick="StartQrScan">
+                                <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
+                            </button>
+                            <button class="btn btn-outline-primary" @onclick="PickQrImage">
+                                <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Close")</button>
+                        </div>
+                    }
+
+                    @* Hidden file input + workspace div for the file-decode path.
+                       Always rendered while the panel is open so the JS picker can find them. *@
+                    <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
+                    <div id="qr-file-decode-tmp" style="display:none;"></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsEnabled { get; set; }
+    [Parameter] public EventCallback OnApplied { get; set; }
+    [Parameter] public Func<Guid, string>? PlayerNameResolver { get; set; }
+
+    private enum ImportStatus
+    {
+        Reading,           // initial / transient while we read the clipboard
+        NotResultLink,     // clipboard holds an invite link (#p=), not a result link
+        NoResult,          // clipboard empty or contents don't look like a result link
+        NoMatchingTable,   // decoded fine but no container/table found locally
+        Scanning,          // camera scanner is live
+        ScanError,         // camera failed to start
+        FileDecoding,      // user picked an image, html5-qrcode decoding it
+        FileScanFailed,    // decode finished but no QR was found
+        Preview,           // decoded + found, awaiting confirmation
+        AlreadyScored,     // matching table already scored; ask before overwriting
+        Applied,           // success
+    }
+
+    private bool showPanel;
+    private ImportStatus status = ImportStatus.Reading;
+    private ScoringResult? pendingResult;
+    private ScoreImportService.Lookup? pendingLookup;
+    private DotNetObjectReference<ScoreImportPanel>? scannerRef;
+    private string? scanErrorMessage;
+    private int scanElapsedSeconds;
+    private System.Threading.CancellationTokenSource? scanTimerCts;
+
+    private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
+        = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    public void Dispose()
+    {
+        // Fire-and-forget: stop the scanner if it's still running (e.g. user navigated away).
+        _ = StopQrScannerIfRunning();
+        scannerRef?.Dispose();
+    }
+
+    private string ResolveName(Guid id)
+        => PlayerNameResolver?.Invoke(id) ?? id.ToString();
+
+    private static string FormatPoints(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
+
+    private async Task OpenPanel()
+    {
+        showPanel = true;
+        status = ImportStatus.Reading;
+        pendingResult = null;
+        pendingLookup = null;
+        StateHasChanged();
+        await TryClipboard();
+    }
+
+    private async Task ClosePanel()
+    {
+        await StopQrScannerIfRunning();
+        showPanel = false;
+        status = ImportStatus.Reading;
+        pendingResult = null;
+        pendingLookup = null;
+    }
+
+    private async Task TryClipboard()
+    {
+        status = ImportStatus.Reading;
+        pendingResult = null;
+        pendingLookup = null;
+        StateHasChanged();
+
+        string? clip = null;
+        try { clip = await JS.InvokeAsync<string?>("readClipboardText"); }
+        catch { /* permission denied or unsupported — fall through to NoResult */ }
+
+        await ProcessText(clip);
+    }
+
+    // --- QR-camera scanning ---
+
+    private async Task StartQrScan()
+    {
+        scanErrorMessage = null;
+        scanElapsedSeconds = 0;
+        status = ImportStatus.Scanning;
+        StateHasChanged();
+
+        // Wait one render tick so the #qr-scanner-view div is in the DOM before html5-qrcode
+        // tries to attach to it.
+        await Task.Yield();
+
+        scannerRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("startQrScanner", "qr-scanner-view", scannerRef);
+            StartScanTimer();
+        }
+        catch (Exception ex)
+        {
+            scanErrorMessage = ex.Message;
+            status = ImportStatus.ScanError;
+            StateHasChanged();
+        }
+    }
+
+    private void StartScanTimer()
+    {
+        scanTimerCts?.Cancel();
+        scanTimerCts = new System.Threading.CancellationTokenSource();
+        var token = scanTimerCts.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested && status == ImportStatus.Scanning)
+            {
+                try { await Task.Delay(1000, token); } catch { break; }
+                if (status != ImportStatus.Scanning) break;
+                scanElapsedSeconds++;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private async Task CancelQrScan()
+    {
+        await StopQrScannerIfRunning();
+        status = ImportStatus.NoResult;
+        StateHasChanged();
+    }
+
+    private async Task StopQrScannerIfRunning()
+    {
+        scanTimerCts?.Cancel();
+        scanTimerCts = null;
+        try { await JS.InvokeVoidAsync("stopQrScanner"); }
+        catch { /* nothing to stop */ }
+    }
+
+    [JSInvokable]
+    public async Task OnQrScanned(string decodedText)
+    {
+        // The scanner has already stopped itself on first decode. Route the decoded text
+        // through the same pipeline as the clipboard path.
+        scanTimerCts?.Cancel();
+        scanTimerCts = null;
+        await ProcessText(decodedText);
+    }
+
+    [JSInvokable]
+    public Task OnQrFileScanFailed(string _error)
+    {
+        status = ImportStatus.FileScanFailed;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task PickQrImage()
+    {
+        // JS opens the file picker. We don't transition state here — if the user cancels
+        // we'd be stuck. JS calls OnQrFileSelected once a file is actually picked.
+        scannerRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("pickQrImage", "qrFileInput", "qr-file-decode-tmp", scannerRef);
+        }
+        catch
+        {
+            status = ImportStatus.FileScanFailed;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public Task OnQrFileSelected()
+    {
+        status = ImportStatus.FileDecoding;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task ProcessText(string? text)
+    {
+        var raw = (text ?? "").Trim();
+        if (raw.Length == 0)
+        {
+            status = ImportStatus.NoResult;
+            StateHasChanged();
+            return;
+        }
+
+        // URL-decode in case the user copied something with %23 (encoded #) etc.
+        var decoded = Uri.UnescapeDataString(raw);
+
+        // Detect scoring-invite URLs (they have #p=…) so we can show a clear message instead
+        // of generic "no result link".
+        if (decoded.Contains("#p=", StringComparison.Ordinal) || decoded.Contains("?p=", StringComparison.Ordinal))
+        {
+            status = ImportStatus.NotResultLink;
+            StateHasChanged();
+            return;
+        }
+
+        // Extract the payload: try `r=<base64url>` first, then fall back to treating the
+        // whole string as the bare payload (for users who copied just the fragment).
+        var match = ResultPayloadRegex.Match(decoded);
+        var payload = match.Success ? match.Groups[1].Value : decoded;
+
+        var parsed = ScoringPayloadCodec.DecodeResult(payload);
+        if (parsed == null || parsed.Scores == null || parsed.Scores.Count < 3 || parsed.Scores.Count > 4)
+        {
+            status = ImportStatus.NoResult;
+            StateHasChanged();
+            return;
+        }
+
+        var lookup = await ScoreImport.FindAsync(parsed);
+        if (lookup == null)
+        {
+            status = ImportStatus.NoMatchingTable;
+            pendingResult = parsed;
+            StateHasChanged();
+            return;
+        }
+
+        pendingResult = parsed;
+        pendingLookup = lookup;
+        // If the target already has scores, surface that in the preview view so the user
+        // knows the Apply button overwrites.
+        status = lookup.Context.Table.Score != null
+                 && lookup.Context.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
+            ? ImportStatus.AlreadyScored
+            : ImportStatus.Preview;
+        StateHasChanged();
+    }
+
+    private async Task Apply(bool confirmOverwrite)
+    {
+        if (pendingResult == null) return;
+
+        var outcome = await ScoreImport.ApplyAsync(pendingResult, Lang.Get, confirmOverwrite);
+        if (!outcome.Success)
+        {
+            status = outcome.Reason == ScoreImportService.FailureReason.AlreadyScored
+                ? ImportStatus.AlreadyScored
+                : ImportStatus.NoMatchingTable;
+            StateHasChanged();
+            return;
+        }
+
+        status = ImportStatus.Applied;
+        StateHasChanged();
+
+        if (OnApplied.HasDelegate)
+            await OnApplied.InvokeAsync();
+    }
+}

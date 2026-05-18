@@ -5,9 +5,11 @@ namespace Tsump.Scoring;
 
 /// <summary>
 /// Outbound payload: organizer → scoring app. Encoded into the URL fragment of a /score link.
+/// ContextId identifies the container the result belongs to: a Hanchan.Id for weekly sessions
+/// or a TournamentSession.Id for tournaments. Resolvers on the organizer side disambiguate.
 /// </summary>
 public record ScoringInvite(
-    Guid HanchanId,
+    Guid ContextId,
     int TableNumber,
     List<string> PlayerNames,
     List<Guid> PlayerIds,
@@ -15,14 +17,14 @@ public record ScoringInvite(
     List<int> Uma,
     string? Title,
     string? OrganizerUrl,
-    int HanchanNumber = 1);
+    int SessionNumber = 1);
 
 /// <summary>
 /// Inbound payload: scoring app → organizer. Encoded into the URL fragment of an /import-score link.
 /// Uma is intentionally omitted — the organizer recomputes it from settings.
 /// </summary>
 public record ScoringResult(
-    Guid HanchanId,
+    Guid ContextId,
     int TableNumber,
     List<PlayerResultEntry> Scores);
 

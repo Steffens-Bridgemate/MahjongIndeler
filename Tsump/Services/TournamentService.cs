@@ -14,7 +14,26 @@ public class TournamentService
 
     public async Task<List<Tournament>> GetAllAsync()
     {
-        return await _storage.GetAsync<List<Tournament>>(StorageKey) ?? new List<Tournament>();
+        var tournaments = await _storage.GetAsync<List<Tournament>>(StorageKey) ?? new List<Tournament>();
+
+        // Backfill TournamentSession.Id for data persisted before the field existed.
+        // One-shot migration: when any session has Guid.Empty, assign new Guids and re-save.
+        bool dirty = false;
+        foreach (var t in tournaments)
+        {
+            foreach (var s in t.Sessions)
+            {
+                if (s.Id == Guid.Empty)
+                {
+                    s.Id = Guid.NewGuid();
+                    dirty = true;
+                }
+            }
+        }
+        if (dirty)
+            await _storage.SetAsync(StorageKey, tournaments);
+
+        return tournaments;
     }
 
     public async Task<Tournament?> GetByIdAsync(Guid id)

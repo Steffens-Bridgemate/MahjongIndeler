@@ -77,6 +77,10 @@ else
         {
         <div class="card-body">
 
+        <ScoreImportPanel IsEnabled="externalScoringEnabled"
+                          OnApplied="ReloadTournament"
+                          PlayerNameResolver="GetParticipantDisplay" />
+
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
                 @{
@@ -258,6 +262,8 @@ else
             <div class="row">
                 @foreach (var table in session.Tables)
                 {
+                    var tableRef = table;
+                    var sessRef = session;
                     <div class="col-md-4 mb-3">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
                             <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
@@ -279,6 +285,19 @@ else
                                     </li>
                                 }
                             </ul>
+                            @if (externalScoringEnabled)
+                            {
+                                var shareTitle = $"{tournament.Name} — {Lang.Get("Hanchan")} {sessRef.SessionNumber} — {Lang.Get("Table")} {tableRef.TableNumber}";
+                                var shortQrTitle = $"{Lang.Get("Hanchan")} {sessRef.SessionNumber} — {Lang.Get("Table")} {tableRef.TableNumber}";
+                                <TableShareActions ContextId="sessRef.Id"
+                                                   SessionNumber="sessRef.SessionNumber"
+                                                   Table="tableRef"
+                                                   PlayerNameResolver="GetParticipantDisplay"
+                                                   StartingPoints="tournamentStartingPoints"
+                                                   Uma="@(tableRef.PlayerCount == 3 ? uma3Players : uma4Players)"
+                                                   Title="@shareTitle"
+                                                   ShortQrTitle="@shortQrTitle" />
+                            }
                         </div>
                     </div>
                 }
@@ -306,7 +325,8 @@ else
                 {
                     @foreach (var table in session.Tables)
                     {
-                        <ScoreTable Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                        <ScoreTable @key="(scoreTableVersion, session.Id, table.TableNumber)"
+                                    Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
                                     DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                     }
                 }
@@ -320,7 +340,8 @@ else
                 @foreach (var entry in tableGroup.Entries)
                 {
                     <h6 class="text-muted mb-1">@entry.Label</h6>
-                    <ScoreTable Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                    <ScoreTable @key="(scoreTableVersion, entry.Label, tableGroup.TableNumber)"
+                                Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
                                 DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                 }
             }
@@ -498,6 +519,10 @@ else
     private int tournamentStartingPoints = 30000;
     private List<int> uma4Players = new() { 15000, 5000, -5000, -15000 };
     private List<int> uma3Players = new() { 12500, 0, -12500 };
+    private bool externalScoringEnabled;
+    // Bumped after each successful import so @key changes on the rendered ScoreTables,
+    // forcing Blazor to dispose stale instances and rebuild with the freshly written model.
+    private int scoreTableVersion;
 
     // Meeting matrix data
     private List<TournamentParticipant> sortedParticipants = new();
@@ -531,6 +556,7 @@ else
             tournamentStartingPoints = tournament?.StartingPoints ?? settings.TournamentStartingPoints;
             uma4Players = tournament?.Uma4Players != null ? new List<int>(tournament.Uma4Players) : new List<int>(settings.TournamentUma4Players);
             uma3Players = tournament?.Uma3Players != null ? new List<int>(tournament.Uma3Players) : new List<int>(settings.TournamentUma3Players);
+            externalScoringEnabled = settings.EnableExternalScoring;
             if (tournament != null && tournament.IsGenerated)
             {
                 BuildTournamentMatrix();
@@ -635,6 +661,16 @@ else
     {
         var p = tournament?.Participants.FirstOrDefault(x => x.Id == id);
         return p != null ? $"{p.Number}. {p.Name}" : Lang.Get("Unknown");
+    }
+
+    /// <summary>Re-reads the tournament from storage and bumps the ScoreTable @key so
+    /// the Scores tab reflects an imported result without stale references hanging around.
+    /// Invoked by ScoreImportPanel.OnApplied.</summary>
+    private async Task ReloadTournament()
+    {
+        tournament = await TournamentService.GetByIdAsync(Id);
+        scoreTableVersion++;
+        StateHasChanged();
     }
 
     private void OnPlayerClick(Guid playerId, int sessionNumber)

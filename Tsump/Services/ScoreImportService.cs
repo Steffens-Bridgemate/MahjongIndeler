@@ -5,45 +5,43 @@ using Tsump.Scoring;
 namespace Tsump.Services;
 
 /// <summary>
-/// Applies a decoded <see cref="ScoringResult"/> to the matching Hanchan + table in the
-/// organizer's stored sessions. Shared by the route-based ImportScorePage and the in-app
-/// paste flow on WeeklySessionPage.
+/// Applies a decoded <see cref="ScoringResult"/> to the matching table inside whichever
+/// container (Hanchan or TournamentSession) the ContextId points to. Resolves through
+/// any registered <see cref="IScoreContextResolver"/>; the first one that recognises the
+/// ContextId wins.
 /// </summary>
 public class ScoreImportService
 {
-    private readonly SessionService _sessions;
-    private readonly SettingsService _settings;
+    private readonly IEnumerable<IScoreContextResolver> _resolvers;
 
-    public ScoreImportService(SessionService sessions, SettingsService settings)
+    public ScoreImportService(IEnumerable<IScoreContextResolver> resolvers)
     {
-        _sessions = sessions;
-        _settings = settings;
+        _resolvers = resolvers;
     }
 
     public enum FailureReason
     {
         None,
-        NoMatchingHanchan,
-        NoMatchingTable,
-        AlreadyScored,
+        NoMatchingContainer,   // ContextId not recognised by any resolver
+        NoMatchingTable,       // Container found, table number absent (e.g. session regenerated)
+        AlreadyScored,         // Table already has non-virtual EndPoints and overwrite wasn't confirmed
     }
 
-    public record Lookup(Hanchan Hanchan, TableAssignment Table);
+    public record Lookup(ResolvedContext Context);
 
-    public record ApplyOutcome(bool Success, FailureReason Reason, Hanchan? Hanchan, TableAssignment? Table);
+    public record ApplyOutcome(bool Success, FailureReason Reason, ResolvedContext? Context);
 
-    /// <summary>Finds the Hanchan + table referenced by the result, without applying anything.</summary>
+    /// <summary>Finds the table referenced by the result, without applying anything. Returns
+    /// null if no resolver recognised the ContextId or the table wasn't found.</summary>
     public async Task<Lookup?> FindAsync(ScoringResult result)
     {
-        var all = await _sessions.GetAllAsync();
-        var hanchan = all.FirstOrDefault(h => h.Id == result.HanchanId);
-        var table = hanchan?.Tables.FirstOrDefault(t => t.TableNumber == result.TableNumber);
-        return hanchan == null || table == null ? null : new Lookup(hanchan, table);
+        var (context, _) = await ResolveAsync(result);
+        return context == null ? null : new Lookup(context);
     }
 
     /// <summary>
     /// Writes the result's scores into the matching table, derives Mr. X's score for 3-player
-    /// tables, and saves the hanchan. Returns details for UI feedback.
+    /// tables, and persists the container. Returns details for UI feedback.
     /// </summary>
     /// <param name="confirmOverwrite">
     /// If false and the target table already has any non-null EndPoints, the operation is
@@ -51,29 +49,30 @@ public class ScoreImportService
     /// </param>
     public async Task<ApplyOutcome> ApplyAsync(ScoringResult result, Func<string, string> langGet, bool confirmOverwrite = false)
     {
-        var lookup = await FindAsync(result);
-        if (lookup == null)
+        var (context, resolver) = await ResolveAsync(result);
+        if (context == null || resolver == null)
         {
-            var all = await _sessions.GetAllAsync();
-            var hanchan = all.FirstOrDefault(h => h.Id == result.HanchanId);
-            return new ApplyOutcome(false,
-                hanchan == null ? FailureReason.NoMatchingHanchan : FailureReason.NoMatchingTable,
-                hanchan, null);
+            // Distinguish "no resolver recognised it" from "container found but no table".
+            foreach (var r in _resolvers)
+            {
+                var outcome = await r.FindAsync(result.ContextId, result.TableNumber);
+                if (outcome is ResolveOutcome.ContainerOnly)
+                    return new ApplyOutcome(false, FailureReason.NoMatchingTable, null);
+            }
+            return new ApplyOutcome(false, FailureReason.NoMatchingContainer, null);
         }
 
-        var (matchingHanchan, matchingTable) = (lookup.Hanchan, lookup.Table);
-
+        var table = context.Table;
         if (!confirmOverwrite
-            && matchingTable.Score != null
-            && matchingTable.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue))
+            && table.Score != null
+            && table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue))
         {
-            return new ApplyOutcome(false, FailureReason.AlreadyScored, matchingHanchan, matchingTable);
+            return new ApplyOutcome(false, FailureReason.AlreadyScored, context);
         }
 
-        var settings = await _settings.GetAsync();
-        ScoreTable.InitializeScores(new List<TableAssignment> { matchingTable }, langGet, settings.WeeklyStartingPoints);
+        ScoreTable.InitializeScores(new List<TableAssignment> { table }, langGet, context.StartingPoints);
 
-        var score = matchingTable.Score!;
+        var score = table.Score!;
         foreach (var entry in result.Scores)
         {
             var ps = score.PlayerScores.FirstOrDefault(p => p.PlayerId == entry.PlayerId);
@@ -86,12 +85,23 @@ public class ScoreImportService
         // 3-player table: derive Mr. X's EndPoints so the sum of differences is zero.
         // Same helper that ScoreTable runs on edit, so manual entry and imported results
         // produce identical Mr. X values.
-        ScoreTable.DeriveVirtualEnd(matchingTable);
+        ScoreTable.DeriveVirtualEnd(table);
 
         // Compute Uma using the same logic the in-app ScoreTable uses on edit.
-        ScoreTable.CalculateUma(matchingTable, settings.WeeklyUma3Players, settings.WeeklyUma4Players);
+        ScoreTable.CalculateUma(table, context.Uma3Players, context.Uma4Players);
 
-        await _sessions.SaveAsync(matchingHanchan);
-        return new ApplyOutcome(true, FailureReason.None, matchingHanchan, matchingTable);
+        await resolver.SaveAsync(context);
+        return new ApplyOutcome(true, FailureReason.None, context);
+    }
+
+    private async Task<(ResolvedContext? Context, IScoreContextResolver? Resolver)> ResolveAsync(ScoringResult result)
+    {
+        foreach (var r in _resolvers)
+        {
+            var outcome = await r.FindAsync(result.ContextId, result.TableNumber);
+            if (outcome is ResolveOutcome.Found f)
+                return (f.Context, r);
+        }
+        return (null, null);
     }
 }
