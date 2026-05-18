@@ -26,11 +26,11 @@ public static class QrCodeRenderer
             BackgroundColor: "#0d6efd");
 
         // Green circle + white check. "This QR carries completed scores back to the organizer."
-        // Drawn as a 3-point polyline with rounded joins/caps so the stroke can't miter-spike
-        // out of the badge — the earlier filled bi-check glyph's stroked sharp corners broke
-        // QR decode by extending into the surrounding modules.
+        // Glyph: Bootstrap Icons bi-check-lg (MIT licence). Filled-only, rounded arc joins —
+        // no stroke at all, so no rasterisation surprises and no miter spikes that could
+        // leak out of the badge and corrupt the surrounding QR modules.
         public static readonly CenterOverlay ScoringResult = new(
-            GlyphSvg: "<path d=\"M4 8.5 L7 11.5 L12.5 5\" fill=\"none\" stroke=\"white\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+            GlyphSvg: "<path d=\"M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.066.02L3.217 8.384a.757.757 0 1 1 1.06-1.06l3.052 3.093 5.4-6.425z\"/>",
             BackgroundColor: "#198754");
     }
 
@@ -53,8 +53,15 @@ public static class QrCodeRenderer
         if (widthMatch.Success) int.TryParse(widthMatch.Groups[1].Value, out qrPixelSize);
 
         // Strip width/height from the opening <svg> tag only (not from inner <rect> elements,
-        // which encode each QR module and need their dimensions intact).
+        // which encode each QR module and need their dimensions intact). Add a viewBox in
+        // their place so SVG consumers that need intrinsic dimensions (e.g. a canvas
+        // rasteriser loading the SVG via an Image) can still tell the coordinate space —
+        // without a viewBox the browser falls back to 300x150 and clips anything past that.
         var cleaned = Regex.Replace(openTag.Value, @"\s+(width|height)=""[^""]*""", "", RegexOptions.IgnoreCase);
+        if (qrPixelSize > 0 && !cleaned.Contains("viewBox", StringComparison.OrdinalIgnoreCase))
+        {
+            cleaned = cleaned.Insert(cleaned.Length - 1, $" viewBox=\"0 0 {qrPixelSize} {qrPixelSize}\"");
+        }
         var svg = rawSvg.Substring(0, openTag.Index)
                   + cleaned
                   + rawSvg.Substring(openTag.Index + openTag.Length);
