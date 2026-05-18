@@ -32,23 +32,27 @@
     [Parameter] public string? Url { get; set; }
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public QrCodeRenderer.CenterOverlay? Overlay { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 
     private string? svgMarkup;
     private string? renderedFor;
+    private QrCodeRenderer.CenterOverlay? renderedOverlay;
 
     protected override void OnParametersSet()
     {
-        // Re-render the SVG only when the URL actually changes — building a QR is cheap
+        // Re-render the SVG only when the URL or overlay changes — building a QR is cheap
         // but not free (a few ms for our payload sizes).
-        if (IsOpen && !string.IsNullOrEmpty(Url) && Url != renderedFor)
+        if (IsOpen && !string.IsNullOrEmpty(Url) && (Url != renderedFor || !ReferenceEquals(Overlay, renderedOverlay)))
         {
-            svgMarkup = QrCodeRenderer.ToSvg(Url);
+            svgMarkup = QrCodeRenderer.ToSvg(Url, overlay: Overlay);
             renderedFor = Url;
+            renderedOverlay = Overlay;
         }
         else if (!IsOpen)
         {
             renderedFor = null;
+            renderedOverlay = null;
         }
     }
 

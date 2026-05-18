@@ -756,6 +756,7 @@ else
 
 <QrCodeModal IsOpen="showScoringQr" Url="@scoringQrUrl" Title="@scoringQrTitle"
              Subtitle="@(scoringQrCopied ? Lang.Get("QrCopiedToClipboard") : Lang.Get("QrCodeScoringSubtitle"))"
+             Overlay="@Tsump.Scoring.QrCodeRenderer.Overlays.Organizer"
              OnClose="CloseScoringQr" />
 
 @code {
@@ -1666,7 +1667,7 @@ else
         // is the user gesture clipboard.write needs.
         try
         {
-            var svg = Tsump.Scoring.QrCodeRenderer.ToSvg(scoringQrUrl);
+            var svg = Tsump.Scoring.QrCodeRenderer.ToSvg(scoringQrUrl, overlay: Tsump.Scoring.QrCodeRenderer.Overlays.Organizer);
             var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, scoringQrTitle);
             if (ok)
             {
