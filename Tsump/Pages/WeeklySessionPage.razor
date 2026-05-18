@@ -1955,6 +1955,15 @@ else
         allHanchans = await SessionService.GetAllAsync();
         hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
 
+        // Re-point currentHanchan/tables to the freshly-loaded entry inside hanchansOnDate
+        // so subsequent edits mutate the same object that cross-hanchan status checks read.
+        var freshSelf = hanchansOnDate.FirstOrDefault(h => h.Id == hanchan.Id);
+        if (freshSelf != null)
+        {
+            currentHanchan = freshSelf;
+            tables = freshSelf.Tables;
+        }
+
         saved = true;
         attendanceExpanded = false;
     }
@@ -1964,6 +1973,16 @@ else
         if (currentHanchan == null) return;
         currentHanchan.Tables = tables;
         await SessionService.SaveAsync(currentHanchan);
+
+        var allHanchans = await SessionService.GetAllAsync();
+        hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
+        var freshSelf = hanchansOnDate.FirstOrDefault(h => h.Id == currentHanchan.Id);
+        if (freshSelf != null)
+        {
+            currentHanchan = freshSelf;
+            tables = freshSelf.Tables;
+        }
+        StateHasChanged();
     }
 
     private record AllScoresEntry(string Label, TableAssignment Table);
