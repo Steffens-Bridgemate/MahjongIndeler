@@ -107,52 +107,52 @@
             return navigator.clipboard.writeText(plainText);
         };
         window.copyQrImageToClipboard = async function (svgMarkup, qrSize, title) {
-            // Renders an SVG string to a square PNG on an offscreen canvas (with an
-            // optional title band above the QR), then writes the result to the clipboard
-            // as image/png. Must be called from a user-gesture handler.
-            // The QR's own quiet zone is preserved, so a title band above doesn't
-            // impede scanning.
+            // Renders an SVG string to a PNG on an offscreen canvas (with an optional
+            // title band above the QR), then writes the result to the clipboard as
+            // image/png. Must be called from a user-gesture handler.
+            // The canvas is sized to the SVG's natural pixel dimensions (from its
+            // viewBox) rather than the passed qrSize. High-version QR codes (needed
+            // for ECL-H with large payloads) have SVGs wider than 700 px; shrinking
+            // them to 480 px produces ~2.6 px modules that html5-qrcode cannot decode.
             if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) return false;
             try {
+                var svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+                var url = URL.createObjectURL(svgBlob);
+                var img = new Image();
+                try {
+                    await new Promise(function (resolve, reject) {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = url;
+                    });
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+                var size = img.naturalWidth > 0 ? img.naturalWidth : qrSize;
                 var titleHeight = title ? 56 : 0;
-                var width = qrSize;
-                var height = qrSize + titleHeight;
 
                 var canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
+                canvas.width = size;
+                canvas.height = size + titleHeight;
                 var ctx = canvas.getContext('2d');
                 ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, width, height);
+                ctx.fillRect(0, 0, size, size + titleHeight);
 
                 if (title) {
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     // Auto-shrink the font so the title fits within 90% of the QR width.
-                    var maxWidth = width * 0.9;
+                    var maxWidth = size * 0.9;
                     var fontSize = 28;
                     ctx.font = 'bold ' + fontSize + 'px sans-serif';
                     while (ctx.measureText(title).width > maxWidth && fontSize > 12) {
                         fontSize -= 1;
                         ctx.font = 'bold ' + fontSize + 'px sans-serif';
                     }
-                    ctx.fillText(title, width / 2, titleHeight / 2);
+                    ctx.fillText(title, size / 2, titleHeight / 2);
                 }
-
-                var svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
-                var url = URL.createObjectURL(svgBlob);
-                try {
-                    var img = new Image();
-                    await new Promise(function (resolve, reject) {
-                        img.onload = resolve;
-                        img.onerror = reject;
-                        img.src = url;
-                    });
-                    ctx.drawImage(img, 0, titleHeight, qrSize, qrSize);
-                } finally {
-                    URL.revokeObjectURL(url);
-                }
+                ctx.drawImage(img, 0, titleHeight, size, size);
 
                 var pngBlob = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/png'); });
                 if (!pngBlob) return false;
