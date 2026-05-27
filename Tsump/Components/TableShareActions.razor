@@ -74,8 +74,9 @@
         // The button click is the user gesture clipboard.write needs.
         try
         {
-            var svg = QrCodeRenderer.ToSvg(qrUrl, overlay: QrCodeRenderer.Overlays.Organizer);
-            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, ShortQrTitle ?? Title);
+            var svg = QrCodeRenderer.ToSvg(qrUrl);
+            var organizerOverlay = QrCodeRenderer.Overlays.Organizer;
+            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, ShortQrTitle ?? Title, organizerOverlay.BackgroundColor, "white");
             if (ok)
             {
                 qrCopied = true;

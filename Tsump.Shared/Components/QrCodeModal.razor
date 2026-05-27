@@ -6,6 +6,18 @@
     <div class="qr-backdrop" @onclick="OnCloseHandler">
         <div class="qr-popup" @onclick:stopPropagation="true">
             <div class="qr-header">
+                @if (Overlay != null)
+                {
+                    @* Coloured badge: organizer = blue clipboard, scoring = green check.
+                       Lives in the header rather than on the QR itself because hardware
+                       2D scanners can't tolerate any on-QR overlay. *@
+                    <svg width="28" height="28" viewBox="0 0 32 32" class="me-2" style="flex-shrink:0;">
+                        <circle cx="16" cy="16" r="16" fill="@Overlay.BackgroundColor" />
+                        <g transform="translate(4,4) scale(1.5)" fill="white">
+                            @((MarkupString)Overlay.GlyphSvg)
+                        </g>
+                    </svg>
+                }
                 <h6 class="mb-0 flex-grow-1">@(Title ?? Lang.Get("QrCodeTitle"))</h6>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="OnCloseHandler" aria-label="@Lang.Get("Close")">
                     <i class="bi bi-x-lg"></i>
@@ -37,22 +49,21 @@
 
     private string? svgMarkup;
     private string? renderedFor;
-    private QrCodeRenderer.CenterOverlay? renderedOverlay;
 
     protected override void OnParametersSet()
     {
-        // Re-render the SVG only when the URL or overlay changes — building a QR is cheap
-        // but not free (a few ms for our payload sizes).
-        if (IsOpen && !string.IsNullOrEmpty(Url) && (Url != renderedFor || !ReferenceEquals(Overlay, renderedOverlay)))
+        // Re-render the SVG only when the URL actually changes — building a QR is cheap
+        // but not free (a few ms for our payload sizes). Overlay no longer affects the QR
+        // itself (it's drawn separately in the header above), so it doesn't need to
+        // invalidate the cached SVG.
+        if (IsOpen && !string.IsNullOrEmpty(Url) && Url != renderedFor)
         {
-            svgMarkup = QrCodeRenderer.ToSvg(Url, overlay: Overlay);
+            svgMarkup = QrCodeRenderer.ToSvg(Url);
             renderedFor = Url;
-            renderedOverlay = Overlay;
         }
         else if (!IsOpen)
         {
             renderedFor = null;
-            renderedOverlay = null;
         }
     }
 

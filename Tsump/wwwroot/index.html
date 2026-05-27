@@ -106,7 +106,7 @@
         window.copyTextToClipboard = function (plainText) {
             return navigator.clipboard.writeText(plainText);
         };
-        window.copyQrImageToClipboard = async function (svgMarkup, qrSize, title) {
+        window.copyQrImageToClipboard = async function (svgMarkup, qrSize, title, headerBg, headerFg) {
             // Renders an SVG string to a PNG on an offscreen canvas (with an optional
             // title band above the QR), then writes the result to the clipboard as
             // image/png. Must be called from a user-gesture handler.
@@ -114,6 +114,10 @@
             // viewBox) rather than the passed qrSize. High-version QR codes (needed
             // for ECL-H with large payloads) have SVGs wider than 700 px; shrinking
             // them to 480 px produces ~2.6 px modules that html5-qrcode cannot decode.
+            // headerBg/headerFg are optional — when set, the title band is filled with
+            // headerBg and the title text is drawn in headerFg. This is how the organizer
+            // (blue) and scoring app (green) QRs are visually distinguished in WhatsApp
+            // now that on-QR overlays were dropped for hardware-scanner compatibility.
             if (!navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) return false;
             try {
                 var svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
@@ -139,7 +143,13 @@
                 ctx.fillRect(0, 0, size, size + titleHeight);
 
                 if (title) {
-                    ctx.fillStyle = 'black';
+                    if (headerBg) {
+                        ctx.fillStyle = headerBg;
+                        ctx.fillRect(0, 0, size, titleHeight);
+                        ctx.fillStyle = headerFg || 'white';
+                    } else {
+                        ctx.fillStyle = 'black';
+                    }
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     // Auto-shrink the font so the title fits within 90% of the QR width.

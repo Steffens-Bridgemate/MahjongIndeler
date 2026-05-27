@@ -1667,8 +1667,9 @@ else
         // is the user gesture clipboard.write needs.
         try
         {
-            var svg = Tsump.Scoring.QrCodeRenderer.ToSvg(scoringQrUrl, overlay: Tsump.Scoring.QrCodeRenderer.Overlays.Organizer);
-            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, scoringQrTitle);
+            var svg = Tsump.Scoring.QrCodeRenderer.ToSvg(scoringQrUrl);
+            var organizerOverlay = Tsump.Scoring.QrCodeRenderer.Overlays.Organizer;
+            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, scoringQrTitle, organizerOverlay.BackgroundColor, "white");
             if (ok)
             {
                 scoringQrCopied = true;

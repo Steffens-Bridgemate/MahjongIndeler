@@ -93,27 +93,27 @@ Always passes `confirmOverwrite: true` (the user has already seen the overwrite 
 
 On expiry: `ClosePanel`. Disposed alongside the panel.
 
-## QR overlays
+## QR badges (off the QR, in the header)
 
 [Tsump.Shared/Scoring/QrCodeRenderer.cs](../Tsump.Shared/Scoring/QrCodeRenderer.cs)
 
 ```csharp
-record CenterOverlay(string GlyphSvg, string BackgroundColor, double RelativeSize = 0.22);
+record CenterOverlay(string GlyphSvg, string BackgroundColor);
 
 static class Overlays {
     static readonly CenterOverlay Organizer;       // blue clipboard
     static readonly CenterOverlay ScoringResult;   // green check
 }
 
-static string ToSvg(string url, int pixelsPerModule = 4, CenterOverlay? overlay = null);
+static string ToSvg(string url, int pixelsPerModule = 4);   // pristine — no overlay arg
 ```
 
-- **ECC level H** (not M) so the centre badge (~22% of QR width) leaves enough redundant data for reliable decode.
-- **viewBox is added** (`width`/`height` stripped). Without viewBox, canvas rasterisers fall back to 300×150 and clip larger QRs — the result QR clipping bug.
-- **Glyphs must be filled-only**, never stroked at sharp angles. Stroked paths with default miter joins spike beyond the badge into surrounding modules and break decode (the bi-check stroke bug). Both pre-built overlays use filled Bootstrap Icons paths.
-- The white ring around the coloured circle (radius = `bgRadius + qrPixelSize * 0.012`) gives visual separation from the dense QR modules.
+**The QR itself is pristine.** Earlier attempts painted a badge on the QR (centre, then small centre, then off-centre); phones decoded all of them but USB HID 2D scanners refused even the smallest off-centre version. The badge now lives in two places, both *outside* the QR's module grid:
 
-`QrCodeModal` ([Tsump.Shared/Components/QrCodeModal.razor](../Tsump.Shared/Components/QrCodeModal.razor)) takes an optional `Overlay` parameter and forwards to `QrCodeRenderer.ToSvg`. Callers (`TableShareActions`, `WeeklySessionPage`, MahjongScoring's `ScorePage`) pass the same overlay to both `QrCodeModal` AND the auto-PNG-to-clipboard JS path, so what the user sees in the modal matches what gets pasted into WhatsApp.
+1. **Modal header** ([QrCodeModal.razor](../Tsump.Shared/Components/QrCodeModal.razor)) — small inline-SVG coloured circle + white glyph rendered next to the title. `QrCodeModal` takes an `Overlay` parameter; when non-null it draws the badge, otherwise renders a header without one.
+2. **PNG title band** — the auto-clipboard PNG has its title band filled with the overlay's `BackgroundColor` (blue for organizer, green for scoring) and the title text drawn in white. Callers pass `headerBg`/`headerFg` to `copyQrImageToClipboard` (see [Tsump/wwwroot/index.html](../Tsump/wwwroot/index.html) and the matching helper in the MahjongScoring repo). When pasted into WhatsApp, the recipient sees a coloured banner above an unadorned QR — colour alone is enough differentiation at a glance.
+
+QR SVG mechanics still in effect: ECC level H, `width`/`height` stripped and replaced with a `viewBox` so the canvas rasteriser knows the coordinate space.
 
 ## Hardware (USB HID) scanner notes
 
