@@ -25,7 +25,9 @@
       "Bash(git branch *)",
       "Bash(git remote *)",
       "Bash(git submodule *)",
-      "Bash(git -C external/MahjongIndeler log -1 --oneline)"
+      "Bash(git -C external/MahjongIndeler log -1 --oneline)",
+      "Bash(xargs grep -l \"ScoringPayload\\\\|Codec\")",
+      "Bash(gh run *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\aners\\source\\repos\\MahjongScoring\\Tsump.Scoring",
