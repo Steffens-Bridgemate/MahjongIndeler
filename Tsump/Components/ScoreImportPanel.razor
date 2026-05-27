@@ -668,15 +668,19 @@
             {
                 await Task.Delay(AutoReturnAfterApplyMs, cts.Token);
                 if (cts.IsCancellationRequested) return;
-                await InvokeAsync(async () =>
+                await InvokeAsync(() =>
                 {
                     if (!showPanel || status != ImportStatus.Applied) return;
                     status = ImportStatus.Reading;
                     pendingResult = null;
                     pendingLookup = null;
+                    scanBuffer = "";
                     StateHasChanged();
-                    // Silent clipboard re-check, same policy as panel open.
-                    await TryClipboard(isExplicitCheck: false);
+                    // Deliberately NOT re-reading the clipboard here. In a multi-scan
+                    // workflow the clipboard still holds the URL we just applied, and
+                    // re-processing it would loop the user back into AlreadyScored. The
+                    // textarea is auto-focused by OnAfterRenderAsync so the next scan or
+                    // paste lands directly in the buffer.
                 });
             }
             catch (TaskCanceledException) { /* user clicked something before we fired */ }
