@@ -1533,6 +1533,13 @@ else
     private async Task ProcessClipboardText(string? text)
     {
         var raw = (text ?? "").Trim();
+        // Strip the optional framing markers carried by result QRs (camera/file/HID-scanner
+        // paths can deliver them; the WhatsApp clipboard text doesn't, but it's harmless
+        // either way).
+        if (raw.StartsWith(ScoringPayloadCodec.ScanFrameStart))
+            raw = raw.Substring(ScoringPayloadCodec.ScanFrameStart.Length);
+        if (raw.EndsWith(ScoringPayloadCodec.ScanFrameEnd))
+            raw = raw.Substring(0, raw.Length - ScoringPayloadCodec.ScanFrameEnd.Length);
         if (raw.Length == 0)
         {
             importStatus = ImportStatus.NoResult;

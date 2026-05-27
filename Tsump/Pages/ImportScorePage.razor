@@ -130,6 +130,14 @@ else
         }
         var prefix = "r=";
         var payload = fragment.StartsWith(prefix, StringComparison.Ordinal) ? fragment.Substring(prefix.Length) : fragment;
+        // Strip framing markers in case a phone QR-scan-opens-URL flow preserved them
+        // through the URL bar. Normally a framed `[[https://...]]` wouldn't navigate at
+        // all (the leading `[[` isn't a valid URL prefix), but a trailing `]]` can show
+        // up at the end of the fragment depending on URL detection heuristics.
+        if (payload.StartsWith(ScoringPayloadCodec.ScanFrameStart))
+            payload = payload.Substring(ScoringPayloadCodec.ScanFrameStart.Length);
+        if (payload.EndsWith(ScoringPayloadCodec.ScanFrameEnd))
+            payload = payload.Substring(0, payload.Length - ScoringPayloadCodec.ScanFrameEnd.Length);
         result = ScoringPayloadCodec.DecodeResult(payload);
         if (result == null || result.Scores == null || result.Scores.Count < 3 || result.Scores.Count > 4)
             decodeError = true;

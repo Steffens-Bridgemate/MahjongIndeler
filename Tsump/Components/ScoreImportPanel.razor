@@ -97,7 +97,8 @@
                              || status == ImportStatus.NoResult
                              || status == ImportStatus.NoMatchingTable
                              || status == ImportStatus.ScanError
-                             || status == ImportStatus.FileScanFailed)
+                             || status == ImportStatus.FileScanFailed
+                             || status == ImportStatus.ScanTruncated)
                     {
                         @if (status == ImportStatus.NotResultLink)
                         {
@@ -114,6 +115,10 @@
                         else if (status == ImportStatus.FileScanFailed)
                         {
                             <div class="alert alert-warning py-2 mb-2">@Lang.Get("FileScanNoQr")</div>
+                        }
+                        else if (status == ImportStatus.ScanTruncated)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorTruncated")</div>
                         }
                         else
                         {
@@ -219,6 +224,8 @@
         Preview,           // decoded + found, awaiting confirmation
         AlreadyScored,     // matching table already scored; ask before overwriting
         Applied,           // success
+        ScanTruncated,     // saw the closing frame marker but not the opening one
+                           // — focus arrived after the HID scan started
     }
 
     private bool showPanel;
@@ -265,6 +272,7 @@
                   or ImportStatus.NoMatchingTable
                   or ImportStatus.ScanError
                   or ImportStatus.FileScanFailed
+                  or ImportStatus.ScanTruncated
                   or ImportStatus.Applied;
 
     private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
@@ -329,6 +337,29 @@
         scanInputDebounceCts?.Cancel();
         if (string.IsNullOrEmpty(scanBuffer)) return;
 
+        // Bidirectional framing: the result QR wraps its URL in `[[ ... ]]`. Detect a
+        // complete framed scan deterministically (no reliance on scanner-specific Enter
+        // events) and distinguish front-truncation from a still-in-progress scan.
+        var hasStart = scanBuffer.StartsWith(ScoringPayloadCodec.ScanFrameStart);
+        var hasEnd = scanBuffer.EndsWith(ScoringPayloadCodec.ScanFrameEnd);
+        if (hasStart && hasEnd)
+        {
+            // Complete framed scan — submit immediately. ProcessText strips the markers.
+            await SubmitScanBuffer();
+            return;
+        }
+        if (hasEnd && !hasStart)
+        {
+            // Closing marker without opening one → the focus arrived after the scan
+            // started and we missed the head of the URL. Tell the user to re-scan.
+            scanBuffer = "";
+            status = ImportStatus.ScanTruncated;
+            StateHasChanged();
+            return;
+        }
+
+        // No end marker yet — either still scanning (the closing marker will arrive on a
+        // later keystroke) or unframed input (manual paste/type). Debounce as fallback.
         var cts = new System.Threading.CancellationTokenSource();
         scanInputDebounceCts = cts;
         try
@@ -522,6 +553,12 @@
         // valid OR invalid, per the spec.
         ResetInactivityTimer();
         var raw = (text ?? "").Trim();
+        // Strip the optional framing markers carried by result QRs. The clipboard message
+        // doesn't include them but camera/file/HID-scanner paths do, so unwrap centrally.
+        if (raw.StartsWith(ScoringPayloadCodec.ScanFrameStart))
+            raw = raw.Substring(ScoringPayloadCodec.ScanFrameStart.Length);
+        if (raw.EndsWith(ScoringPayloadCodec.ScanFrameEnd))
+            raw = raw.Substring(0, raw.Length - ScoringPayloadCodec.ScanFrameEnd.Length);
         if (raw.Length == 0)
         {
             status = ImportStatus.NoResult;

@@ -44,6 +44,16 @@ public static class ScoringPayloadCodec
     /// <summary>Index of the Penalty value inside each <see cref="ScoringResult.Scores"/> entry.</summary>
     public const int ScorePenalty = 2;
 
+    /// <summary>Opening marker wrapped around the URL encoded into the result QR. Lets
+    /// the organizer's scan-input handler detect a complete framed scan without relying
+    /// on scanner-specific terminator keystrokes, and recognise front-truncation when
+    /// the closing marker arrives but the opening one is missing. Neither `[` nor `]`
+    /// appears in our URLs (base64url uses [A-Za-z0-9_-]; URL schemes use :/.#=).</summary>
+    public const string ScanFrameStart = "[[";
+
+    /// <summary>Closing marker — paired with <see cref="ScanFrameStart"/>.</summary>
+    public const string ScanFrameEnd = "]]";
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
