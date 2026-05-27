@@ -247,11 +247,12 @@
     private ElementReference scanInputRef;
     private string scanBuffer = "";
     private System.Threading.CancellationTokenSource? scanInputDebounceCts;
-    // 250 ms after the last keystroke is short enough to feel snappy after a scan, long
-    // enough that a fast scanner burst still coalesces into a single submit. The terminator
-    // (Enter / Tab / blur via change) usually triggers first; this is just a fallback for
-    // scanners configured without a terminator.
-    private const int ScanInputDebounceMs = 250;
+    // Debounce ONLY applies in unframed mode (manual paste / type). For HID-scanner
+    // input, the [[ ... ]] framing markers signal end-of-scan deterministically — no
+    // debounce, so the scanner can stall between bursts without truncating the buffer.
+    // 500 ms is long enough that a human typing pauses don't fire prematurely, short
+    // enough that paste-and-wait feels responsive.
+    private const int ScanInputDebounceMs = 500;
     // Tracks which status we last auto-focused for, so we re-focus on every transition INTO
     // a waiting state but don't fight the user during Preview/AlreadyScored reviews.
     private ImportStatus? lastAutoFocusedStatus;
@@ -366,9 +367,16 @@
             StateHasChanged();
             return;
         }
+        if (hasStart)
+        {
+            // Mid-frame: buffer starts with [[ but the closing ]] hasn't arrived yet.
+            // Wait silently — explicitly no debounce so a scanner stalling between
+            // bursts doesn't get its in-flight scan truncated by a timer.
+            return;
+        }
 
-        // No end marker yet — either still scanning (the closing marker will arrive on a
-        // later keystroke) or unframed input (manual paste/type). Debounce as fallback.
+        // No framing markers at all → unframed input (manual paste/type/etc.). Debounce
+        // is the only signal we have for "input complete" here.
         var cts = new System.Threading.CancellationTokenSource();
         scanInputDebounceCts = cts;
         try
@@ -382,12 +390,12 @@
 
     private async Task OnScanKeyDown(KeyboardEventArgs e)
     {
-        // Cover the common HID-scanner Enter variants: main-row Enter, numpad Enter, and
-        // the (rare) "Return" key value. Tab is deliberately NOT matched here — some
-        // scanners insert tabs between URL segments as a delimiter, which would cause
-        // mid-scan submission of a truncated buffer.
         if (e.Key is "Enter" or "Return" || e.Code is "Enter" or "NumpadEnter")
         {
+            // Mid-frame Enter (some scanners use Enter as a mid-data segment terminator):
+            // ignore — the framing-marker check in OnScanInput will commit when ]] arrives.
+            // Outside framed mode (manual paste/type), treat Enter as the commit signal.
+            if (scanBuffer.Contains(ScoringPayloadCodec.ScanFrameStart)) return;
             scanInputDebounceCts?.Cancel();
             await SubmitScanBuffer();
         }
