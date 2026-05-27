@@ -19,6 +19,13 @@
                     </svg>
                 }
                 <h6 class="mb-0 flex-grow-1">@(Title ?? Lang.Get("QrCodeTitle"))</h6>
+                @if (OnSave.HasDelegate)
+                {
+                    <button class="btn btn-sm btn-outline-secondary me-1" @onclick="OnSaveHandler"
+                            aria-label="@Lang.Get("SaveAs")" title="@Lang.Get("SaveAs")">
+                        <i class="bi bi-floppy"></i>
+                    </button>
+                }
                 <button class="btn btn-sm btn-outline-secondary" @onclick="OnCloseHandler" aria-label="@Lang.Get("Close")">
                     <i class="bi bi-x-lg"></i>
                 </button>
@@ -46,6 +53,10 @@
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public QrCodeRenderer.CenterOverlay? Overlay { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Optional "save as" action. When wired, a floppy-icon button appears in the
+    /// header; the callback is responsible for actually triggering the file save (the modal
+    /// stays out of the JS interop business).</summary>
+    [Parameter] public EventCallback OnSave { get; set; }
 
     private string? svgMarkup;
     private string? renderedFor;
@@ -71,5 +82,11 @@
     {
         if (OnClose.HasDelegate)
             await OnClose.InvokeAsync();
+    }
+
+    private async Task OnSaveHandler()
+    {
+        if (OnSave.HasDelegate)
+            await OnSave.InvokeAsync();
     }
 }
