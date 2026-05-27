@@ -23,6 +23,19 @@
                     <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Cancel")</button>
                 </div>
                 <div class="card-body">
+                    @* Always-on input that captures HID-scanner keystrokes, manual pastes,
+                       and typed URLs. Hidden during live camera scanning / file decoding
+                       where it would steal focus or look out of place. Same ProcessText
+                       pipeline as the camera / file / clipboard paths. *@
+                    @if (ShouldRenderScanInput)
+                    {
+                        <input @ref="scanInputRef" type="text" class="form-control mb-3"
+                               value="@scanBuffer"
+                               @oninput="OnScanInput"
+                               @onkeydown="OnScanKeyDown"
+                               placeholder="@Lang.Get("ImportResultPlaceholder")"
+                               autocomplete="off" />
+                    }
                     @if (status == ImportStatus.Reading)
                     {
                         <p class="text-muted small mb-0">@Lang.Get("ImportResultReading")</p>
@@ -100,8 +113,8 @@
                         }
 
                         <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-outline-primary" @onclick="TryClipboard">
-                                <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
+                            <button class="btn btn-outline-primary" @onclick="() => TryClipboard()">
+                                <i class="bi bi-clipboard me-1"></i>@Lang.Get("CheckClipboard")
                             </button>
                             <button class="btn btn-outline-primary" @onclick="StartQrScan">
                                 <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
@@ -157,7 +170,7 @@
                     {
                         <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
                         <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-primary" @onclick="TryClipboard">
+                            <button class="btn btn-primary" @onclick="() => TryClipboard()">
                                 <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
                             </button>
                             <button class="btn btn-outline-primary" @onclick="StartQrScan">
@@ -209,6 +222,42 @@
     private int scanElapsedSeconds;
     private System.Threading.CancellationTokenSource? scanTimerCts;
 
+    // Always-on input that catches USB HID-scanner keystrokes, manual pastes, and typed URLs.
+    private ElementReference scanInputRef;
+    private string scanBuffer = "";
+    private System.Threading.CancellationTokenSource? scanInputDebounceCts;
+    // 500 ms after the last keystroke is long enough that fast scanner bursts coalesce into
+    // a single submit, short enough that a user pasting + waiting still gets feedback quickly.
+    // Most scanners append Enter anyway — Enter cancels the debounce and submits immediately.
+    private const int ScanInputDebounceMs = 500;
+    // Tracks which status we last auto-focused for, so we re-focus on every transition INTO
+    // a waiting state but don't fight the user during Preview/AlreadyScored reviews.
+    private ImportStatus? lastAutoFocusedStatus;
+
+    // Closes the panel after this much idle time. Any user activity (button click, keystroke,
+    // ProcessText, Apply) resets the countdown. Tuned for a typical multi-table workflow:
+    // long enough that the organizer can step away briefly, short enough that a forgotten
+    // panel doesn't linger.
+    private const int InactivityTimeoutMs = 5 * 60 * 1000;
+    private System.Threading.CancellationTokenSource? inactivityCts;
+
+    // After a successful Apply, the panel briefly shows the success banner then auto-arms
+    // for the next scan by returning to Reading. Any user button click cancels this.
+    private const int AutoReturnAfterApplyMs = 2000;
+    private System.Threading.CancellationTokenSource? autoReturnCts;
+
+    private bool ShouldRenderScanInput
+        => status != ImportStatus.Scanning && status != ImportStatus.FileDecoding;
+
+    private bool ShouldAutoFocusScanInput
+        => status is ImportStatus.Reading
+                  or ImportStatus.NoResult
+                  or ImportStatus.NotResultLink
+                  or ImportStatus.NoMatchingTable
+                  or ImportStatus.ScanError
+                  or ImportStatus.FileScanFailed
+                  or ImportStatus.Applied;
+
     private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
         = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
 
@@ -217,6 +266,86 @@
         // Fire-and-forget: stop the scanner if it's still running (e.g. user navigated away).
         _ = StopQrScannerIfRunning();
         scannerRef?.Dispose();
+        scanInputDebounceCts?.Cancel();
+        inactivityCts?.Cancel();
+        autoReturnCts?.Cancel();
+    }
+
+    /// <summary>Restarts the idle countdown that closes the panel after <see cref="InactivityTimeoutMs"/>.
+    /// Call from every code path triggered by user activity.</summary>
+    private void ResetInactivityTimer()
+    {
+        inactivityCts?.Cancel();
+        if (!showPanel) return;
+        var cts = new System.Threading.CancellationTokenSource();
+        inactivityCts = cts;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(InactivityTimeoutMs, cts.Token);
+                if (cts.IsCancellationRequested) return;
+                await InvokeAsync(ClosePanel);
+            }
+            catch (TaskCanceledException) { /* a newer activity reset us */ }
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!showPanel)
+        {
+            lastAutoFocusedStatus = null;
+            return;
+        }
+        if (!ShouldAutoFocusScanInput) return;
+        if (lastAutoFocusedStatus == status) return;
+        try
+        {
+            await scanInputRef.FocusAsync();
+            lastAutoFocusedStatus = status;
+        }
+        catch
+        {
+            // Element not yet in the DOM (e.g. very first render before showPanel propagates).
+            // Will retry on the next render cycle.
+        }
+    }
+
+    private async Task OnScanInput(ChangeEventArgs e)
+    {
+        ResetInactivityTimer();
+        autoReturnCts?.Cancel();
+        scanBuffer = e.Value?.ToString() ?? "";
+        scanInputDebounceCts?.Cancel();
+        if (string.IsNullOrEmpty(scanBuffer)) return;
+
+        var cts = new System.Threading.CancellationTokenSource();
+        scanInputDebounceCts = cts;
+        try
+        {
+            await Task.Delay(ScanInputDebounceMs, cts.Token);
+            if (cts.IsCancellationRequested) return;
+            await SubmitScanBuffer();
+        }
+        catch (TaskCanceledException) { /* a newer keystroke arrived — that one resets the timer */ }
+    }
+
+    private async Task OnScanKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            scanInputDebounceCts?.Cancel();
+            await SubmitScanBuffer();
+        }
+    }
+
+    private async Task SubmitScanBuffer()
+    {
+        var text = scanBuffer;
+        scanBuffer = "";
+        if (string.IsNullOrEmpty(text)) return;
+        await ProcessText(text);
     }
 
     private string ResolveName(Guid id)
@@ -231,11 +360,16 @@
         pendingResult = null;
         pendingLookup = null;
         StateHasChanged();
-        await TryClipboard();
+        ResetInactivityTimer();
+        // Silent clipboard check on open: an empty clipboard leaves the panel in Reading
+        // with just the scan input, not a "no result link" alert the user didn't ask for.
+        await TryClipboard(isExplicitCheck: false);
     }
 
     private async Task ClosePanel()
     {
+        inactivityCts?.Cancel();
+        autoReturnCts?.Cancel();
         await StopQrScannerIfRunning();
         showPanel = false;
         status = ImportStatus.Reading;
@@ -243,8 +377,10 @@
         pendingLookup = null;
     }
 
-    private async Task TryClipboard()
+    private async Task TryClipboard(bool isExplicitCheck = true)
     {
+        ResetInactivityTimer();
+        autoReturnCts?.Cancel();
         status = ImportStatus.Reading;
         pendingResult = null;
         pendingLookup = null;
@@ -252,7 +388,12 @@
 
         string? clip = null;
         try { clip = await JS.InvokeAsync<string?>("readClipboardText"); }
-        catch { /* permission denied or unsupported — fall through to NoResult */ }
+        catch { /* permission denied or unsupported — fall through to NoResult on explicit check */ }
+
+        // On panel-open (implicit check), stay in Reading if the clipboard has nothing
+        // useful — don't alert the user about an emptiness they didn't ask to verify.
+        if (!isExplicitCheck && string.IsNullOrWhiteSpace(clip))
+            return;
 
         await ProcessText(clip);
     }
@@ -261,6 +402,8 @@
 
     private async Task StartQrScan()
     {
+        ResetInactivityTimer();
+        autoReturnCts?.Cancel();
         scanErrorMessage = null;
         scanElapsedSeconds = 0;
         status = ImportStatus.Scanning;
@@ -336,6 +479,8 @@
 
     private async Task PickQrImage()
     {
+        ResetInactivityTimer();
+        autoReturnCts?.Cancel();
         // JS opens the file picker. We don't transition state here — if the user cancels
         // we'd be stuck. JS calls OnQrFileSelected once a file is actually picked.
         scannerRef ??= DotNetObjectReference.Create(this);
@@ -360,6 +505,9 @@
 
     private async Task ProcessText(string? text)
     {
+        // Any inbound text (clipboard, scan, paste, camera, file) counts as activity —
+        // valid OR invalid, per the spec.
+        ResetInactivityTimer();
         var raw = (text ?? "").Trim();
         if (raw.Length == 0)
         {
@@ -415,6 +563,7 @@
 
     private async Task Apply(bool confirmOverwrite)
     {
+        ResetInactivityTimer();
         if (pendingResult == null) return;
 
         var outcome = await ScoreImport.ApplyAsync(pendingResult, Lang.Get, confirmOverwrite);
@@ -432,5 +581,36 @@
 
         if (OnApplied.HasDelegate)
             await OnApplied.InvokeAsync();
+
+        // Auto-arm for the next scan: keep the success banner up for a beat, then return
+        // to Reading so the input is focused and ready. Any user button click in the
+        // meantime cancels this (see autoReturnCts.Cancel calls in user-action handlers).
+        ScheduleAutoReturnToReading();
+    }
+
+    private void ScheduleAutoReturnToReading()
+    {
+        autoReturnCts?.Cancel();
+        var cts = new System.Threading.CancellationTokenSource();
+        autoReturnCts = cts;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(AutoReturnAfterApplyMs, cts.Token);
+                if (cts.IsCancellationRequested) return;
+                await InvokeAsync(async () =>
+                {
+                    if (!showPanel || status != ImportStatus.Applied) return;
+                    status = ImportStatus.Reading;
+                    pendingResult = null;
+                    pendingLookup = null;
+                    StateHasChanged();
+                    // Silent clipboard re-check, same policy as panel open.
+                    await TryClipboard(isExplicitCheck: false);
+                });
+            }
+            catch (TaskCanceledException) { /* user clicked something before we fired */ }
+        });
     }
 }
