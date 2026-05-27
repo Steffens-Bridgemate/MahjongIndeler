@@ -30,11 +30,12 @@ public class ScoreInviteService
         string organizerBaseUrl)
     {
         var names = table.PlayerIds.Select(playerNameResolver).ToList();
+        // PlayerIds intentionally not carried — the scoring app and the organizer both pair
+        // players by position (index in `names` == index in table.PlayerIds).
         var invite = new ScoringInvite(
             contextId,
             table.TableNumber,
             names,
-            new List<Guid>(table.PlayerIds),
             startingPoints,
             new List<int>(uma),
             title,

@@ -56,13 +56,21 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var s in result.Scores)
+            @* Position-based: row i of the result applies to the i-th non-virtual PlayerId
+               on the matched table. *@
+            @for (int i = 0; i < result.Scores.Count; i++)
             {
+                var s = result.Scores[i];
+                var pids = lookup.Context.Table.PlayerIds;
+                var playerName = i < pids.Count ? ResolveName(pids[i]) : "—";
+                var end = s[ScoringPayloadCodec.ScoreEndPoints];
+                var loan = s[ScoringPayloadCodec.ScoreLoan];
+                var pen = s[ScoringPayloadCodec.ScorePenalty];
                 <tr>
-                    <td>@ResolveName(s.PlayerId)</td>
-                    <td class="text-end">@FormatPoints(s.EndPoints)</td>
-                    <td class="text-end">@(s.Loan != 0 ? FormatPoints(s.Loan) : "")</td>
-                    <td class="text-end">@(s.Penalty != 0 ? FormatPoints(s.Penalty) : "")</td>
+                    <td>@playerName</td>
+                    <td class="text-end">@FormatPoints(end)</td>
+                    <td class="text-end">@(loan != 0 ? FormatPoints(loan) : "")</td>
+                    <td class="text-end">@(pen != 0 ? FormatPoints(pen) : "")</td>
                 </tr>
             }
         </tbody>

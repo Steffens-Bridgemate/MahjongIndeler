@@ -21,7 +21,7 @@ The paired scoring app lives in the [MahjongScoring](https://github.com/Steffens
 
 `Tsump.Shared` is the source of truth for both apps. MahjongScoring includes this whole repo as a submodule at `external/MahjongIndeler` and references the same `Tsump.Shared.csproj` from there.
 
-**Wire-format note.** `ScoringInvite` / `ScoringResult` ([Tsump.Shared/Scoring/ScoringPayload.cs](Tsump.Shared/Scoring/ScoringPayload.cs)) use `ContextId` (Guid; carries either a `Hanchan.Id` or a `TournamentSession.Id`) and `SessionNumber`. Older `HanchanId` / `HanchanNumber` names were renamed. Breaking changes to this codec require coordinated deploys.
+**Wire-format note.** `ScoringInvite` / `ScoringResult` ([Tsump.Shared/Scoring/ScoringPayload.cs](Tsump.Shared/Scoring/ScoringPayload.cs)) are minified for QR-size reasons: short field names (`c`/`t`/`n`/`p`/`u`/`o`/`sn` on the invite; `c`/`t`/`s` on the result). `ContextId` (Guid) carries either a `Hanchan.Id` or a `TournamentSession.Id`. **No PlayerIds in either payload** — players are paired by position (index in `PlayerNames` = index in `table.PlayerIds`). The result's `Scores` is `List<int[]>` where each entry is `[endPoints, loan, penalty]`; use the `ScoreEndPoints` / `ScoreLoan` / `ScorePenalty` index constants on `ScoringPayloadCodec`. Breaking changes to this codec require coordinated deploys.
 
 Push to `master` in this repo auto-triggers `.github/workflows/deploy.yml`, which bumps `Tsump/AppVersion.cs`, publishes, and deploys to Pages.
 

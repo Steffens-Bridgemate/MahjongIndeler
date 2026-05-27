@@ -7,23 +7,37 @@ The organizer side of the score round-trip. Companion to [score-import-ui.md](sc
 [Tsump.Shared/Scoring/ScoringPayload.cs](../Tsump.Shared/Scoring/ScoringPayload.cs)
 
 ```csharp
+// Field names are minified ([JsonPropertyName("c")] etc.) to keep encoded QRs small.
 record ScoringInvite(
-    Guid ContextId, int TableNumber, List<string> PlayerNames, List<Guid> PlayerIds,
-    int StartingPoints, List<int> Uma, string? Title, string? OrganizerUrl,
-    int SessionNumber = 1);
+    Guid ContextId,                    // c
+    int TableNumber,                   // t
+    List<string> PlayerNames,          // n
+    int StartingPoints,                // p
+    List<int> Uma,                     // u
+    string? Title,                     // title
+    string? OrganizerUrl,              // o
+    int SessionNumber = 1);            // sn
 
-record ScoringResult(Guid ContextId, int TableNumber, List<PlayerResultEntry> Scores);
-record PlayerResultEntry(Guid PlayerId, int EndPoints, int Loan, int Penalty);
+record ScoringResult(
+    Guid ContextId,                    // c
+    int TableNumber,                   // t
+    List<int[]> Scores);               // s — each entry is [endPoints, loan, penalty]
+
+// Use these to index entries readably:
+const int ScoreEndPoints = 0;
+const int ScoreLoan      = 1;
+const int ScorePenalty   = 2;
 ```
 
 - `ContextId` is the **only key used for lookup**. It carries either a `Hanchan.Id` (weekly) or a `TournamentSession.Id` (tournament); the organizer's resolvers disambiguate.
+- **No PlayerIds in either payload.** Players are paired by position: the invite's `PlayerNames[i]` corresponds to `table.PlayerIds[i]` on the organizer; the result's `Scores[i]` applies back to the i-th non-virtual `PlayerScore` on that table. The scoring app generates per-session synthetic Guids internally so `ScoreTable` can keep wiring edits up by `PlayerScore.PlayerId`, but those Guids never reach the wire format.
 - `SessionNumber` is display-only (used to build the "Hanchan N" subtitle on the scoring side); never used for lookup.
 - `Uma` is sent in the outbound invite (the scoring app shows it), but **omitted** from the inbound result — the organizer recomputes Uma from its own settings to avoid drift if Uma config changes between invite send and result return.
 - `OrganizerUrl` carries `Nav.BaseUri` so the scoring app can build a return URL back to whichever organizer instance issued the invite.
 
-JSON via `System.Text.Json` with `DefaultIgnoreCondition = WhenWritingNull`, base64url-encoded into the URL fragment (`#p=…` outbound, `#r=…` inbound).
+JSON via `System.Text.Json` with `DefaultIgnoreCondition = WhenWritingNull`, base64url-encoded into the URL fragment (`#p=…` outbound, `#r=…` inbound). Minified field names + array-form score entries cut the result URL to ~35% of its prior length, which materially helps hardware 2D scanners decode the QR.
 
-`HanchanId` / `HanchanNumber` are historical names from before tournaments existed — renamed to `ContextId` / `SessionNumber` in a coordinated cross-repo deploy. No back-compat shim; we relied on there being no outstanding scoring links at rename time.
+History: `HanchanId` / `HanchanNumber` were earlier names from before tournaments. Renamed to `ContextId` / `SessionNumber`. Field names minified and `PlayerResultEntry` collapsed into a 3-int array in a later coordinated deploy. No back-compat shim — relied on no outstanding scoring links in the wild.
 
 ## Resolver strategy
 
@@ -71,7 +85,7 @@ Two implementations, both DI-registered in [Program.cs](../Tsump/Program.cs):
 1. **Resolve.** Walk registered resolvers; first `Found` wins.
 2. **Overwrite gate.** If `table.Score` already has any non-virtual `PlayerScore` with `EndPoints` set and `confirmOverwrite` is false → return `FailureReason.AlreadyScored` (UI re-prompts the user).
 3. **Initialise.** `ScoreTable.InitializeScores(new List<TableAssignment> { table }, langGet, context.StartingPoints)` — adds `PlayerScore` rows for players in `table.PlayerIds`, removes stale ones, adds Mr. X if 3-player. **Note**: only the matching table gets initialised here — the rest of the container's tables keep whatever `Score` state they had in storage. See the score-null gotcha in [CLAUDE.md](../CLAUDE.md).
-4. **Apply.** For each `PlayerResultEntry`, set `EndPoints` / `Loan` / `Penalty` on the matching `PlayerScore`.
+4. **Apply.** Pair `result.Scores[i]` to the i-th non-virtual `PlayerScore` on the table by **position**. A count mismatch (e.g. assignments regenerated since the link was issued) terminates with `FailureReason.NoMatchingTable`. Each entry's three slots are accessed via the `ScoreEndPoints` / `ScoreLoan` / `ScorePenalty` constants on `ScoringPayloadCodec`.
 5. **Derive Mr. X.** `ScoreTable.DeriveVirtualEnd(table)`.
 6. **Compute Uma.** `ScoreTable.CalculateUma(table, context.Uma3Players, context.Uma4Players)`.
 7. **Persist.** `resolver.SaveAsync(context)` — Hanchan resolver calls `SessionService.SaveAsync`, Tournament resolver calls `TournamentService.SaveAsync` on the whole tournament.
@@ -81,7 +95,7 @@ Two implementations, both DI-registered in [Program.cs](../Tsump/Program.cs):
 
 - It doesn't refresh any UI state — callers reload data after a successful outcome (`ReloadTournament` in TournamentDetail; `ApplyImportPreview` in WeeklySessionPage).
 - It doesn't initialise `Score` on other tables in the container. UI re-loaders must call `ScoreTable.InitializeScores` on all tables themselves to keep them visible (the score-null gotcha).
-- It doesn't validate that the result's player Ids are members of the matching table. If a stale link is applied to a regenerated table with different players, the loop in step 4 silently skips entries whose `PlayerId` doesn't match — the table ends up partially filled.
+- It can't validate that the player **identities** still match (no PlayerIds in the wire format). If the assignments were regenerated and the new table has the same player *count* but different players, the result silently writes onto whichever players sit at those positions now. Count mismatch is caught (`NoMatchingTable`); identity drift is not.
 
 ## Find vs Apply
 

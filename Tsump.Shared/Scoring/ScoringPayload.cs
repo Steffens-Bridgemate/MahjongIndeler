@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Tsump.Scoring;
 
@@ -7,34 +8,45 @@ namespace Tsump.Scoring;
 /// Outbound payload: organizer → scoring app. Encoded into the URL fragment of a /score link.
 /// ContextId identifies the container the result belongs to: a Hanchan.Id for weekly sessions
 /// or a TournamentSession.Id for tournaments. Resolvers on the organizer side disambiguate.
+/// PlayerIds intentionally absent — the scoring app shows players in PlayerNames order and
+/// the result comes back in that same order (see <see cref="ScoringResult.Scores"/>).
+/// Field names minified (c/t/n/p/u/o/sn) to keep the encoded QR small for hardware scanners.
 /// </summary>
 public record ScoringInvite(
-    Guid ContextId,
-    int TableNumber,
-    List<string> PlayerNames,
-    List<Guid> PlayerIds,
-    int StartingPoints,
-    List<int> Uma,
-    string? Title,
-    string? OrganizerUrl,
-    int SessionNumber = 1);
+    [property: JsonPropertyName("c")]     Guid ContextId,
+    [property: JsonPropertyName("t")]     int TableNumber,
+    [property: JsonPropertyName("n")]     List<string> PlayerNames,
+    [property: JsonPropertyName("p")]     int StartingPoints,
+    [property: JsonPropertyName("u")]     List<int> Uma,
+    [property: JsonPropertyName("title")] string? Title,
+    [property: JsonPropertyName("o")]     string? OrganizerUrl,
+    [property: JsonPropertyName("sn")]    int SessionNumber = 1);
 
 /// <summary>
 /// Inbound payload: scoring app → organizer. Encoded into the URL fragment of an /import-score link.
-/// Uma is intentionally omitted — the organizer recomputes it from settings.
+/// Each entry in <see cref="Scores"/> is a 3-int array <c>[endPoints, loan, penalty]</c>, indexed
+/// by table-player position — the organizer's <c>ScoreImportService.ApplyAsync</c> pairs each
+/// entry with the i-th non-virtual <c>PlayerScore</c> on the looked-up table. No PlayerIds in
+/// the wire format; no per-player starting points (same for all four); no Uma (recomputed).
+/// Use the <c>Score*</c> index constants below to access the fields readably.
 /// </summary>
 public record ScoringResult(
-    Guid ContextId,
-    int TableNumber,
-    List<PlayerResultEntry> Scores);
-
-public record PlayerResultEntry(Guid PlayerId, int EndPoints, int Loan, int Penalty);
+    [property: JsonPropertyName("c")] Guid ContextId,
+    [property: JsonPropertyName("t")] int TableNumber,
+    [property: JsonPropertyName("s")] List<int[]> Scores);
 
 public static class ScoringPayloadCodec
 {
+    /// <summary>Index of the EndPoints value inside each <see cref="ScoringResult.Scores"/> entry.</summary>
+    public const int ScoreEndPoints = 0;
+    /// <summary>Index of the Loan value inside each <see cref="ScoringResult.Scores"/> entry.</summary>
+    public const int ScoreLoan = 1;
+    /// <summary>Index of the Penalty value inside each <see cref="ScoringResult.Scores"/> entry.</summary>
+    public const int ScorePenalty = 2;
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     public static string EncodeInvite(ScoringInvite invite)

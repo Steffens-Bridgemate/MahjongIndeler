@@ -576,13 +576,21 @@ else
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach (var s in pendingImportResult!.Scores)
+                                            @* Position-based: row i of the result applies to the i-th
+                                               non-virtual PlayerId on the matched table. *@
+                                            @for (int i = 0; i < pendingImportResult!.Scores.Count; i++)
                                             {
+                                                var s = pendingImportResult.Scores[i];
+                                                var pids = pendingImportLookup!.Context.Table.PlayerIds;
+                                                var playerName = i < pids.Count ? GetPlayerName(pids[i]) : "—";
+                                                var end = s[ScoringPayloadCodec.ScoreEndPoints];
+                                                var loan = s[ScoringPayloadCodec.ScoreLoan];
+                                                var pen = s[ScoringPayloadCodec.ScorePenalty];
                                                 <tr>
-                                                    <td>@GetPlayerName(s.PlayerId)</td>
-                                                    <td class="text-end">@FormatImportScore(s.EndPoints)</td>
-                                                    <td class="text-end">@(s.Loan != 0 ? FormatImportScore(s.Loan) : "")</td>
-                                                    <td class="text-end">@(s.Penalty != 0 ? FormatImportScore(s.Penalty) : "")</td>
+                                                    <td>@playerName</td>
+                                                    <td class="text-end">@FormatImportScore(end)</td>
+                                                    <td class="text-end">@(loan != 0 ? FormatImportScore(loan) : "")</td>
+                                                    <td class="text-end">@(pen != 0 ? FormatImportScore(pen) : "")</td>
                                                 </tr>
                                             }
                                         </tbody>
@@ -1634,11 +1642,12 @@ else
         // Carry the full base (origin + subpath, e.g. "https://example.com/MahjongIndeler/")
         // so the scoring app's return URL hits this organizer deployment, not the host root.
         var organizerOrigin = Nav.BaseUri.TrimEnd('/');
+        // PlayerIds intentionally not carried — the scoring app and the organizer both pair
+        // players by position (index in `names` == index in table.PlayerIds).
         var invite = new ScoringInvite(
             currentHanchan.Id,
             table.TableNumber,
             names,
-            new List<Guid>(table.PlayerIds),
             weeklyStartingPoints,
             new List<int>(uma),
             title,

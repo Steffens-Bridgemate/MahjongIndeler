@@ -73,13 +73,21 @@ public class ScoreImportService
         ScoreTable.InitializeScores(new List<TableAssignment> { table }, langGet, context.StartingPoints);
 
         var score = table.Score!;
-        foreach (var entry in result.Scores)
+        // Position-based pairing — result.Scores[i] applies to the i-th non-virtual PlayerScore.
+        // Order is the same on both sides (the invite carried PlayerNames in table.PlayerIds
+        // order; the scoring app renders + returns in that order). A count mismatch means the
+        // table was regenerated after the link was issued.
+        var realPlayers = score.PlayerScores.Where(p => !p.IsVirtual).ToList();
+        if (result.Scores.Count != realPlayers.Count)
         {
-            var ps = score.PlayerScores.FirstOrDefault(p => p.PlayerId == entry.PlayerId);
-            if (ps == null) continue;
-            ps.EndPoints = entry.EndPoints;
-            ps.Loan = entry.Loan;
-            ps.Penalty = entry.Penalty;
+            return new ApplyOutcome(false, FailureReason.NoMatchingTable, context);
+        }
+        for (int i = 0; i < result.Scores.Count; i++)
+        {
+            var entry = result.Scores[i];
+            realPlayers[i].EndPoints = entry[ScoringPayloadCodec.ScoreEndPoints];
+            realPlayers[i].Loan      = entry[ScoringPayloadCodec.ScoreLoan];
+            realPlayers[i].Penalty   = entry[ScoringPayloadCodec.ScorePenalty];
         }
 
         // 3-player table: derive Mr. X's EndPoints so the sum of differences is zero.
