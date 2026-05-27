@@ -32,6 +32,7 @@
                         <input @ref="scanInputRef" type="text" class="form-control mb-3"
                                value="@scanBuffer"
                                @oninput="OnScanInput"
+                               @onchange="OnScanChange"
                                @onkeydown="OnScanKeyDown"
                                placeholder="@Lang.Get("ImportResultPlaceholder")"
                                autocomplete="off" />
@@ -234,10 +235,11 @@
     private ElementReference scanInputRef;
     private string scanBuffer = "";
     private System.Threading.CancellationTokenSource? scanInputDebounceCts;
-    // 500 ms after the last keystroke is long enough that fast scanner bursts coalesce into
-    // a single submit, short enough that a user pasting + waiting still gets feedback quickly.
-    // Most scanners append Enter anyway — Enter cancels the debounce and submits immediately.
-    private const int ScanInputDebounceMs = 500;
+    // 250 ms after the last keystroke is short enough to feel snappy after a scan, long
+    // enough that a fast scanner burst still coalesces into a single submit. The terminator
+    // (Enter / Tab / blur via change) usually triggers first; this is just a fallback for
+    // scanners configured without a terminator.
+    private const int ScanInputDebounceMs = 250;
     // Tracks which status we last auto-focused for, so we re-focus on every transition INTO
     // a waiting state but don't fight the user during Preview/AlreadyScored reviews.
     private ImportStatus? lastAutoFocusedStatus;
@@ -341,11 +343,29 @@
 
     private async Task OnScanKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        // Cover the common HID-scanner terminators: Enter/Return on the main keys, Enter on
+        // the numpad (sometimes reported with different Key/Code), and Tab (some scanners
+        // are configured with Tab as the suffix). Tab would normally shift focus — but by
+        // the time the next focusable element gets it we've already submitted, so the user
+        // sees the preview rather than a stray focus jump.
+        if (e.Key is "Enter" or "Return" or "Tab"
+            || e.Code is "Enter" or "NumpadEnter")
         {
             scanInputDebounceCts?.Cancel();
             await SubmitScanBuffer();
         }
+    }
+
+    private async Task OnScanChange(ChangeEventArgs e)
+    {
+        // The change event fires on blur or Enter for single-line inputs. This is the most
+        // reliable "scan finished" signal across HID scanners that emit oddball terminators
+        // (raw CR/LF chars, Tab, or no terminator at all but cause the field to blur).
+        var text = (e.Value?.ToString() ?? "").Trim();
+        if (string.IsNullOrEmpty(text)) return;
+        scanBuffer = text;
+        scanInputDebounceCts?.Cancel();
+        await SubmitScanBuffer();
     }
 
     private async Task SubmitScanBuffer()
