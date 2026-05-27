@@ -32,7 +32,6 @@
                         <input @ref="scanInputRef" type="text" class="form-control mb-3"
                                value="@scanBuffer"
                                @oninput="OnScanInput"
-                               @onchange="OnScanChange"
                                @onkeydown="OnScanKeyDown"
                                placeholder="@Lang.Get("ImportResultPlaceholder")"
                                autocomplete="off" />
@@ -343,29 +342,15 @@
 
     private async Task OnScanKeyDown(KeyboardEventArgs e)
     {
-        // Cover the common HID-scanner terminators: Enter/Return on the main keys, Enter on
-        // the numpad (sometimes reported with different Key/Code), and Tab (some scanners
-        // are configured with Tab as the suffix). Tab would normally shift focus — but by
-        // the time the next focusable element gets it we've already submitted, so the user
-        // sees the preview rather than a stray focus jump.
-        if (e.Key is "Enter" or "Return" or "Tab"
-            || e.Code is "Enter" or "NumpadEnter")
+        // Cover the common HID-scanner Enter variants: main-row Enter, numpad Enter, and
+        // the (rare) "Return" key value. Tab is deliberately NOT matched here — some
+        // scanners insert tabs between URL segments as a delimiter, which would cause
+        // mid-scan submission of a truncated buffer.
+        if (e.Key is "Enter" or "Return" || e.Code is "Enter" or "NumpadEnter")
         {
             scanInputDebounceCts?.Cancel();
             await SubmitScanBuffer();
         }
-    }
-
-    private async Task OnScanChange(ChangeEventArgs e)
-    {
-        // The change event fires on blur or Enter for single-line inputs. This is the most
-        // reliable "scan finished" signal across HID scanners that emit oddball terminators
-        // (raw CR/LF chars, Tab, or no terminator at all but cause the field to blur).
-        var text = (e.Value?.ToString() ?? "").Trim();
-        if (string.IsNullOrEmpty(text)) return;
-        scanBuffer = text;
-        scanInputDebounceCts?.Cancel();
-        await SubmitScanBuffer();
     }
 
     private async Task SubmitScanBuffer()
