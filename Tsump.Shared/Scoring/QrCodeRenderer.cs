@@ -13,9 +13,12 @@ namespace Tsump.Scoring;
 public static class QrCodeRenderer
 {
     /// <summary>A circular coloured badge plus a white glyph, drawn over the centre of the QR.
-    /// Caller supplies an SVG fragment for the glyph rendered against a 16x16 viewBox using
-    /// <c>fill="currentColor"</c> (or no fill — the wrapping &lt;g&gt; sets fill to white).</summary>
-    public sealed record CenterOverlay(string GlyphSvg, string BackgroundColor, double RelativeSize = 0.22);
+    /// Caller supplies an SVG fragment for the glyph rendered against a 16x16 viewBox; the
+    /// wrapping &lt;g&gt; sets fill to white. Kept small (~15% of QR diameter) so hardware
+    /// 2D scanners — whose embedded decoders cope much worse with burst-error occlusion than
+    /// phone-based decoders — still decode reliably. Larger overlays look better but failed
+    /// on the user's USB HID scanner even though phones read them fine.</summary>
+    public sealed record CenterOverlay(string GlyphSvg, string BackgroundColor, double RelativeSize = 0.15);
 
     public static class Overlays
     {
@@ -79,17 +82,17 @@ public static class QrCodeRenderer
         var center = qrPixelSize / 2.0;
         var overlaySize = qrPixelSize * overlay.RelativeSize;
         var bgRadius = overlaySize / 2.0;
-        // A thin white ring around the coloured circle so the badge separates visually from
-        // the dense QR modules behind it.
-        var ringRadius = bgRadius + qrPixelSize * 0.012;
-        // Glyph occupies 70% of the badge diameter so it has breathing room inside the circle.
-        var glyphBoxSize = overlaySize * 0.7;
+        // Glyph fills 80% of the badge diameter — bumped from 70% to keep icons recognisable
+        // now that the badge itself is small. Still leaves a thin coloured rim around the
+        // glyph so the icon shape reads cleanly.
+        var glyphBoxSize = overlaySize * 0.8;
         var glyphScale = glyphBoxSize / 16.0;
         var glyphOffset = center - glyphBoxSize / 2.0;
 
+        // No white separator ring: every pixel we cover counts toward the QR's burst-error
+        // budget, so we keep the occluded area as small as possible. The coloured circle
+        // alone is contrast enough against the QR modules.
         var overlaySvg =
-            $"<circle cx=\"{center.ToString(inv)}\" cy=\"{center.ToString(inv)}\" " +
-            $"r=\"{ringRadius.ToString(inv)}\" fill=\"white\" />" +
             $"<circle cx=\"{center.ToString(inv)}\" cy=\"{center.ToString(inv)}\" " +
             $"r=\"{bgRadius.ToString(inv)}\" fill=\"{overlay.BackgroundColor}\" />" +
             $"<g transform=\"translate({glyphOffset.ToString(inv)},{glyphOffset.ToString(inv)}) " +
