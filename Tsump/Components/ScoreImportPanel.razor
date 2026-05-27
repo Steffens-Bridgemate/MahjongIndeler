@@ -29,12 +29,18 @@
                        pipeline as the camera / file / clipboard paths. *@
                     @if (ShouldRenderScanInput)
                     {
-                        <input @ref="scanInputRef" type="text" class="form-control mb-3"
-                               value="@scanBuffer"
-                               @oninput="OnScanInput"
-                               @onkeydown="OnScanKeyDown"
-                               placeholder="@Lang.Get("ImportResultPlaceholder")"
-                               autocomplete="off" />
+                        @* Multi-line so the full scanned URL is visible while the scanner
+                           is typing it in. Textarea preserves Enter as a literal \n in the
+                           value — the framing-marker check below is whitespace-tolerant,
+                           and SubmitScanBuffer ignores whitespace-only buffers so a stray
+                           trailing Enter from the scanner doesn't trigger a NoResult. *@
+                        <textarea @ref="scanInputRef" class="form-control mb-3" rows="3"
+                                  value="@scanBuffer"
+                                  @oninput="OnScanInput"
+                                  @onkeydown="OnScanKeyDown"
+                                  placeholder="@Lang.Get("ImportResultPlaceholder")"
+                                  autocomplete="off"
+                                  style="font-family: monospace; word-break: break-all;" />
                     }
                     @if (status == ImportStatus.Reading)
                     {
@@ -335,13 +341,16 @@
         autoReturnCts?.Cancel();
         scanBuffer = e.Value?.ToString() ?? "";
         scanInputDebounceCts?.Cancel();
-        if (string.IsNullOrEmpty(scanBuffer)) return;
+        if (string.IsNullOrWhiteSpace(scanBuffer)) return;
 
         // Bidirectional framing: the result QR wraps its URL in `[[ ... ]]`. Detect a
         // complete framed scan deterministically (no reliance on scanner-specific Enter
         // events) and distinguish front-truncation from a still-in-progress scan.
-        var hasStart = scanBuffer.StartsWith(ScoringPayloadCodec.ScanFrameStart);
-        var hasEnd = scanBuffer.EndsWith(ScoringPayloadCodec.ScanFrameEnd);
+        // Trimmed so a trailing Enter from the scanner (inserted as \n by the textarea)
+        // doesn't mask the closing marker.
+        var trimmed = scanBuffer.Trim();
+        var hasStart = trimmed.StartsWith(ScoringPayloadCodec.ScanFrameStart);
+        var hasEnd = trimmed.EndsWith(ScoringPayloadCodec.ScanFrameEnd);
         if (hasStart && hasEnd)
         {
             // Complete framed scan — submit immediately. ProcessText strips the markers.
@@ -388,7 +397,9 @@
     {
         var text = scanBuffer;
         scanBuffer = "";
-        if (string.IsNullOrEmpty(text)) return;
+        // Whitespace-only buffer can happen when the textarea captures a stray trailing
+        // Enter as \n after a successful submit; don't restart the import flow for that.
+        if (string.IsNullOrWhiteSpace(text)) return;
         await ProcessText(text);
     }
 
