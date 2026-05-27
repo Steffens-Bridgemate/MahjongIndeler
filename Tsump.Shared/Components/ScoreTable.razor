@@ -84,8 +84,9 @@
                                                on End goes straight to the next card's End. *@
                                             <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                                    tabindex="-1"
+                                                   readonly="@ReadOnlyStart"
                                                    value="@FormatDisplay(psRef.StartingPoints)"
-                                                   @onchange="e => OnStartingPointsChanged(psRef, e)" />
+                                                   @onchange="async e => { if (!ReadOnlyStart) await OnStartingPointsChanged(psRef, e); }" />
                                         </td>
                                     </tr>
                                     <tr>
@@ -227,8 +228,9 @@
                                    on the last End cell jumps to the next ScoreTable's first End. *@
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                        tabindex="-1"
+                                       readonly="@ReadOnlyStart"
                                        value="@FormatDisplay(psRef.StartingPoints)"
-                                       @onchange="e => OnStartingPointsChanged(psRef, e)"
+                                       @onchange="async e => { if (!ReadOnlyStart) await OnStartingPointsChanged(psRef, e); }"
                                        style="width:100%;" />
                             </td>
                         }
@@ -382,6 +384,9 @@
 
     [Parameter]
     public int DefaultStartingPoints { get; set; } = 30000;
+
+    [Parameter]
+    public bool ReadOnlyStart { get; set; }
 
     [Parameter]
     public List<int> Uma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };
