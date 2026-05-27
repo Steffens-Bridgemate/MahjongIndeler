@@ -12,12 +12,13 @@ namespace Tsump.Scoring;
 /// </summary>
 public static class QrCodeRenderer
 {
-    /// <summary>A circular coloured badge plus a white glyph, drawn over the centre of the QR.
-    /// Caller supplies an SVG fragment for the glyph rendered against a 16x16 viewBox; the
-    /// wrapping &lt;g&gt; sets fill to white. Kept small (~15% of QR diameter) so hardware
-    /// 2D scanners — whose embedded decoders cope much worse with burst-error occlusion than
-    /// phone-based decoders — still decode reliably. Larger overlays look better but failed
-    /// on the user's USB HID scanner even though phones read them fine.</summary>
+    /// <summary>A small circular coloured badge plus a white glyph, drawn over the QR.
+    /// Position is biased toward the bottom-right (see <c>OverlayCenterX/Y</c>) rather than
+    /// the dead centre so it avoids the QR's central alignment pattern — hardware 2D
+    /// scanners fail to decode when the centre fiducial is occluded, even though phone
+    /// decoders fall back to the corner finders. Caller supplies an SVG fragment for the
+    /// glyph rendered against a 16x16 viewBox; the wrapping &lt;g&gt; sets fill to white.
+    /// (Name kept as <c>CenterOverlay</c> for API stability across consumers.)</summary>
     public sealed record CenterOverlay(string GlyphSvg, string BackgroundColor, double RelativeSize = 0.15);
 
     public static class Overlays
@@ -76,10 +77,22 @@ public static class QrCodeRenderer
         return svg;
     }
 
+    // Badge sits in the bottom-right quadrant rather than the dead centre so it avoids the
+    // QR's central alignment pattern (the small 5x5 fiducial decoders use to correct for
+    // skew). Hardware 2D scanners that fall back when the *centre* alignment pattern is
+    // occluded tend to tolerate the loss of a *peripheral* alignment pattern more readily
+    // because there are nearby neighbours to estimate from. 0.7,0.7 puts the badge centre
+    // at ~70% along each axis — far enough from the middle to clear the centre fiducial
+    // for typical organizer payload sizes (versions 7-15), close enough that it doesn't
+    // touch the bottom-right edge or any module-timing patterns.
+    private const double OverlayCenterX = 0.7;
+    private const double OverlayCenterY = 0.7;
+
     private static string InjectOverlay(string svg, int qrPixelSize, CenterOverlay overlay)
     {
         var inv = CultureInfo.InvariantCulture;
-        var center = qrPixelSize / 2.0;
+        var cx = qrPixelSize * OverlayCenterX;
+        var cy = qrPixelSize * OverlayCenterY;
         var overlaySize = qrPixelSize * overlay.RelativeSize;
         var bgRadius = overlaySize / 2.0;
         // Glyph fills 80% of the badge diameter — bumped from 70% to keep icons recognisable
@@ -87,15 +100,16 @@ public static class QrCodeRenderer
         // glyph so the icon shape reads cleanly.
         var glyphBoxSize = overlaySize * 0.8;
         var glyphScale = glyphBoxSize / 16.0;
-        var glyphOffset = center - glyphBoxSize / 2.0;
+        var glyphOffsetX = cx - glyphBoxSize / 2.0;
+        var glyphOffsetY = cy - glyphBoxSize / 2.0;
 
         // No white separator ring: every pixel we cover counts toward the QR's burst-error
         // budget, so we keep the occluded area as small as possible. The coloured circle
         // alone is contrast enough against the QR modules.
         var overlaySvg =
-            $"<circle cx=\"{center.ToString(inv)}\" cy=\"{center.ToString(inv)}\" " +
+            $"<circle cx=\"{cx.ToString(inv)}\" cy=\"{cy.ToString(inv)}\" " +
             $"r=\"{bgRadius.ToString(inv)}\" fill=\"{overlay.BackgroundColor}\" />" +
-            $"<g transform=\"translate({glyphOffset.ToString(inv)},{glyphOffset.ToString(inv)}) " +
+            $"<g transform=\"translate({glyphOffsetX.ToString(inv)},{glyphOffsetY.ToString(inv)}) " +
             $"scale({glyphScale.ToString(inv)})\" fill=\"white\">{overlay.GlyphSvg}</g>";
 
         var closeIdx = svg.LastIndexOf("</svg>", StringComparison.OrdinalIgnoreCase);
