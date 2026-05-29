@@ -48,7 +48,7 @@ public class LanguageService
 
         // Tournament sub-nav
         ["TournamentParticipants"] = "Deelnemers",
-        ["TournamentAssignments"] = "Tafelindeling",
+        ["TournamentAssignments"] = "Tafels",
         ["TournamentGuidesheets"] = "Gidsbriefjes",
 
         // Nav / Layout
@@ -148,6 +148,8 @@ public class LanguageService
         ["SaveHanchan"] = "Hanchan opslaan",
         ["NeedAtLeast3"] = "Minimaal 3 aanwezige spelers nodig.",
         ["TableAssignments"] = "Tafelindeling",
+        ["AssignmentsAndScores"] = "Indeling en scores",
+        ["Assignments"] = "Indeling",
         ["Table"] = "Tafel",
         ["players"] = "spelers",
         ["Unknown"] = "Onbekend",
@@ -454,7 +456,7 @@ public class LanguageService
 
         // Tournament sub-nav
         ["TournamentParticipants"] = "Participants",
-        ["TournamentAssignments"] = "Table Assignments",
+        ["TournamentAssignments"] = "Tables",
         ["TournamentGuidesheets"] = "Guidesheets",
 
         // Nav / Layout
@@ -554,6 +556,8 @@ public class LanguageService
         ["SaveHanchan"] = "Save Hanchan",
         ["NeedAtLeast3"] = "Need at least 3 present players.",
         ["TableAssignments"] = "Table Assignments",
+        ["AssignmentsAndScores"] = "Assignments and scores",
+        ["Assignments"] = "Assignments",
         ["Table"] = "Table",
         ["players"] = "players",
         ["Unknown"] = "Unknown",

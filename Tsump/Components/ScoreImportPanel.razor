@@ -12,7 +12,7 @@
     <div class="mb-3">
         @if (!showPanel)
         {
-            <button class="btn btn-outline-secondary" @onclick="OpenPanel">
+            <button class="@TriggerButtonClass" disabled="@TriggerDisabled" @onclick="OpenPanel">
                 <i class="bi bi-box-arrow-in-down me-1"></i>@Lang.Get("ImportResult")
             </button>
         }
@@ -261,6 +261,12 @@
     [Parameter] public bool IsEnabled { get; set; }
     [Parameter] public EventCallback OnApplied { get; set; }
     [Parameter] public Func<Guid, string>? PlayerNameResolver { get; set; }
+    /// <summary>CSS classes for the collapsed "Import result" trigger button, so a host can
+    /// colour it to match its surroundings. Defaults to the neutral outline style.</summary>
+    [Parameter] public string TriggerButtonClass { get; set; } = "btn btn-outline-secondary";
+    /// <summary>Disables the collapsed trigger button (e.g. when the host is on a tab where
+    /// importing isn't relevant). Has no effect once the panel is open.</summary>
+    [Parameter] public bool TriggerDisabled { get; set; }
 
     private enum ImportStatus
     {

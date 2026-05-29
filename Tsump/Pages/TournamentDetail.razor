@@ -42,54 +42,77 @@ else
         </li>
     </ul>
 
-    @* --- Generate button --- *@
-    <div class="mb-3">
-        @if (showRegenerateConfirm)
-        {
-            <div class="alert alert-warning d-inline-block me-2">
-                @Lang.Get("RegenerateConfirmTournament")
-                <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
-                <button class="btn btn-sm btn-secondary" @onclick="() => showRegenerateConfirm = false">@Lang.Get("Cancel")</button>
-            </div>
-        }
-        else
-        {
+    @* --- Initial generate button (pre-generation only; once generated the Regenerate
+         button moves into the assignments card, on the Import-result row). --- *@
+    @if (!tournament.IsGenerated)
+    {
+        <div class="mb-3">
             <button class="btn btn-primary me-2" @onclick="GenerateSessions"
                     disabled="@(tournament.Participants.Count < 13)">
-                @(tournament.IsGenerated ? Lang.Get("RegenerateAllHanchans") : Lang.Get("GenerateAllHanchans"))
+                <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("GenerateAllHanchans")
             </button>
-        }
-        @if (tournament.Participants.Count < 13)
-        {
-            <span class="text-warning">@Lang.Get("NeedAtLeast13")</span>
-        }
-    </div>
+            @if (tournament.Participants.Count < 13)
+            {
+                <span class="text-warning">@Lang.Get("NeedAtLeast13")</span>
+            }
+        </div>
+    }
 
     @* --- Sessions display --- *@
     @if (tournament.Sessions.Count > 0)
     {
         <div class="card mt-3 mb-3">
         <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => assignmentsExpanded = !assignmentsExpanded">
-            <h4 class="mb-0 flex-grow-1">@Lang.Get("TableAssignments")</h4>
+            <h4 class="mb-0 flex-grow-1">@Lang.Get("AssignmentsAndScores")</h4>
             <span class="ms-2">@(assignmentsExpanded ? "\u25B2" : "\u25BC")</span>
         </div>
         @if (assignmentsExpanded)
         {
         <div class="card-body">
 
-        <ScoreImportPanel IsEnabled="externalScoringEnabled"
-                          OnApplied="ReloadTournament"
-                          PlayerNameResolver="GetParticipantDisplay" />
+        @* Regenerate + Import result share a row, each active only on the tab it relates to:
+           Regenerate is live on the Assignments ("Indeling") tab and greys out on a scores tab;
+           Import result is the reverse. Active = blue (btn-primary), inactive = disabled grey. *@
+        @{
+            var onTablesTab = tournamentActiveTab == "tables";
+        }
+        <div class="d-flex align-items-start flex-wrap gap-2 mb-3">
+            @if (showRegenerateConfirm)
+            {
+                <div class="alert alert-warning d-inline-block mb-0 py-2">
+                    @Lang.Get("RegenerateConfirmTournament")
+                    <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="() => showRegenerateConfirm = false">@Lang.Get("Cancel")</button>
+                </div>
+            }
+            else
+            {
+                <button class="btn @(onTablesTab ? "btn-primary" : "btn-secondary")" disabled="@(!onTablesTab)" @onclick="GenerateSessions">
+                    <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("RegenerateAllHanchans")
+                </button>
+            }
+            <ScoreImportPanel IsEnabled="externalScoringEnabled"
+                              OnApplied="ReloadTournament"
+                              PlayerNameResolver="GetParticipantDisplay"
+                              TriggerButtonClass="@(onTablesTab ? "btn btn-secondary" : "btn btn-primary")"
+                              TriggerDisabled="onTablesTab" />
+        </div>
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
                 @{
                     var tablesActive = tournamentActiveTab == "tables";
+                    // btn-primary isn't a bg-* utility, so it ignores --bs-bg-opacity (the trick the
+                    // scores tabs use), and the .nav-tabs.active rule would otherwise blank the
+                    // selected tab. Set the background inline to the *themed* btn-primary blue
+                    // (app.css overrides .btn-primary to #004b8d, not Bootstrap's default), dimming
+                    // only the background to 0.2 when not active (text-white keeps the label white).
+                    var tablesOpacity = tablesActive ? "1" : "0.2";
                 }
-                <a class="nav-link bg-primary text-white @(tablesActive ? "active" : "")"
-                   style="@ScoreStatusHelper.TabStyle(tablesActive)"
+                <a class="nav-link btn-primary text-white @(tablesActive ? "active" : "")"
+                   style="background-color: rgba(0, 75, 141, @tablesOpacity) !important;"
                    href="javascript:void(0)" @onclick='() => tournamentActiveTab = "tables"'>
-                    @Lang.Get("TableAssignments")
+                    @Lang.Get("Assignments")
                 </a>
             </li>
             <li class="nav-item">
@@ -99,7 +122,7 @@ else
                     var scoresExplain = scoresStatus == ScoreStatusHelper.Status.Partial || scoresStatus == ScoreStatusHelper.Status.Stale;
                 }
                 <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "") @scoresClass"
-                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "scores")"
+                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "scores", 0.2)"
                    href="javascript:void(0)" @onclick="ActivateScoresTab">
                     @Lang.Get("Scores")
                     @if (scoresExplain)
@@ -116,7 +139,7 @@ else
                     var allExplain = scoresExplain;
                 }
                 <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "") @allClass"
-                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "allscores")"
+                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "allscores", 0.2)"
                    href="javascript:void(0)" @onclick="ActivateAllScoresTab">
                     @Lang.Get("AllScores")
                     @if (allExplain)

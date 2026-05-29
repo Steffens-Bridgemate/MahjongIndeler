@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//c/Users/aners/source/repos/MahjongMeetingsManagement/**)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(grep -rln 'bs-primary\\\\|btn-primary\\\\|--bs-primary-rgb\\\\|$primary' Tsump/wwwroot/)"
     ]
   }
 }

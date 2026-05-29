@@ -85,4 +85,9 @@ public static class ScoreStatusHelper
     /// <summary>Returns the bg-opacity inline style for a nav-link tab, or an empty
     /// string when the tab is active (full opacity).</summary>
     public static string TabStyle(bool isActive) => isActive ? "" : UnselectedTabBgStyle;
+
+    /// <summary>As <see cref="TabStyle(bool)"/> but with a caller-chosen unselected background
+    /// opacity (e.g. a panel that wants its inactive tabs dimmed more strongly).</summary>
+    public static string TabStyle(bool isActive, double unselectedOpacity) =>
+        isActive ? "" : $"--bs-bg-opacity: {unselectedOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture)};";
 }
