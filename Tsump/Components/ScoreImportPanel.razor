@@ -25,19 +25,17 @@
                 <div class="card-body">
                     @* Always-on input that captures HID-scanner keystrokes, manual pastes,
                        and typed URLs. Hidden during live camera scanning / file decoding
-                       where it would steal focus or look out of place. Same ProcessText
-                       pipeline as the camera / file / clipboard paths. *@
+                       where it would steal focus or look out of place. *@
                     @if (ShouldRenderScanInput)
                     {
-                        @* Multi-line so the full scanned URL is visible while the scanner
-                           is typing it in. Textarea preserves Enter as a literal \n in the
-                           value — the framing-marker check below is whitespace-tolerant,
-                           and SubmitScanBuffer ignores whitespace-only buffers so a stray
-                           trailing Enter from the scanner doesn't trigger a NoResult. *@
+                        @* Uncontrolled on purpose. Keystroke accumulation and frame detection
+                           live in JS (attachScanCapture), which hands the COMPLETE scan to
+                           .NET in a single OnScanComplete call. A controlled value="@..." bound
+                           to @oninput re-renders per keystroke and, under a slow event loop
+                           (debug build, sluggish phone), reverts the textarea mid-burst and
+                           drops characters. JS owns el.value; Blazor never touches it after the
+                           first render. Multi-line so the full URL is visible while scanning. *@
                         <textarea @ref="scanInputRef" class="form-control mb-3" rows="3"
-                                  value="@scanBuffer"
-                                  @oninput="OnScanInput"
-                                  @onkeydown="OnScanKeyDown"
                                   placeholder="@Lang.Get("ImportResultPlaceholder")"
                                   autocomplete="off"
                                   style="font-family: monospace; word-break: break-all;" />
@@ -244,15 +242,13 @@
     private System.Threading.CancellationTokenSource? scanTimerCts;
 
     // Always-on input that catches USB HID-scanner keystrokes, manual pastes, and typed URLs.
+    // Keystroke accumulation + frame detection happen JS-side (see attachScanCapture in
+    // index.html); the complete scan arrives here in one call via OnScanComplete.
     private ElementReference scanInputRef;
-    private string scanBuffer = "";
-    private System.Threading.CancellationTokenSource? scanInputDebounceCts;
-    // Debounce ONLY applies in unframed mode (manual paste / type). For HID-scanner
-    // input, the [[ ... ]] framing markers signal end-of-scan deterministically — no
-    // debounce, so the scanner can stall between bursts without truncating the buffer.
-    // 500 ms is long enough that a human typing pauses don't fire prematurely, short
-    // enough that paste-and-wait feels responsive.
-    private const int ScanInputDebounceMs = 500;
+    // True while the JS capture listeners are bound to the current textarea element. Reset
+    // whenever the textarea leaves the DOM (camera/file states, panel closed) so we re-bind
+    // when it returns.
+    private bool scanCaptureAttached;
     // Tracks which status we last auto-focused for, so we re-focus on every transition INTO
     // a waiting state but don't fight the user during Preview/AlreadyScored reviews.
     private ImportStatus? lastAutoFocusedStatus;
@@ -289,8 +285,12 @@
     {
         // Fire-and-forget: stop the scanner if it's still running (e.g. user navigated away).
         _ = StopQrScannerIfRunning();
+        if (scanCaptureAttached)
+        {
+            try { _ = JS.InvokeVoidAsync("detachScanCapture", scanInputRef); }
+            catch { /* renderer tearing down — listeners die with the element anyway */ }
+        }
         scannerRef?.Dispose();
-        scanInputDebounceCts?.Cancel();
         inactivityCts?.Cancel();
         autoReturnCts?.Cancel();
     }
@@ -320,95 +320,61 @@
         if (!showPanel)
         {
             lastAutoFocusedStatus = null;
+            scanCaptureAttached = false; // textarea gone; its listeners die with it
             return;
         }
-        if (!ShouldAutoFocusScanInput) return;
-        if (lastAutoFocusedStatus == status) return;
-        try
+        if (!ShouldRenderScanInput)
         {
-            await scanInputRef.FocusAsync();
-            lastAutoFocusedStatus = status;
+            // Camera / file-decode states: the textarea isn't in the DOM right now.
+            scanCaptureAttached = false;
+            return;
         }
-        catch
+
+        scannerRef ??= DotNetObjectReference.Create(this);
+        // Bind the JS keystroke capture to the textarea once per appearance. attachScanCapture
+        // is idempotent (it detaches any prior binding first), so a stray re-call is harmless.
+        if (!scanCaptureAttached)
         {
-            // Element not yet in the DOM (e.g. very first render before showPanel propagates).
-            // Will retry on the next render cycle.
+            try { scanCaptureAttached = await JS.InvokeAsync<bool>("attachScanCapture", scanInputRef, scannerRef); }
+            catch { /* element not ready yet — retry next render */ }
+        }
+
+        // Re-focus (and clear) on every transition INTO a waiting state so the next scan lands
+        // in an empty, focused box. Never fires mid-scan: a scan in flight does no .NET calls,
+        // so there's no re-render between keystrokes to trigger this.
+        if (ShouldAutoFocusScanInput && lastAutoFocusedStatus != status)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("focusAndClearScanInput", scanInputRef);
+                lastAutoFocusedStatus = status;
+            }
+            catch { /* element not ready yet — retry next render */ }
         }
     }
 
-    private async Task OnScanInput(ChangeEventArgs e)
+    /// <summary>Called from JS (attachScanCapture) once a complete scan / paste / typed URL
+    /// has been assembled — framed input commits on `]]`, unframed input on Enter or idle.
+    /// The full string crosses to .NET exactly once, so a slow event loop can't truncate it.</summary>
+    [JSInvokable]
+    public async Task OnScanComplete(string text)
     {
         ResetInactivityTimer();
         autoReturnCts?.Cancel();
-        scanBuffer = e.Value?.ToString() ?? "";
-        scanInputDebounceCts?.Cancel();
-        if (string.IsNullOrWhiteSpace(scanBuffer)) return;
-
-        // Bidirectional framing: the result QR wraps its URL in `[[ ... ]]`. Detect a
-        // complete framed scan deterministically (no reliance on scanner-specific Enter
-        // events) and distinguish front-truncation from a still-in-progress scan.
-        // Trimmed so a trailing Enter from the scanner (inserted as \n by the textarea)
-        // doesn't mask the closing marker.
-        var trimmed = scanBuffer.Trim();
-        var hasStart = trimmed.StartsWith(ScoringPayloadCodec.ScanFrameStart);
-        var hasEnd = trimmed.EndsWith(ScoringPayloadCodec.ScanFrameEnd);
-        if (hasStart && hasEnd)
-        {
-            // Complete framed scan — submit immediately. ProcessText strips the markers.
-            await SubmitScanBuffer();
-            return;
-        }
-        if (hasEnd && !hasStart)
-        {
-            // Closing marker without opening one → the focus arrived after the scan
-            // started and we missed the head of the URL. Tell the user to re-scan.
-            scanBuffer = "";
-            status = ImportStatus.ScanTruncated;
-            StateHasChanged();
-            return;
-        }
-        if (hasStart)
-        {
-            // Mid-frame: buffer starts with [[ but the closing ]] hasn't arrived yet.
-            // Wait silently — explicitly no debounce so a scanner stalling between
-            // bursts doesn't get its in-flight scan truncated by a timer.
-            return;
-        }
-
-        // No framing markers at all → unframed input (manual paste/type/etc.). Debounce
-        // is the only signal we have for "input complete" here.
-        var cts = new System.Threading.CancellationTokenSource();
-        scanInputDebounceCts = cts;
-        try
-        {
-            await Task.Delay(ScanInputDebounceMs, cts.Token);
-            if (cts.IsCancellationRequested) return;
-            await SubmitScanBuffer();
-        }
-        catch (TaskCanceledException) { /* a newer keystroke arrived — that one resets the timer */ }
-    }
-
-    private async Task OnScanKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key is "Enter" or "Return" || e.Code is "Enter" or "NumpadEnter")
-        {
-            // Mid-frame Enter (some scanners use Enter as a mid-data segment terminator):
-            // ignore — the framing-marker check in OnScanInput will commit when ]] arrives.
-            // Outside framed mode (manual paste/type), treat Enter as the commit signal.
-            if (scanBuffer.Contains(ScoringPayloadCodec.ScanFrameStart)) return;
-            scanInputDebounceCts?.Cancel();
-            await SubmitScanBuffer();
-        }
-    }
-
-    private async Task SubmitScanBuffer()
-    {
-        var text = scanBuffer;
-        scanBuffer = "";
-        // Whitespace-only buffer can happen when the textarea captures a stray trailing
-        // Enter as \n after a successful submit; don't restart the import flow for that.
         if (string.IsNullOrWhiteSpace(text)) return;
         await ProcessText(text);
+    }
+
+    /// <summary>Called from JS when the buffer ended with the closing `]]` but never had the
+    /// opening `[[` — focus arrived after the HID scan started, so we missed the head.</summary>
+    [JSInvokable]
+    public Task OnScanTruncated()
+    {
+        ResetInactivityTimer();
+        autoReturnCts?.Cancel();
+        status = ImportStatus.ScanTruncated;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private string ResolveName(Guid id)
@@ -674,7 +640,6 @@
                     status = ImportStatus.Reading;
                     pendingResult = null;
                     pendingLookup = null;
-                    scanBuffer = "";
                     StateHasChanged();
                     // Deliberately NOT re-reading the clipboard here. In a multi-scan
                     // workflow the clipboard still holds the URL we just applied, and

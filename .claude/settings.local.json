@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/aners/source/repos/MahjongMeetingsManagement/**)"
+      "Read(//c/Users/aners/source/repos/MahjongMeetingsManagement/**)",
+      "Bash(dotnet build *)"
     ]
   }
 }

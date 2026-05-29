@@ -248,6 +248,84 @@
             };
             input.click();
         };
+
+        // --- HID-scanner / paste capture, JS-side ---
+        // A USB HID scanner is a keyboard that types the whole URL in a sub-second burst.
+        // We accumulate keystrokes natively here and hand the COMPLETE string to .NET in a
+        // single invokeMethodAsync call. Doing the per-keystroke work in JS (synchronous, no
+        // marshaling) means a slow Blazor event loop — debug build, or a sluggish phone —
+        // can't overrun us and drop characters, which is what happens with a controlled
+        // <textarea value=@...> bound to @oninput.
+        //
+        // Framing: result QRs wrap the URL in `[[ … ]]`. A complete framed scan is detected
+        // deterministically the instant `]]` arrives — no timer. Unframed input (manual paste
+        // or typing) commits on Enter or after a short idle. Neither `[` nor `]` occurs in our
+        // URLs, so the markers are unambiguous.
+        window.attachScanCapture = function (el, dotNetRef) {
+            if (!el) return false;
+            window.detachScanCapture(el); // drop any prior binding on this element
+
+            const FRAME_START = '[[';
+            const FRAME_END = ']]';
+            const UNFRAMED_IDLE_MS = 500;
+
+            let idleTimer = null;
+            const clearIdle = function () { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } };
+            const submit = function (text) {
+                clearIdle();
+                el.value = ''; // only ever cleared at commit time, never mid-burst
+                dotNetRef.invokeMethodAsync('OnScanComplete', text);
+            };
+
+            const onInput = function () {
+                const value = el.value;
+                const trimmed = value.trim();
+                if (trimmed.length === 0) { clearIdle(); return; }
+                const hasStart = trimmed.startsWith(FRAME_START);
+                const hasEnd = trimmed.endsWith(FRAME_END);
+                if (hasStart && hasEnd) { submit(value); return; }     // complete framed scan
+                if (hasEnd && !hasStart) {                              // front-truncated: focus arrived late
+                    clearIdle();
+                    el.value = '';
+                    dotNetRef.invokeMethodAsync('OnScanTruncated');
+                    return;
+                }
+                if (hasStart) { clearIdle(); return; }                 // mid-frame: wait for ]]
+                // Unframed (paste/type): idle debounce is the only "input complete" signal.
+                clearIdle();
+                idleTimer = setTimeout(function () { idleTimer = null; submit(el.value); }, UNFRAMED_IDLE_MS);
+            };
+
+            const onKeyDown = function (e) {
+                if (e.key === 'Enter' || e.key === 'Return' || e.code === 'Enter' || e.code === 'NumpadEnter') {
+                    // Mid-frame Enter (some scanners use it as a segment terminator): ignore —
+                    // the ]] check commits. Otherwise Enter is the manual commit signal.
+                    if (el.value.includes(FRAME_START)) return;
+                    e.preventDefault(); // don't insert a newline before we read the value
+                    submit(el.value);
+                }
+            };
+
+            el.addEventListener('input', onInput);
+            el.addEventListener('keydown', onKeyDown);
+            el._scanCapture = { onInput: onInput, onKeyDown: onKeyDown };
+            return true;
+        };
+
+        window.detachScanCapture = function (el) {
+            if (!el || !el._scanCapture) return;
+            try {
+                el.removeEventListener('input', el._scanCapture.onInput);
+                el.removeEventListener('keydown', el._scanCapture.onKeyDown);
+            } catch (_) { }
+            el._scanCapture = null;
+        };
+
+        window.focusAndClearScanInput = function (el) {
+            if (!el) return;
+            el.value = '';
+            try { el.focus(); } catch (_) { }
+        };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script>
