@@ -6,8 +6,10 @@ Primary file: [Tsump/Components/ScoreImportPanel.razor](../Tsump/Components/Scor
 
 ## Used by
 
-- `<ScoreImportPanel>` is wired in **[TournamentDetail.razor](../Tsump/Pages/TournamentDetail.razor)** above the Tables/Scores/AllScores tab nav (page-level, one panel per tournament).
-- **[WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor)** still has its own **older inlined copy** of an earlier version of this flow (always-on capture, auto-clipboard-on-open, 2s auto-return). The Phase B migration to the component was started and reverted; until it's redone, the weekly copy is **significantly behind** the component (no neutral-state flow, no JS-side capture, no two-state bar). Don't try to keep them in sync feature-by-feature — the plan is to replace the inlined copy wholesale.
+- **[TournamentDetail.razor](../Tsump/Pages/TournamentDetail.razor)** — in a Regenerate+Import row at the top of the assignments card body; `TriggerDisabled` on the Assignments tab. `OnApplied="ReloadTournament"`.
+- **[WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor)** — at the top of the Scores tab content. `OnApplied="OnHanchanScoreApplied"`.
+
+Both also use `<TableShareActions>` for the per-table share/QR buttons. There is no inlined import/share code left in either page — the components are the single source of truth.
 
 ## Design: neutral-first
 

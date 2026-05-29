@@ -98,7 +98,7 @@ Steps 3–6 (initialise → apply by position → derive Mr. X → compute Uma) 
 
 ## What `ApplyAsync` does NOT do
 
-- It doesn't refresh any UI state — callers reload data after a successful outcome (`ReloadTournament` in TournamentDetail; `ApplyImportPreview` in WeeklySessionPage).
+- It doesn't refresh any UI state — callers reload data after a successful outcome (`ReloadTournament` in TournamentDetail; `OnHanchanScoreApplied` in WeeklySessionPage, both wired to `ScoreImportPanel.OnApplied`).
 - It doesn't initialise `Score` on other tables in the container. UI re-loaders must call `ScoreTable.InitializeScores` on all tables themselves to keep them visible (the score-null gotcha).
 - It can't validate that the player **identities** still match (no PlayerIds in the wire format). If the assignments were regenerated and the new table has the same player *count* but different players, the result silently writes onto whichever players sit at those positions now. Count mismatch is caught (`NoMatchingTable`); identity drift is not.
 
@@ -117,7 +117,7 @@ Three read-only helpers, no mutation of stored data, no save:
 | Caller | Path | What it does after `ApplyAsync` |
 |---|---|---|
 | [ImportScorePage.razor](../Tsump/Pages/ImportScorePage.razor) | `/import-score#r=…` deep link | Renders applied banner, link back to session |
-| [WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor) `ApplyImportPreview` | older inlined import panel (pending Phase B migration) | Reloads `hanchansOnDate`, re-points `currentHanchan`, re-inits scores, bumps `scoreTableVersion` |
+| [WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor) `OnHanchanScoreApplied` | `<ScoreImportPanel>` on the Scores tab | Reloads `hanchansOnDate`, re-points `currentHanchan`, re-inits scores, bumps `scoreTableVersion` |
 | [ScoreImportPanel.razor](../Tsump/Components/ScoreImportPanel.razor) `Apply` | the shared component | Invokes `OnApplied` (consumer e.g. `TournamentDetail.ReloadTournament` reloads + re-inits scores), then continues per input method — see [score-import-ui.md](score-import-ui.md) |
 
 `BuildPreviewAsync` / `DescribeAsync` are also consumed by [ScanLog.razor](../Tsump/Pages/ScanLog.razor) (read-only; no apply).

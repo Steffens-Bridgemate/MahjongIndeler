@@ -1,11 +1,9 @@
 @page "/session"
 @using Tsump.Models
 @using Tsump.Services
-@using Tsump.Scoring
 @inject MemberService MemberService
 @inject SessionService SessionService
 @inject TableAssignmentService TableAssignmentService
-@inject ScoreImportService ScoreImport
 @inject LanguageService Lang
 @inject SettingsService SettingsService
 @inject IJSRuntime JS
@@ -494,23 +492,18 @@ else
                                     </li>
                                 }
                             </ul>
-                            @if (externalScoringEnabled)
+                            @if (externalScoringEnabled && currentHanchan != null)
                             {
                                 var tableRef = table;
                                 <div class="card-footer p-2">
-                                    <div class="d-flex gap-1">
-                                        <button class="btn btn-sm btn-outline-secondary flex-grow-1"
-                                                @onclick="() => ShareScoringLink(tableRef)"
-                                                title="@Lang.Get("ShareScoringLink")">
-                                            <i class="bi bi-link-45deg me-1"></i>@(sharedScoringLinkTableNumber == tableRef.TableNumber ? Lang.Get("Copied") : Lang.Get("ShareScoringLink"))
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary"
-                                                @onclick="() => ShowScoringQrFor(tableRef)"
-                                                title="@Lang.Get("ShowQrCode")"
-                                                aria-label="@Lang.Get("ShowQrCode")">
-                                            <i class="bi bi-qr-code"></i>
-                                        </button>
-                                    </div>
+                                    <TableShareActions ContextId="currentHanchan.Id"
+                                                       SessionNumber="CurrentHanchanNumber()"
+                                                       Table="tableRef"
+                                                       PlayerNameResolver="GetPlayerName"
+                                                       StartingPoints="weeklyStartingPoints"
+                                                       Uma="@(tableRef.PlayerCount == 3 ? uma3Players : uma4Players)"
+                                                       Title="@($"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()} — {Lang.Get("Table")} {tableRef.TableNumber}")"
+                                                       ShortQrTitle="@($"{BuildHanchanSubtitle()} — {Lang.Get("Table")} {tableRef.TableNumber}")" />
                                 </div>
                             }
                         </div>
@@ -527,189 +520,9 @@ else
         }
         else if (activeTab == "scores")
         {
-            @if (externalScoringEnabled)
-            {
-                <div class="mb-3">
-                    @if (!showImportResult)
-                    {
-                        <button class="btn btn-outline-secondary" @onclick="OpenImportResult">
-                            <i class="bi bi-box-arrow-in-down me-1"></i>@Lang.Get("ImportResult")
-                        </button>
-                    }
-                    else
-                    {
-                        <div class="card">
-                            <div class="card-header d-flex align-items-center">
-                                <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
-                            </div>
-                            <div class="card-body">
-                                @if (importStatus == ImportStatus.Reading)
-                                {
-                                    <p class="text-muted small mb-0">@Lang.Get("ImportResultReading")</p>
-                                }
-                                else if (importStatus == ImportStatus.Preview || importStatus == ImportStatus.AlreadyScored)
-                                {
-                                    @if (pendingImportLookup != null)
-                                    {
-                                        var pl = pendingImportLookup.Context;
-                                        var headerClass = pl.Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white";
-                                        <div class="@headerClass py-1 px-2 mb-2 rounded">
-                                            @pl.DisplayLabel
-                                            <span class="ms-1">(@pl.Table.PlayerCount @Lang.Get("players"))</span>
-                                        </div>
-                                    }
-                                    <p>@Lang.Get("ImportScoreConfirm")</p>
-
-                                    @if (importStatus == ImportStatus.AlreadyScored)
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportScoreOverwriteWarning")</div>
-                                    }
-
-                                    <table class="table table-sm table-bordered" style="max-width:500px;">
-                                        <thead>
-                                            <tr>
-                                                <th>@Lang.Get("Player")</th>
-                                                <th class="text-end">@Lang.Get("EndShort")</th>
-                                                <th class="text-end">@Lang.Get("LoanShort")</th>
-                                                <th class="text-end">@Lang.Get("PenaltyShort")</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @* Position-based: row i of the result applies to the i-th
-                                               non-virtual PlayerId on the matched table. *@
-                                            @for (int i = 0; i < pendingImportResult!.Scores.Count; i++)
-                                            {
-                                                var s = pendingImportResult.Scores[i];
-                                                var pids = pendingImportLookup!.Context.Table.PlayerIds;
-                                                var playerName = i < pids.Count ? GetPlayerName(pids[i]) : "—";
-                                                var end = s[ScoringPayloadCodec.ScoreEndPoints];
-                                                var loan = s[ScoringPayloadCodec.ScoreLoan];
-                                                var pen = s[ScoringPayloadCodec.ScorePenalty];
-                                                <tr>
-                                                    <td>@playerName</td>
-                                                    <td class="text-end">@FormatImportScore(end)</td>
-                                                    <td class="text-end">@(loan != 0 ? FormatImportScore(loan) : "")</td>
-                                                    <td class="text-end">@(pen != 0 ? FormatImportScore(pen) : "")</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-
-                                    <button class="btn btn-success me-2" @onclick="() => ApplyImportPreview(confirmOverwrite: true)">
-                                        <i class="bi bi-check2 me-1"></i>@(importStatus == ImportStatus.AlreadyScored ? Lang.Get("YesOverwrite") : Lang.Get("ImportScoreApply"))
-                                    </button>
-                                    <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Cancel")</button>
-                                }
-                                else if (importStatus == ImportStatus.NotResultLink
-                                         || importStatus == ImportStatus.NoResult
-                                         || importStatus == ImportStatus.NoMatchingTable
-                                         || importStatus == ImportStatus.ScanError
-                                         || importStatus == ImportStatus.FileScanFailed)
-                                {
-                                    @if (importStatus == ImportStatus.NotResultLink)
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
-                                    }
-                                    else if (importStatus == ImportStatus.NoMatchingTable)
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
-                                    }
-                                    else if (importStatus == ImportStatus.ScanError)
-                                    {
-                                        <div class="alert alert-danger py-2 mb-2">@(scanErrorMessage ?? Lang.Get("ScanCameraError"))</div>
-                                    }
-                                    else if (importStatus == ImportStatus.FileScanFailed)
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("FileScanNoQr")</div>
-                                    }
-                                    else
-                                    {
-                                        <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
-                                    }
-
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button class="btn btn-outline-primary" @onclick="TryImportFromClipboard">
-                                            <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Retry")
-                                        </button>
-                                        <button class="btn btn-outline-primary" @onclick="StartQrScan">
-                                            <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
-                                        </button>
-                                        <button class="btn btn-outline-primary" @onclick="PickQrImage">
-                                            <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
-                                        </button>
-                                    </div>
-                                }
-                                else if (importStatus == ImportStatus.FileDecoding)
-                                {
-                                    <div class="d-flex align-items-center small">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
-                                        <span class="text-muted">@Lang.Get("FileDecoding")</span>
-                                    </div>
-                                }
-                                else if (importStatus == ImportStatus.Scanning)
-                                {
-                                    <p class="text-muted small mb-2">@Lang.Get("ScanQrHint")</p>
-                                    <div id="qr-scanner-view" style="max-width:480px; width:100%; margin:0 auto;"></div>
-
-                                    <div class="d-flex align-items-center mt-2 small">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
-                                        <span class="text-muted">
-                                            @Lang.Get("ScanLooking")
-                                            @if (scanElapsedSeconds >= 1)
-                                            {
-                                                <span class="ms-1">(@scanElapsedSeconds s)</span>
-                                            }
-                                        </span>
-                                    </div>
-
-                                    @if (scanElapsedSeconds >= 8)
-                                    {
-                                        <div class="alert alert-info py-2 mt-2 mb-2 small">
-                                            @Lang.Get("ScanStillLooking")
-                                        </div>
-                                    }
-
-                                    <ul class="text-muted small mt-2 mb-2 ps-3">
-                                        <li>@Lang.Get("ScanTipFraming")</li>
-                                        <li>@Lang.Get("ScanTipFocus")</li>
-                                        <li>@Lang.Get("ScanTipLight")</li>
-                                        @if (scanElapsedSeconds >= 8)
-                                        {
-                                            <li>@Lang.Get("ScanTipLaptop")</li>
-                                        }
-                                    </ul>
-
-                                    <button class="btn btn-outline-secondary" @onclick="CancelQrScan">
-                                        <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
-                                    </button>
-                                }
-                                else if (importStatus == ImportStatus.Applied)
-                                {
-                                    <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button class="btn btn-primary" @onclick="TryImportFromClipboard">
-                                            <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
-                                        </button>
-                                        <button class="btn btn-outline-primary" @onclick="StartQrScan">
-                                            <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
-                                        </button>
-                                        <button class="btn btn-outline-primary" @onclick="PickQrImage">
-                                            <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
-                                        </button>
-                                        <button class="btn btn-outline-secondary" @onclick="CancelImportResult">@Lang.Get("Close")</button>
-                                    </div>
-                                }
-
-                                @* Hidden file input + workspace div for the file-decode path.
-                                   Always rendered while the panel is open so the JS picker can find them. *@
-                                <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
-                                <div id="qr-file-decode-tmp" style="display:none;"></div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
+            <ScoreImportPanel IsEnabled="externalScoringEnabled"
+                              OnApplied="OnHanchanScoreApplied"
+                              PlayerNameResolver="GetPlayerName" />
             @foreach (var table in tables)
             {
                 <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
@@ -761,11 +574,6 @@ else
         font-size: 1.2em;
     }
 </style>
-
-<QrCodeModal IsOpen="showScoringQr" Url="@scoringQrUrl" Title="@scoringQrTitle"
-             Subtitle="@(scoringQrCopied ? Lang.Get("QrCopiedToClipboard") : Lang.Get("QrCodeScoringSubtitle"))"
-             Overlay="@Tsump.Scoring.QrCodeRenderer.Overlays.Organizer"
-             OnClose="CloseScoringQr" />
 
 @code {
     private string? statusExplanation;
@@ -831,43 +639,9 @@ else
     private bool showExportRankings;
     private bool externalScoringEnabled;
 
-    // In-app "Import result" flow. The panel auto-reads the clipboard on open
-    // and jumps straight to a preview if the clipboard contains a valid result link,
-    // or shows one of the diagnostic banners otherwise.
-    private bool showImportResult;
-    private ImportStatus importStatus = ImportStatus.Reading;
-    private ScoringResult? pendingImportResult;
-    private ScoreImportService.Lookup? pendingImportLookup;
     // Bumped on each successful import; included in @key on ScoreTable so Blazor
     // disposes the stale instance and re-renders with the freshly written model.
     private int scoreTableVersion;
-
-    private enum ImportStatus
-    {
-        Reading,           // initial / transient state while we read the clipboard
-        NotResultLink,     // clipboard holds an invite link (#p=), not a result link
-        NoResult,          // clipboard is empty, or contents don't look like a result link
-        NoMatchingTable,   // decoded fine but no Hanchan/Table found locally
-        Scanning,          // camera scanner is live
-        ScanError,         // camera failed to start (permission denied, no camera, ...)
-        FileDecoding,      // user picked an image, html5-qrcode is decoding it
-        FileScanFailed,    // decode finished but no QR was found in the image
-        Preview,           // decoded + found, awaiting user confirmation
-        AlreadyScored,     // matching table already has scores; preview + ask before overwriting
-        Applied,           // success
-    }
-
-    private DotNetObjectReference<WeeklySessionPage>? qrScannerRef;
-    private string? scanErrorMessage;
-    private int scanElapsedSeconds;
-    private System.Threading.CancellationTokenSource? scanTimerCts;
-
-    private static string FormatImportScore(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
-    private int? sharedScoringLinkTableNumber;
-    private bool showScoringQr;
-    private string? scoringQrUrl;
-    private string? scoringQrTitle;
-    private bool scoringQrCopied;
     private bool copiedRankingsToClipboard;
     private string? workflowStepKey;
     private string activeTab = "tables";
@@ -882,14 +656,7 @@ else
         sessionDate.Date < DateTime.Today && currentHanchan is { IsFinalized: true };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
-    public void Dispose()
-    {
-        Lang.OnLanguageChanged -= StateHasChanged;
-        // Fire-and-forget: stop the scanner if it's still running (e.g. user navigated away
-        // while in the Scanning state). Errors are swallowed inside StopQrScannerIfRunning.
-        _ = StopQrScannerIfRunning();
-        qrScannerRef?.Dispose();
-    }
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
     private IEnumerable<Member> FilteredMembers()
     {
@@ -1388,336 +1155,26 @@ else
                printBtn + bodyContent + "</body></html>";
     }
 
-    private async Task OpenImportResult()
+    /// <summary>Invoked by <see cref="ScoreImportPanel"/> after a result is applied. Reloads
+    /// the day's hanchans and re-points <c>currentHanchan</c> at the fresh instance (GetAllAsync
+    /// deserialises anew), re-initialising scores so unscored tables don't vanish and bumping
+    /// the ScoreTable @key so each rebuilds with the written model. Mirrors
+    /// <c>TournamentDetail.ReloadTournament</c>.</summary>
+    private async Task OnHanchanScoreApplied()
     {
-        showImportResult = true;
-        importStatus = ImportStatus.Reading;
-        pendingImportResult = null;
-        pendingImportLookup = null;
-        StateHasChanged();
-        await TryImportFromClipboard();
-    }
-
-    private async Task TryImportFromClipboard()
-    {
-        importStatus = ImportStatus.Reading;
-        pendingImportResult = null;
-        pendingImportLookup = null;
-        StateHasChanged();
-
-        string? clip = null;
-        try
-        {
-            clip = await JS.InvokeAsync<string?>("readClipboardText");
-        }
-        catch { /* permission denied or unsupported — fall through to NoResult */ }
-
-        await ProcessClipboardText(clip);
-    }
-
-    private async Task CancelImportResult()
-    {
-        await StopQrScannerIfRunning();
-        showImportResult = false;
-        importStatus = ImportStatus.Reading;
-        pendingImportResult = null;
-        pendingImportLookup = null;
-    }
-
-    // --- QR-camera scanning, mirrors the clipboard path ---
-
-    private async Task StartQrScan()
-    {
-        scanErrorMessage = null;
-        scanElapsedSeconds = 0;
-        importStatus = ImportStatus.Scanning;
-        StateHasChanged();
-
-        // Wait one render tick so the #qr-scanner-view div is in the DOM before html5-qrcode
-        // tries to attach to it.
-        await Task.Yield();
-
-        qrScannerRef ??= DotNetObjectReference.Create(this);
-        try
-        {
-            await JS.InvokeVoidAsync("startQrScanner", "qr-scanner-view", qrScannerRef);
-            StartScanTimer();
-        }
-        catch (Exception ex)
-        {
-            scanErrorMessage = ex.Message;
-            importStatus = ImportStatus.ScanError;
-            StateHasChanged();
-        }
-    }
-
-    private void StartScanTimer()
-    {
-        scanTimerCts?.Cancel();
-        scanTimerCts = new System.Threading.CancellationTokenSource();
-        var token = scanTimerCts.Token;
-        _ = Task.Run(async () =>
-        {
-            while (!token.IsCancellationRequested && importStatus == ImportStatus.Scanning)
-            {
-                try { await Task.Delay(1000, token); } catch { break; }
-                if (importStatus != ImportStatus.Scanning) break;
-                scanElapsedSeconds++;
-                await InvokeAsync(StateHasChanged);
-            }
-        });
-    }
-
-    private async Task CancelQrScan()
-    {
-        await StopQrScannerIfRunning();
-        importStatus = ImportStatus.NoResult;
-        StateHasChanged();
-    }
-
-    private async Task StopQrScannerIfRunning()
-    {
-        scanTimerCts?.Cancel();
-        scanTimerCts = null;
-        try { await JS.InvokeVoidAsync("stopQrScanner"); }
-        catch { /* nothing to stop */ }
-    }
-
-    [JSInvokable]
-    public async Task OnQrScanned(string decodedText)
-    {
-        // The scanner has already stopped itself on first decode. Route the decoded text
-        // through the same pipeline as the clipboard path.
-        scanTimerCts?.Cancel();
-        scanTimerCts = null;
-        await ProcessClipboardText(decodedText);
-    }
-
-    [JSInvokable]
-    public Task OnQrFileScanFailed(string _error)
-    {
-        // html5-qrcode couldn't find a QR in the picked image (no match, or unreadable).
-        importStatus = ImportStatus.FileScanFailed;
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    private async Task PickQrImage()
-    {
-        // JS opens the file picker. We don't transition state here — if the user cancels
-        // the picker we'd be stuck. Instead JS calls OnQrFileSelected once a file is
-        // actually picked, which is when we flip to FileDecoding.
-        qrScannerRef ??= DotNetObjectReference.Create(this);
-        try
-        {
-            await JS.InvokeVoidAsync("pickQrImage", "qrFileInput", "qr-file-decode-tmp", qrScannerRef);
-        }
-        catch
-        {
-            importStatus = ImportStatus.FileScanFailed;
-            StateHasChanged();
-        }
-    }
-
-    [JSInvokable]
-    public Task OnQrFileSelected()
-    {
-        importStatus = ImportStatus.FileDecoding;
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
-        = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
-
-    private async Task ProcessClipboardText(string? text)
-    {
-        var raw = (text ?? "").Trim();
-        // Strip the optional framing markers carried by result QRs (camera/file/HID-scanner
-        // paths can deliver them; the WhatsApp clipboard text doesn't, but it's harmless
-        // either way).
-        if (raw.StartsWith(ScoringPayloadCodec.ScanFrameStart))
-            raw = raw.Substring(ScoringPayloadCodec.ScanFrameStart.Length);
-        if (raw.EndsWith(ScoringPayloadCodec.ScanFrameEnd))
-            raw = raw.Substring(0, raw.Length - ScoringPayloadCodec.ScanFrameEnd.Length);
-        if (raw.Length == 0)
-        {
-            importStatus = ImportStatus.NoResult;
-            StateHasChanged();
-            return;
-        }
-
-        // URL-decode in case the user copied something with %23 (encoded #) etc.
-        var decoded = Uri.UnescapeDataString(raw);
-
-        // Detect scoring-invite URLs (they have #p=…) so we can show a clear message instead
-        // of generic "no result link".
-        if (decoded.Contains("#p=", StringComparison.Ordinal) || decoded.Contains("?p=", StringComparison.Ordinal))
-        {
-            importStatus = ImportStatus.NotResultLink;
-            StateHasChanged();
-            return;
-        }
-
-        // Extract the payload: try `r=<base64url>` first, then fall back to treating the
-        // whole string as the bare payload (for users who copied just the fragment).
-        var match = ResultPayloadRegex.Match(decoded);
-        var payload = match.Success ? match.Groups[1].Value : decoded;
-
-        var parsed = ScoringPayloadCodec.DecodeResult(payload);
-        if (parsed == null || parsed.Scores == null || parsed.Scores.Count < 3 || parsed.Scores.Count > 4)
-        {
-            importStatus = ImportStatus.NoResult;
-            StateHasChanged();
-            return;
-        }
-
-        var lookup = await ScoreImport.FindAsync(parsed);
-        if (lookup == null)
-        {
-            importStatus = ImportStatus.NoMatchingTable;
-            pendingImportResult = parsed;
-            StateHasChanged();
-            return;
-        }
-
-        pendingImportResult = parsed;
-        pendingImportLookup = lookup;
-        // If the target already has scores, surface that in the preview view so the user
-        // knows the Apply button overwrites.
-        importStatus = lookup.Context.Table.Score != null
-                       && lookup.Context.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
-            ? ImportStatus.AlreadyScored
-            : ImportStatus.Preview;
-        StateHasChanged();
-    }
-
-    private async Task ApplyImportPreview(bool confirmOverwrite)
-    {
-        if (pendingImportResult == null) return;
-
-        var outcome = await ScoreImport.ApplyAsync(pendingImportResult, Lang.Get, confirmOverwrite);
-        if (!outcome.Success)
-        {
-            importStatus = outcome.Reason == ScoreImportService.FailureReason.AlreadyScored
-                ? ImportStatus.AlreadyScored
-                : ImportStatus.NoMatchingTable;
-            StateHasChanged();
-            return;
-        }
-
-        importStatus = ImportStatus.Applied;
-
-        // Refresh local view so the Scores/Rankings tabs reflect the imported values.
         var allHanchans = await SessionService.GetAllAsync();
         hanchansOnDate = allHanchans.Where(s => s.Date.Date == sessionDate.Date).ToList();
-        if (currentHanchan != null
-            && outcome.Context?.Container is Hanchan importedHanchan
-            && importedHanchan.Id == currentHanchan.Id)
+        if (currentHanchan != null)
         {
-            currentHanchan = importedHanchan;
-            tables = currentHanchan.Tables;
-            // Re-initialise Score on every table — the import only writes the matching
-            // table, and ScoreTable renders nothing when Score is null, so unscored tables
-            // would otherwise vanish until the user flips tabs and back.
-            ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
-            // Bump the @key so each rendered ScoreTable rebuilds with the fresh model.
-            scoreTableVersion++;
-        }
-
-        StateHasChanged();
-    }
-
-    private async Task<(string url, string title)?> BuildScoringInviteUrl(TableAssignment table)
-    {
-        if (!externalScoringEnabled)
-        {
-            Nav.NavigateTo("settings");
-            return null;
-        }
-        if (currentHanchan == null)
-        {
-            // Defensive: save the hanchan first so the invite has a stable Id to round-trip.
-            await SaveHanchan();
-            if (currentHanchan == null) return null;
-        }
-
-        var names = table.PlayerIds.Select(GetPlayerName).ToList();
-        var uma = table.PlayerCount == 3 ? uma3Players : uma4Players;
-        var title = $"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()} — {Lang.Get("Table")} {table.TableNumber}";
-
-        // Carry the full base (origin + subpath, e.g. "https://example.com/MahjongIndeler/")
-        // so the scoring app's return URL hits this organizer deployment, not the host root.
-        var organizerOrigin = Nav.BaseUri.TrimEnd('/');
-        // PlayerIds intentionally not carried — the scoring app and the organizer both pair
-        // players by position (index in `names` == index in table.PlayerIds).
-        var invite = new ScoringInvite(
-            currentHanchan.Id,
-            table.TableNumber,
-            names,
-            weeklyStartingPoints,
-            new List<int>(uma),
-            title,
-            organizerOrigin,
-            CurrentHanchanNumber());
-
-        var encoded = ScoringPayloadCodec.EncodeInvite(invite);
-        var url = $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}";
-        return (url, title);
-    }
-
-    private async Task ShowScoringQrFor(TableAssignment table)
-    {
-        var built = await BuildScoringInviteUrl(table);
-        if (built == null) return;
-        scoringQrUrl = built.Value.url;
-        // Short title for the modal: "Hanchan N — Table M" (the full date/title lives in
-        // the WhatsApp message; on a QR modal it's just visual noise).
-        scoringQrTitle = $"{BuildHanchanSubtitle()} — {Lang.Get("Table")} {table.TableNumber}";
-        showScoringQr = true;
-        scoringQrCopied = false;
-        StateHasChanged();
-
-        // Auto-copy the QR as a PNG image so the organizer can immediately paste it
-        // into WhatsApp without using the camera-share flow. The click on the QR button
-        // is the user gesture clipboard.write needs.
-        try
-        {
-            var svg = Tsump.Scoring.QrCodeRenderer.ToSvg(scoringQrUrl);
-            var organizerOverlay = Tsump.Scoring.QrCodeRenderer.Overlays.Organizer;
-            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, scoringQrTitle, organizerOverlay.BackgroundColor, "white");
-            if (ok)
+            var fresh = hanchansOnDate.FirstOrDefault(h => h.Id == currentHanchan.Id);
+            if (fresh != null)
             {
-                scoringQrCopied = true;
-                StateHasChanged();
+                currentHanchan = fresh;
+                tables = currentHanchan.Tables;
+                ScoreTable.InitializeScores(tables, Lang.Get, weeklyStartingPoints);
+                scoreTableVersion++;
             }
         }
-        catch { /* unsupported / blocked — silent fall-back */ }
-    }
-
-    private void CloseScoringQr()
-    {
-        showScoringQr = false;
-        scoringQrUrl = null;
-        scoringQrTitle = null;
-    }
-
-    private async Task ShareScoringLink(TableAssignment table)
-    {
-        var built = await BuildScoringInviteUrl(table);
-        if (built == null) return;
-        var message = $"📋 {built.Value.title}\n{Lang.Get("ShareScoringLinkInstruction")}\n{built.Value.url}";
-
-        await JS.InvokeVoidAsync("copyTextToClipboard", message);
-        sharedScoringLinkTableNumber = table.TableNumber;
-        StateHasChanged();
-        _ = ResetScoringLinkCopiedFlag();
-    }
-
-    private async Task ResetScoringLinkCopiedFlag()
-    {
-        await Task.Delay(2000);
-        sharedScoringLinkTableNumber = null;
         StateHasChanged();
     }
 

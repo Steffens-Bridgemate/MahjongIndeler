@@ -51,7 +51,7 @@ Cross-cutting concerns covered in [domain.md](domain.md) (status classification,
 
 Two non-obvious things specific to WeeklySessionPage worth flagging:
 
-- `scoreTableVersion` is bumped on `SaveScores`, `SaveHanchan`, and `ApplyImportPreview`. It's part of every `ScoreTable`'s `@key` tuple so Blazor disposes/recreates each `ScoreTable` after a save — needed because the underlying `TableAssignment` references are replaced when `hanchansOnDate` is reloaded.
+- `scoreTableVersion` is bumped on `SaveScores`, `SaveHanchan`, and `OnHanchanScoreApplied` (the `<ScoreImportPanel>` callback). It's part of every `ScoreTable`'s `@key` tuple so Blazor disposes/recreates each `ScoreTable` after a save — needed because the underlying `TableAssignment` references are replaced when `hanchansOnDate` is reloaded.
 - `CurrentHanchanNumber` derives the 1-based "Hanchan N of the day" by ordering `hanchansOnDate` by `StartTime`. There's no stored hanchan number (see [domain.md](domain.md)).
 
 ## Workflow.razor
