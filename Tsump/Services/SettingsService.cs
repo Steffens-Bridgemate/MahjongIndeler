@@ -7,6 +7,10 @@ public class SettingsService
     private const string StorageKey = "tsump_settings";
     private readonly LocalStorageService _storage;
 
+    /// <summary>Raised after settings are saved, so persistent UI (e.g. the nav menu) can
+    /// refresh setting-gated items without a page reload.</summary>
+    public event Action? OnChanged;
+
     public SettingsService(LocalStorageService storage)
     {
         _storage = storage;
@@ -20,6 +24,7 @@ public class SettingsService
     public async Task SaveAsync(ClubSettings settings)
     {
         await _storage.SetAsync(StorageKey, settings);
+        OnChanged?.Invoke();
     }
 
     /// <summary>

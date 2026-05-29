@@ -15,21 +15,24 @@
 <div class="card mb-3 @(Table.PlayerCount == 3 ? "border-warning" : "border-success")">
     <div class="card-header @(Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white") py-1 d-flex align-items-center">
         <span class="flex-grow-1">@Lang.Get("Table") @Table.TableNumber (@Table.PlayerCount @Lang.Get("players"))</span>
-        @if (showClearConfirm)
+        @if (!ReadOnly)
         {
-            <span class="me-2 small">@Lang.Get("ClearScoresConfirm")</span>
-            <button class="btn btn-sm btn-danger py-0 px-2 me-1" style="line-height:1;"
-                    @onclick="ConfirmClear">@Lang.Get("YesClear")</button>
-            <button class="btn btn-sm btn-secondary py-0 px-2" style="line-height:1;"
-                    @onclick="() => showClearConfirm = false">@Lang.Get("Cancel")</button>
-        }
-        else
-        {
-            <button class="btn btn-sm bg-white py-0 px-1 border" style="line-height:1;"
-                    @onclick="() => showClearConfirm = true"
-                    title="@Lang.Get("ClearScores")">
-                <i class="bi bi-trash text-danger" style="font-size:1.15rem;"></i>
-            </button>
+            @if (showClearConfirm)
+            {
+                <span class="me-2 small">@Lang.Get("ClearScoresConfirm")</span>
+                <button class="btn btn-sm btn-danger py-0 px-2 me-1" style="line-height:1;"
+                        @onclick="ConfirmClear">@Lang.Get("YesClear")</button>
+                <button class="btn btn-sm btn-secondary py-0 px-2" style="line-height:1;"
+                        @onclick="() => showClearConfirm = false">@Lang.Get("Cancel")</button>
+            }
+            else
+            {
+                <button class="btn btn-sm bg-white py-0 px-1 border" style="line-height:1;"
+                        @onclick="() => showClearConfirm = true"
+                        title="@Lang.Get("ClearScores")">
+                    <i class="bi bi-trash text-danger" style="font-size:1.15rem;"></i>
+                </button>
+            }
         }
     </div>
     <div class="card-body p-2">
@@ -84,9 +87,9 @@
                                                on End goes straight to the next card's End. *@
                                             <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                                    tabindex="-1"
-                                                   readonly="@ReadOnlyStart"
+                                                   readonly="@(ReadOnlyStart || ReadOnly)"
                                                    value="@FormatDisplay(psRef.StartingPoints)"
-                                                   @onchange="async e => { if (!ReadOnlyStart) await OnStartingPointsChanged(psRef, e); }" />
+                                                   @onchange="async e => { if (!ReadOnlyStart && !ReadOnly) await OnStartingPointsChanged(psRef, e); }" />
                                         </td>
                                     </tr>
                                     <tr>
@@ -95,6 +98,7 @@
                                             @* All End inputs share tabindex=1 → tabbed first, in source order. *@
                                             <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                                    tabindex="1"
+                                                   readonly="@ReadOnly"
                                                    value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
                                                    placeholder="−"
                                                    @onchange="e => OnEndPointsChanged(psRef, e)" />
@@ -106,6 +110,7 @@
                                             <td style="vertical-align:middle;">@Lang.Get("LoanShort")</td>
                                             <td class="text-center">
                                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                                       readonly="@ReadOnly"
                                                        value="@FormatLoan(psRef.Loan)"
                                                        placeholder="−"
                                                        @onfocus="e => OnLoanFocus(psRef)"
@@ -117,6 +122,7 @@
                                             <td style="vertical-align:middle;">@Lang.Get("PenaltyShort")</td>
                                             <td class="text-center">
                                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                                       readonly="@ReadOnly"
                                                        value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
                                                        placeholder="−"
                                                        @onchange="e => OnPenaltyChanged(psRef, e)"
@@ -228,9 +234,9 @@
                                    on the last End cell jumps to the next ScoreTable's first End. *@
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                        tabindex="-1"
-                                       readonly="@ReadOnlyStart"
+                                       readonly="@(ReadOnlyStart || ReadOnly)"
                                        value="@FormatDisplay(psRef.StartingPoints)"
-                                       @onchange="async e => { if (!ReadOnlyStart) await OnStartingPointsChanged(psRef, e); }"
+                                       @onchange="async e => { if (!ReadOnlyStart && !ReadOnly) await OnStartingPointsChanged(psRef, e); }"
                                        style="width:100%;" />
                             </td>
                         }
@@ -244,6 +250,7 @@
                                 @* All End inputs share tabindex=1 → tabbed first across the page in source order. *@
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
                                        tabindex="1"
+                                       readonly="@ReadOnly"
                                        value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
                                        placeholder="−"
                                        @onchange="e => OnEndPointsChanged(psRef, e)"
@@ -260,6 +267,7 @@
                             var psRef = ps;
                             <td class="text-center">
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       readonly="@ReadOnly"
                                        value="@FormatLoan(psRef.Loan)"
                                        placeholder="−"
                                        @onfocus="e => OnLoanFocus(psRef)"
@@ -332,6 +340,7 @@
                                 else
                                 {
                                     <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                           readonly="@ReadOnly"
                                            value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
                                            placeholder="−"
                                            @onchange="e => OnPenaltyChanged(psRef, e)"
@@ -387,6 +396,11 @@
 
     [Parameter]
     public bool ReadOnlyStart { get; set; }
+
+    /// <summary>Fully read-only: all score inputs are locked and the clear (trash) button is
+    /// hidden. Used for the scan-log decode preview, where the table is for inspection only.</summary>
+    [Parameter]
+    public bool ReadOnly { get; set; }
 
     [Parameter]
     public List<int> Uma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };

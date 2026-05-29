@@ -43,13 +43,17 @@ public class TournamentScoreContextResolver : IScoreContextResolver
         if (table == null) return new ResolveOutcome.ContainerOnly(label);
 
         var settings = await _settings.GetAsync();
+        var names = table.PlayerIds
+            .Select(id => matchingTournament.Participants.FirstOrDefault(p => p.Id == id)?.Name ?? _lang.Get("Unknown"))
+            .ToList();
         var context = new ResolvedContext(
             matchingTournament,
             $"{label} · {_lang.Get("Table")} {tableNumber}",
             table,
             matchingTournament.StartingPoints ?? settings.WeeklyStartingPoints,
             matchingTournament.Uma3Players ?? settings.WeeklyUma3Players,
-            matchingTournament.Uma4Players ?? settings.WeeklyUma4Players);
+            matchingTournament.Uma4Players ?? settings.WeeklyUma4Players,
+            names);
         return new ResolveOutcome.Found(context);
     }
 

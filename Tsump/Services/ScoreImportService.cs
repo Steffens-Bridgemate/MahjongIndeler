@@ -31,6 +31,16 @@ public class ScoreImportService
 
     public record ApplyOutcome(bool Success, FailureReason Reason, ResolvedContext? Context);
 
+    /// <summary>A decoded result mapped onto its (resolved) table, ready to render read-only.
+    /// <see cref="NameResolver"/> resolves the table's player ids to display names regardless of
+    /// container kind. <see cref="TableMismatch"/> is true when the score-row count no longer
+    /// matches the table (e.g. the session was regenerated) — the table is shown un-applied.</summary>
+    public record DecodePreview(ResolvedContext Context, Func<Guid, string> NameResolver, bool TableMismatch);
+
+    /// <summary>Header info for a logged capture: the friendly hanchan/table label if any
+    /// resolver recognises the ContextId, and whether the specific table still exists.</summary>
+    public record ScanDescription(string? Label, bool Recognized, bool TableFound);
+
     /// <summary>Finds the table referenced by the result, without applying anything. Returns
     /// null if no resolver recognised the ContextId or the table wasn't found.</summary>
     public async Task<Lookup?> FindAsync(ScoringResult result)
@@ -70,6 +80,60 @@ public class ScoreImportService
             return new ApplyOutcome(false, FailureReason.AlreadyScored, context);
         }
 
+        if (!WriteScoresIntoTable(context, result, langGet))
+            return new ApplyOutcome(false, FailureReason.NoMatchingTable, context);
+
+        await resolver.SaveAsync(context);
+        return new ApplyOutcome(true, FailureReason.None, context);
+    }
+
+    /// <summary>Resolves the result's ContextId and renders the scores onto the matching table
+    /// for a read-only preview (no persistence). Returns null when no resolver recognises the
+    /// ContextId or the table is gone — i.e. nothing to show.</summary>
+    public async Task<DecodePreview?> BuildPreviewAsync(ScoringResult result, Func<string, string> langGet)
+    {
+        var (context, _) = await ResolveAsync(result);
+        if (context == null) return null;
+
+        // Mutates the freshly-deserialised (transient) table only; never persisted.
+        var ok = WriteScoresIntoTable(context, result, langGet);
+
+        var table = context.Table;
+        var names = context.PlayerNames;
+        // Map id -> name by position in PlayerIds. Falls back to the raw id when out of range.
+        string Resolve(Guid id)
+        {
+            var idx = table.PlayerIds.IndexOf(id);
+            return idx >= 0 && idx < names.Count ? names[idx] : id.ToString();
+        }
+        return new DecodePreview(context, Resolve, TableMismatch: !ok);
+    }
+
+    /// <summary>Describes a (contextId, tableNumber) for the scan-log header without applying
+    /// anything: friendly label when recognised, plus whether the table still exists.</summary>
+    public async Task<ScanDescription> DescribeAsync(Guid contextId, int tableNumber)
+    {
+        foreach (var r in _resolvers)
+        {
+            var outcome = await r.FindAsync(contextId, tableNumber);
+            switch (outcome)
+            {
+                case ResolveOutcome.Found f:
+                    return new ScanDescription(f.Context.DisplayLabel, Recognized: true, TableFound: true);
+                case ResolveOutcome.ContainerOnly c:
+                    return new ScanDescription(c.DisplayLabel, Recognized: true, TableFound: false);
+            }
+        }
+        return new ScanDescription(null, Recognized: false, TableFound: false);
+    }
+
+    /// <summary>Initialises Score rows on the table and writes the result's scores by position,
+    /// deriving Mr. X and Uma exactly as the in-app ScoreTable does on edit. Returns false on a
+    /// player-count mismatch (table regenerated after the link was issued), leaving Score
+    /// initialised but un-applied so a preview can still render the empty table.</summary>
+    private static bool WriteScoresIntoTable(ResolvedContext context, ScoringResult result, Func<string, string> langGet)
+    {
+        var table = context.Table;
         ScoreTable.InitializeScores(new List<TableAssignment> { table }, langGet, context.StartingPoints);
 
         var score = table.Score!;
@@ -79,9 +143,8 @@ public class ScoreImportService
         // table was regenerated after the link was issued.
         var realPlayers = score.PlayerScores.Where(p => !p.IsVirtual).ToList();
         if (result.Scores.Count != realPlayers.Count)
-        {
-            return new ApplyOutcome(false, FailureReason.NoMatchingTable, context);
-        }
+            return false;
+
         for (int i = 0; i < result.Scores.Count; i++)
         {
             var entry = result.Scores[i];
@@ -90,16 +153,11 @@ public class ScoreImportService
             realPlayers[i].Penalty   = entry[ScoringPayloadCodec.ScorePenalty];
         }
 
-        // 3-player table: derive Mr. X's EndPoints so the sum of differences is zero.
-        // Same helper that ScoreTable runs on edit, so manual entry and imported results
-        // produce identical Mr. X values.
+        // 3-player table: derive Mr. X's EndPoints so the sum of differences is zero. Same helper
+        // that ScoreTable runs on edit, so manual entry and imported results match.
         ScoreTable.DeriveVirtualEnd(table);
-
-        // Compute Uma using the same logic the in-app ScoreTable uses on edit.
         ScoreTable.CalculateUma(table, context.Uma3Players, context.Uma4Players);
-
-        await resolver.SaveAsync(context);
-        return new ApplyOutcome(true, FailureReason.None, context);
+        return true;
     }
 
     private async Task<(ResolvedContext? Context, IScoreContextResolver? Resolver)> ResolveAsync(ScoringResult result)

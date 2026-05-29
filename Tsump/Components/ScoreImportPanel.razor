@@ -2,6 +2,7 @@
 @using Tsump.Scoring
 @using Tsump.Services
 @inject ScoreImportService ScoreImport
+@inject ScanLogService ScanLog
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @implements IDisposable
@@ -23,22 +24,31 @@
                     <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Cancel")</button>
                 </div>
                 <div class="card-body">
-                    @* Always-on input that captures HID-scanner keystrokes, manual pastes,
-                       and typed URLs. Hidden during live camera scanning / file decoding
-                       where it would steal focus or look out of place. *@
+                    @* Always-on capture input for HID-scanner keystrokes, manual pastes, and typed
+                       URLs. Visually hidden (offscreen, focusable): the raw URL no longer needs to
+                       be shown — captures are recorded to the Log instead. Hidden entirely during
+                       live camera scanning / file decoding.
+
+                       Uncontrolled on purpose. Keystroke accumulation and frame detection live in
+                       JS (attachScanCapture), which hands the COMPLETE scan to .NET in a single
+                       OnScanComplete call. A controlled value="@..." bound to @oninput re-renders
+                       per keystroke and, under a slow event loop (debug build, sluggish phone),
+                       reverts the field mid-burst and drops characters. JS owns el.value. *@
                     @if (ShouldRenderScanInput)
                     {
-                        @* Uncontrolled on purpose. Keystroke accumulation and frame detection
-                           live in JS (attachScanCapture), which hands the COMPLETE scan to
-                           .NET in a single OnScanComplete call. A controlled value="@..." bound
-                           to @oninput re-renders per keystroke and, under a slow event loop
-                           (debug build, sluggish phone), reverts the textarea mid-burst and
-                           drops characters. JS owns el.value; Blazor never touches it after the
-                           first render. Multi-line so the full URL is visible while scanning. *@
-                        <textarea @ref="scanInputRef" class="form-control mb-3" rows="3"
-                                  placeholder="@Lang.Get("ImportResultPlaceholder")"
-                                  autocomplete="off"
-                                  style="font-family: monospace; word-break: break-all;" />
+                        <textarea @ref="scanInputRef" class="scan-capture-hidden" rows="1"
+                                  autocomplete="off" aria-label="@Lang.Get("ReadyToScan")" />
+                        @if (ShowScanIndicator)
+                        {
+                            <div class="text-center my-3" role="button" tabindex="-1"
+                                 @onclick="RefocusScanInput" title="@Lang.Get("ReadyToScan")">
+                                <i class="bi bi-qr-code text-primary" style="font-size: 3rem; line-height: 1;"></i>
+                                <div class="progress mt-3 mx-auto scan-progress" style="height: 6px; max-width: 240px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%;"></div>
+                                </div>
+                                <div class="text-muted small mt-2">@Lang.Get("ReadyToScan")</div>
+                            </div>
+                        }
                     }
                     @if (status == ImportStatus.Reading)
                     {
@@ -210,6 +220,24 @@
     </div>
 }
 
+<style>
+    /* Offscreen but focusable: a focused element still receives HID-scanner keystrokes even
+       when invisible. position:fixed avoids the horizontal scroll a left:-9999px element can
+       cause when focused; pointer-events:none keeps it from intercepting clicks. */
+    .scan-capture-hidden {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        padding: 0;
+        border: 0;
+        pointer-events: none;
+        z-index: -1;
+    }
+</style>
+
 @code {
     [Parameter] public bool IsEnabled { get; set; }
     [Parameter] public EventCallback OnApplied { get; set; }
@@ -278,8 +306,23 @@
                   or ImportStatus.ScanTruncated
                   or ImportStatus.Applied;
 
-    private static readonly System.Text.RegularExpressions.Regex ResultPayloadRegex
-        = new(@"r=([A-Za-z0-9_\-]+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+    // The static QR icon + pulsating progress bar shown while armed and waiting for a scan.
+    // Hidden during review (Preview/AlreadyScored) and success (Applied has its own banner).
+    private bool ShowScanIndicator
+        => status is ImportStatus.Reading
+                  or ImportStatus.NoResult
+                  or ImportStatus.NotResultLink
+                  or ImportStatus.NoMatchingTable
+                  or ImportStatus.ScanError
+                  or ImportStatus.FileScanFailed
+                  or ImportStatus.ScanTruncated;
+
+    private async Task RefocusScanInput()
+    {
+        // Explicit user tap on the QR indicator → force focus even on touch devices.
+        try { await JS.InvokeVoidAsync("focusAndClearScanInput", scanInputRef, true); }
+        catch { /* element not ready — harmless */ }
+    }
 
     public void Dispose()
     {
@@ -346,7 +389,7 @@
         {
             try
             {
-                await JS.InvokeVoidAsync("focusAndClearScanInput", scanInputRef);
+                await JS.InvokeVoidAsync("focusAndClearScanInput", scanInputRef, false);
                 lastAutoFocusedStatus = status;
             }
             catch { /* element not ready yet — retry next render */ }
@@ -537,41 +580,24 @@
         // Any inbound text (clipboard, scan, paste, camera, file) counts as activity —
         // valid OR invalid, per the spec.
         ResetInactivityTimer();
-        var raw = (text ?? "").Trim();
-        // Strip the optional framing markers carried by result QRs. The clipboard message
-        // doesn't include them but camera/file/HID-scanner paths do, so unwrap centrally.
-        if (raw.StartsWith(ScoringPayloadCodec.ScanFrameStart))
-            raw = raw.Substring(ScoringPayloadCodec.ScanFrameStart.Length);
-        if (raw.EndsWith(ScoringPayloadCodec.ScanFrameEnd))
-            raw = raw.Substring(0, raw.Length - ScoringPayloadCodec.ScanFrameEnd.Length);
-        if (raw.Length == 0)
+
+        // Log every capture verbatim (no-op when logging is disabled). Fire-and-forget so a
+        // storage hiccup can't block the import flow.
+        _ = ScanLog.AddAsync(text);
+
+        if (string.IsNullOrWhiteSpace(text))
         {
             status = ImportStatus.NoResult;
             StateHasChanged();
             return;
         }
 
-        // URL-decode in case the user copied something with %23 (encoded #) etc.
-        var decoded = Uri.UnescapeDataString(raw);
-
-        // Detect scoring-invite URLs (they have #p=…) so we can show a clear message instead
-        // of generic "no result link".
-        if (decoded.Contains("#p=", StringComparison.Ordinal) || decoded.Contains("?p=", StringComparison.Ordinal))
+        // Frame-strip + unescape + invite-detect + payload-extract + decode, shared with the
+        // scan-log page so both interpret captures identically.
+        var parsed = ScanResultParser.TryParse(text, out var looksLikeInvite);
+        if (parsed == null)
         {
-            status = ImportStatus.NotResultLink;
-            StateHasChanged();
-            return;
-        }
-
-        // Extract the payload: try `r=<base64url>` first, then fall back to treating the
-        // whole string as the bare payload (for users who copied just the fragment).
-        var match = ResultPayloadRegex.Match(decoded);
-        var payload = match.Success ? match.Groups[1].Value : decoded;
-
-        var parsed = ScoringPayloadCodec.DecodeResult(payload);
-        if (parsed == null || parsed.Scores == null || parsed.Scores.Count < 3 || parsed.Scores.Count > 4)
-        {
-            status = ImportStatus.NoResult;
+            status = looksLikeInvite ? ImportStatus.NotResultLink : ImportStatus.NoResult;
             StateHasChanged();
             return;
         }

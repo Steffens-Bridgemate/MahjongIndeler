@@ -40,4 +40,8 @@ public record ResolvedContext(
     TableAssignment Table,
     int StartingPoints,
     List<int> Uma3Players,
-    List<int> Uma4Players);
+    List<int> Uma4Players,
+    // Display names for the table's players, in Table.PlayerIds order. Lets consumers (the
+    // scan-log decode preview) render names without knowing whether the players are Members
+    // or TournamentParticipants. Falls back to the raw id string when a player can't be matched.
+    List<string> PlayerNames);

@@ -32,6 +32,11 @@ public class ClubSettings
     // URL is hard-coded in Tsump.Scoring.ScoringAppConfig (not user-configurable, since
     // PWA-installed organizer instances hide the address bar).
     public bool EnableExternalScoring { get; set; } = false;
+
+    // When true, every captured scan/import string is recorded by ScanLogService and a "Log"
+    // nav item is exposed for inspecting and decoding them. Diagnostic aid for HID-scanner
+    // round-trip issues; off by default.
+    public bool EnableScanLogging { get; set; } = false;
 }
 
 public class ScheduleEntry

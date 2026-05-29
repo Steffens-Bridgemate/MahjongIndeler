@@ -16,6 +16,7 @@ builder.Services.AddScoped<IScoreContextResolver, HanchanScoreContextResolver>()
 builder.Services.AddScoped<IScoreContextResolver, TournamentScoreContextResolver>();
 builder.Services.AddScoped<ScoreImportService>();
 builder.Services.AddScoped<ScoreInviteService>();
+builder.Services.AddScoped<ScanLogService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<TournamentService>();
 builder.Services.AddScoped<TournamentAssignmentService>();

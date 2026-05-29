@@ -1,6 +1,7 @@
 @using Tsump.Services
 @inject LanguageService Lang
 @inject AppModeService Mode
+@inject SettingsService SettingsService
 @implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-light">
@@ -72,11 +73,20 @@
                 <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Settings")
             </NavLink>
         </div>
+        @if (scanLoggingEnabled)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="scan-log">
+                    <span class="bi bi-card-list-nav-menu" aria-hidden="true"></span> @Lang.Get("ScanLog")
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
+    private bool scanLoggingEnabled;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
@@ -85,6 +95,7 @@
         if (firstRender)
         {
             await Mode.LoadAsync();
+            await RefreshScanLogging();
             StateHasChanged();
         }
     }
@@ -93,6 +104,21 @@
     {
         Lang.OnLanguageChanged += StateHasChanged;
         Mode.OnModeChanged += StateHasChanged;
+        SettingsService.OnChanged += OnSettingsChanged;
+    }
+
+    // Re-read the logging flag when settings are saved so the Log item appears/disappears
+    // without a page reload.
+    private async void OnSettingsChanged()
+    {
+        await RefreshScanLogging();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshScanLogging()
+    {
+        var settings = await SettingsService.GetAsync();
+        scanLoggingEnabled = settings.EnableScanLogging;
     }
 
     private void ToggleNavMenu()
@@ -104,5 +130,6 @@
     {
         Lang.OnLanguageChanged -= StateHasChanged;
         Mode.OnModeChanged -= StateHasChanged;
+        SettingsService.OnChanged -= OnSettingsChanged;
     }
 }

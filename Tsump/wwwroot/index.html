@@ -321,10 +321,17 @@
             el._scanCapture = null;
         };
 
-        window.focusAndClearScanInput = function (el) {
+        window.focusAndClearScanInput = function (el, force) {
             if (!el) return;
             el.value = '';
-            try { el.focus(); } catch (_) { }
+            try {
+                // Skip programmatic focus on touch devices unless the user explicitly asked
+                // (force): phones/tablets use the camera path, and focusing an invisible field
+                // there would pop the on-screen keyboard. A USB HID scanner is a desktop
+                // (fine-pointer) peripheral, where auto-focus is what arms the capture.
+                if (!force && window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+                el.focus();
+            } catch (_) { }
         };
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
