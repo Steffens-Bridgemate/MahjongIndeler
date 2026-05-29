@@ -13,10 +13,12 @@ namespace Tsump.Services;
 public class ScoreImportService
 {
     private readonly IEnumerable<IScoreContextResolver> _resolvers;
+    private readonly SettingsService _settings;
 
-    public ScoreImportService(IEnumerable<IScoreContextResolver> resolvers)
+    public ScoreImportService(IEnumerable<IScoreContextResolver> resolvers, SettingsService settings)
     {
         _resolvers = resolvers;
+        _settings = settings;
     }
 
     public enum FailureReason
@@ -87,27 +89,52 @@ public class ScoreImportService
         return new ApplyOutcome(true, FailureReason.None, context);
     }
 
-    /// <summary>Resolves the result's ContextId and renders the scores onto the matching table
-    /// for a read-only preview (no persistence). Returns null when no resolver recognises the
-    /// ContextId or the table is gone — i.e. nothing to show.</summary>
+    /// <summary>Renders a decoded result as a read-only ScoreTable preview (no persistence).
+    /// When a resolver recognises the ContextId, the real table's player names and scoring
+    /// settings are used. Otherwise — a valid result whose context isn't local (another
+    /// organizer, or a regenerated/deleted session) — a synthetic table with positional player
+    /// names ("Player 1", …) and club-default settings is built, so any ScoreTable-worthy result
+    /// can still be inspected. Returns null only when <paramref name="result"/> is null.</summary>
     public async Task<DecodePreview?> BuildPreviewAsync(ScoringResult result, Func<string, string> langGet)
     {
+        if (result == null) return null;
+
         var (context, _) = await ResolveAsync(result);
-        if (context == null) return null;
+        if (context != null)
+        {
+            // Mutates the freshly-deserialised (transient) table only; never persisted.
+            var ok = WriteScoresIntoTable(context, result, langGet);
+            return new DecodePreview(context, ByPosition(context.Table, context.PlayerNames), TableMismatch: !ok);
+        }
 
-        // Mutates the freshly-deserialised (transient) table only; never persisted.
-        var ok = WriteScoresIntoTable(context, result, langGet);
+        // Unrecognised context: fabricate a table from the result so the scores are still
+        // viewable. One synthetic player id per score row (PlayerCount drives Mr. X derivation
+        // for 3-player tables exactly as a real table would).
+        var settings = await _settings.GetAsync();
+        var playerIds = result.Scores.Select(_ => Guid.NewGuid()).ToList();
+        // Parenthesised to signal these are fabricated, not real player names.
+        var names = playerIds.Select((_, i) => $"({langGet("Player")} {i + 1})").ToList();
+        var syntheticTable = new TableAssignment { TableNumber = result.TableNumber, PlayerIds = playerIds };
+        var syntheticContext = new ResolvedContext(
+            result,                                   // placeholder container; SaveAsync is never called on a preview
+            $"{langGet("Table")} {result.TableNumber}",
+            syntheticTable,
+            settings.WeeklyStartingPoints,
+            settings.WeeklyUma3Players,
+            settings.WeeklyUma4Players,
+            names);
+        var okSyn = WriteScoresIntoTable(syntheticContext, result, langGet);
+        return new DecodePreview(syntheticContext, ByPosition(syntheticTable, names), TableMismatch: !okSyn);
+    }
 
-        var table = context.Table;
-        var names = context.PlayerNames;
-        // Map id -> name by position in PlayerIds. Falls back to the raw id when out of range.
-        string Resolve(Guid id)
+    // Resolves a player id to a display name by its position in the table, falling back to the
+    // raw id when out of range.
+    private static Func<Guid, string> ByPosition(TableAssignment table, List<string> names)
+        => id =>
         {
             var idx = table.PlayerIds.IndexOf(id);
             return idx >= 0 && idx < names.Count ? names[idx] : id.ToString();
-        }
-        return new DecodePreview(context, Resolve, TableMismatch: !ok);
-    }
+        };
 
     /// <summary>Describes a (contextId, tableNumber) for the scan-log header without applying
     /// anything: friendly label when recognised, plus whether the table still exists.</summary>

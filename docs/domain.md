@@ -82,5 +82,6 @@ Unselected tab fading: `ScoreStatusHelper.TabStyle(isActive)` returns `--bs-bg-o
 | `SessionService` | `tsump_sessions` | `List<Hanchan>` |
 | `TournamentService` | `tsump_tournaments` | `List<Tournament>` |
 | `SettingsService` | `tsump_settings` | single `ClubSettings` |
+| `ScanLogService` | `tsump_scan_log` | `List<ScanLogEntry>` (import-capture diagnostics; newest-first, capped at 200, only written when `ClubSettings.EnableScanLogging`) |
 
 All `GetAllAsync` calls deserialise fresh — see the **stale-reference** gotcha in [CLAUDE.md](../CLAUDE.md). All Save* calls re-read the full list, replace the entry by Id, write back.

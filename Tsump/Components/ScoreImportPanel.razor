@@ -21,38 +21,39 @@
             <div class="card">
                 <div class="card-header d-flex align-items-center">
                     <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Cancel")</button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Close")</button>
                 </div>
                 <div class="card-body">
-                    @* Always-on capture input for HID-scanner keystrokes, manual pastes, and typed
-                       URLs. Visually hidden (offscreen, focusable): the raw URL no longer needs to
-                       be shown — captures are recorded to the Log instead. Hidden entirely during
-                       live camera scanning / file decoding.
-
-                       Uncontrolled on purpose. Keystroke accumulation and frame detection live in
-                       JS (attachScanCapture), which hands the COMPLETE scan to .NET in a single
-                       OnScanComplete call. A controlled value="@..." bound to @oninput re-renders
-                       per keystroke and, under a slow event loop (debug build, sluggish phone),
-                       reverts the field mid-burst and drops characters. JS owns el.value. *@
-                    @if (ShouldRenderScanInput)
+                    @if (status == ImportStatus.HandScanning)
                     {
+                        @* Offscreen, focusable capture input for HID-scanner keystrokes / typing.
+                           Uncontrolled: JS (attachScanCapture) accumulates the burst and hands the
+                           complete scan to .NET in one OnScanComplete call, so a slow event loop
+                           can't truncate it. Only present in this state. *@
                         <textarea @ref="scanInputRef" class="scan-capture-hidden" rows="1"
                                   autocomplete="off" aria-label="@Lang.Get("ReadyToScan")" />
-                        @if (ShowScanIndicator)
-                        {
-                            <div class="text-center my-3" role="button" tabindex="-1"
-                                 @onclick="RefocusScanInput" title="@Lang.Get("ReadyToScan")">
-                                <i class="bi bi-qr-code text-primary" style="font-size: 3rem; line-height: 1;"></i>
-                                <div class="progress mt-3 mx-auto scan-progress" style="height: 6px; max-width: 240px;">
+                        <div class="text-center my-3" role="button" tabindex="-1"
+                             @onclick="RefocusScanInput" title="@Lang.Get("ReadyToScan")">
+                            <i class="bi bi-qr-code text-primary" style="font-size: 3rem; line-height: 1;"></i>
+                            <div class="progress mt-3 mx-auto" style="height: 6px; max-width: 240px;">
+                                @if (isScanning)
+                                {
+                                    @* Scanning: a fill that repeatedly grows left→right (~1s/cycle). *@
+                                    <div class="progress-bar scan-fill"></div>
+                                }
+                                else
+                                {
+                                    @* Waiting: indeterminate striped sweep. *@
                                     <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%;"></div>
-                                </div>
-                                <div class="text-muted small mt-2">@Lang.Get("ReadyToScan")</div>
+                                }
                             </div>
-                        }
-                    }
-                    @if (status == ImportStatus.Reading)
-                    {
-                        <p class="text-muted small mb-0">@Lang.Get("ImportResultReading")</p>
+                            <div class="text-muted small mt-2">@(isScanning ? Lang.Get("ScanningNow") : Lang.Get("ReadyToScan"))</div>
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-outline-secondary" @onclick="ReturnToNeutral">
+                                <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
+                            </button>
+                        </div>
                     }
                     else if (status == ImportStatus.Preview || status == ImportStatus.AlreadyScored)
                     {
@@ -105,58 +106,7 @@
                         <button class="btn btn-success me-2" @onclick="() => Apply(confirmOverwrite: true)">
                             <i class="bi bi-check2 me-1"></i>@(status == ImportStatus.AlreadyScored ? Lang.Get("YesOverwrite") : Lang.Get("ImportScoreApply"))
                         </button>
-                        <button class="btn btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Cancel")</button>
-                    }
-                    else if (status == ImportStatus.NotResultLink
-                             || status == ImportStatus.NoResult
-                             || status == ImportStatus.NoMatchingTable
-                             || status == ImportStatus.ScanError
-                             || status == ImportStatus.FileScanFailed
-                             || status == ImportStatus.ScanTruncated)
-                    {
-                        @if (status == ImportStatus.NotResultLink)
-                        {
-                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
-                        }
-                        else if (status == ImportStatus.NoMatchingTable)
-                        {
-                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
-                        }
-                        else if (status == ImportStatus.ScanError)
-                        {
-                            <div class="alert alert-danger py-2 mb-2">@(scanErrorMessage ?? Lang.Get("ScanCameraError"))</div>
-                        }
-                        else if (status == ImportStatus.FileScanFailed)
-                        {
-                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("FileScanNoQr")</div>
-                        }
-                        else if (status == ImportStatus.ScanTruncated)
-                        {
-                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorTruncated")</div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
-                        }
-
-                        <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-outline-primary" @onclick="() => TryClipboard()">
-                                <i class="bi bi-clipboard me-1"></i>@Lang.Get("CheckClipboard")
-                            </button>
-                            <button class="btn btn-outline-primary" @onclick="StartQrScan">
-                                <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
-                            </button>
-                            <button class="btn btn-outline-primary" @onclick="PickQrImage">
-                                <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
-                            </button>
-                        </div>
-                    }
-                    else if (status == ImportStatus.FileDecoding)
-                    {
-                        <div class="d-flex align-items-center small">
-                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
-                            <span class="text-muted">@Lang.Get("FileDecoding")</span>
-                        </div>
+                        <button class="btn btn-outline-secondary" @onclick="ReturnToNeutral">@Lang.Get("Cancel")</button>
                     }
                     else if (status == ImportStatus.Scanning)
                     {
@@ -189,24 +139,83 @@
                             }
                         </ul>
 
-                        <button class="btn btn-outline-secondary" @onclick="CancelQrScan">
+                        <button class="btn btn-outline-secondary" @onclick="ReturnToNeutral">
                             <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
                         </button>
+                    }
+                    else if (status == ImportStatus.FileDecoding)
+                    {
+                        <div class="d-flex align-items-center small">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+                            <span class="text-muted">@Lang.Get("FileDecoding")</span>
+                        </div>
                     }
                     else if (status == ImportStatus.Applied)
                     {
                         <div class="alert alert-success py-2 mb-2">@Lang.Get("ImportScoreApplied")</div>
+                        @if (method == InputMethod.Clipboard)
+                        {
+                            @* Clipboard: wait for the user. "Next" repeats the clipboard read and is
+                               focused so the Enter key triggers it. *@
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-primary" @ref="nextButtonRef" @onclick="StartClipboard">
+                                    <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="ReturnToNeutral">@Lang.Get("Cancel")</button>
+                            </div>
+                        }
+                        else
+                        {
+                            @* Camera / hand-scanner / image: the banner shows briefly, then the panel
+                               auto-continues (restart camera, re-arm hand scanner, or back to neutral). *@
+                            <p class="text-muted small mb-0">@Lang.Get("ReadyToScan")</p>
+                        }
+                    }
+                    else
+                    {
+                        @* Neutral + error states: optional banner, then the four method buttons. *@
+                        @if (status == ImportStatus.NotResultLink)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorNotResult")</div>
+                        }
+                        else if (status == ImportStatus.NoResult)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoneInClipboard")</div>
+                        }
+                        else if (status == ImportStatus.NoMatchingTable)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultNoMatchHint")</div>
+                        }
+                        else if (status == ImportStatus.ScanError)
+                        {
+                            <div class="alert alert-danger py-2 mb-2">@(scanErrorMessage ?? Lang.Get("ScanCameraError"))</div>
+                        }
+                        else if (status == ImportStatus.FileScanFailed)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("FileScanNoQr")</div>
+                        }
+                        else if (status == ImportStatus.ScanTruncated)
+                        {
+                            <div class="alert alert-warning py-2 mb-2">@Lang.Get("ImportResultErrorTruncated")</div>
+                        }
+                        else
+                        {
+                            <p class="text-muted small mb-2">@Lang.Get("ImportChooseMethod")</p>
+                        }
+
                         <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-primary" @onclick="() => TryClipboard()">
-                                <i class="bi bi-arrow-right-circle me-1"></i>@Lang.Get("Next")
+                            <button class="btn btn-outline-primary" @onclick="StartClipboard">
+                                <i class="bi bi-clipboard me-1"></i>@Lang.Get("CheckClipboard")
                             </button>
-                            <button class="btn btn-outline-primary" @onclick="StartQrScan">
-                                <i class="bi bi-qr-code-scan me-1"></i>@Lang.Get("ScanQrCode")
+                            <button class="btn btn-outline-primary" @onclick="StartCamera">
+                                <i class="bi bi-camera me-1"></i>@Lang.Get("CameraScan")
                             </button>
-                            <button class="btn btn-outline-primary" @onclick="PickQrImage">
+                            <button class="btn btn-outline-primary" @onclick="StartHandScan">
+                                <i class="bi bi-upc-scan me-1"></i>@Lang.Get("HandScanner")
+                            </button>
+                            <button class="btn btn-outline-primary" @ref="readImageButtonRef" @onclick="StartImage">
                                 <i class="bi bi-image me-1"></i>@Lang.Get("PickQrImage")
                             </button>
-                            <button class="btn btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Close")</button>
                         </div>
                     }
 
@@ -236,6 +245,16 @@
         pointer-events: none;
         z-index: -1;
     }
+
+    /* Scanning-state bar: repeatedly fills left→right, ~1s per cycle. */
+    @@keyframes scan-fill-grow {
+        0% { width: 0%; }
+        100% { width: 100%; }
+    }
+
+    .scan-fill {
+        animation: scan-fill-grow 1s linear infinite;
+    }
 </style>
 
 @code {
@@ -245,23 +264,31 @@
 
     private enum ImportStatus
     {
-        Reading,           // initial / transient while we read the clipboard
-        NotResultLink,     // clipboard holds an invite link (#p=), not a result link
-        NoResult,          // clipboard empty or contents don't look like a result link
-        NoMatchingTable,   // decoded fine but no container/table found locally
+        Neutral,           // panel open, resting: shows the four method buttons
+        HandScanning,      // HID capture armed (QR indicator + progress bar)
         Scanning,          // camera scanner is live
-        ScanError,         // camera failed to start
         FileDecoding,      // user picked an image, html5-qrcode decoding it
-        FileScanFailed,    // decode finished but no QR was found
         Preview,           // decoded + found, awaiting confirmation
         AlreadyScored,     // matching table already scored; ask before overwriting
         Applied,           // success
+        NotResultLink,     // capture is an invite link (#p=), not a result link
+        NoResult,          // empty / contents don't look like a result link
+        NoMatchingTable,   // decoded fine but no container/table found locally
+        ScanError,         // camera failed to start
+        FileScanFailed,    // decode finished but no QR was found
         ScanTruncated,     // saw the closing frame marker but not the opening one
-                           // — focus arrived after the HID scan started
     }
 
+    // Which input method the user picked. Drives what happens after a successful Apply
+    // (restart camera / re-arm hand scanner / repeat clipboard / back to neutral).
+    private enum InputMethod { None, Clipboard, Camera, HandScanner, Image }
+
+    // Which button to focus on the next render, so the Enter key activates it natively.
+    private enum FocusTarget { None, Next, ReadImage }
+
     private bool showPanel;
-    private ImportStatus status = ImportStatus.Reading;
+    private ImportStatus status = ImportStatus.Neutral;
+    private InputMethod method = InputMethod.None;
     private ScoringResult? pendingResult;
     private ScoreImportService.Lookup? pendingLookup;
     private DotNetObjectReference<ScoreImportPanel>? scannerRef;
@@ -269,53 +296,27 @@
     private int scanElapsedSeconds;
     private System.Threading.CancellationTokenSource? scanTimerCts;
 
-    // Always-on input that catches USB HID-scanner keystrokes, manual pastes, and typed URLs.
-    // Keystroke accumulation + frame detection happen JS-side (see attachScanCapture in
-    // index.html); the complete scan arrives here in one call via OnScanComplete.
-    private ElementReference scanInputRef;
-    // True while the JS capture listeners are bound to the current textarea element. Reset
-    // whenever the textarea leaves the DOM (camera/file states, panel closed) so we re-bind
-    // when it returns.
-    private bool scanCaptureAttached;
-    // Tracks which status we last auto-focused for, so we re-focus on every transition INTO
-    // a waiting state but don't fight the user during Preview/AlreadyScored reviews.
-    private ImportStatus? lastAutoFocusedStatus;
+    private ElementReference scanInputRef;   // HID capture textarea (HandScanning only)
+    private ElementReference nextButtonRef;   // clipboard "Next" button
+    private ElementReference readImageButtonRef;
+    private FocusTarget pendingFocus = FocusTarget.None;
 
-    // Closes the panel after this much idle time. Any user activity (button click, keystroke,
-    // ProcessText, Apply) resets the countdown. Tuned for a typical multi-table workflow:
-    // long enough that the organizer can step away briefly, short enough that a forgotten
-    // panel doesn't linger.
+    // True while the JS capture listeners are bound to the current textarea element.
+    private bool scanCaptureAttached;
+    // True while a capture burst is in flight (set/cleared by JS via OnScanProgress on the two
+    // burst transitions only). Drives the scanning vs waiting progress-bar animation.
+    private bool isScanning;
+    // True once we've focused the capture input for the current HandScanning entry.
+    private bool handScanFocused;
+
+    // Closes the panel after this much idle time. Any user activity resets the countdown.
     private const int InactivityTimeoutMs = 5 * 60 * 1000;
     private System.Threading.CancellationTokenSource? inactivityCts;
 
-    // After a successful Apply, the panel briefly shows the success banner then auto-arms
-    // for the next scan by returning to Reading. Any user button click cancels this.
-    private const int AutoReturnAfterApplyMs = 2000;
-    private System.Threading.CancellationTokenSource? autoReturnCts;
-
-    private bool ShouldRenderScanInput
-        => status != ImportStatus.Scanning && status != ImportStatus.FileDecoding;
-
-    private bool ShouldAutoFocusScanInput
-        => status is ImportStatus.Reading
-                  or ImportStatus.NoResult
-                  or ImportStatus.NotResultLink
-                  or ImportStatus.NoMatchingTable
-                  or ImportStatus.ScanError
-                  or ImportStatus.FileScanFailed
-                  or ImportStatus.ScanTruncated
-                  or ImportStatus.Applied;
-
-    // The static QR icon + pulsating progress bar shown while armed and waiting for a scan.
-    // Hidden during review (Preview/AlreadyScored) and success (Applied has its own banner).
-    private bool ShowScanIndicator
-        => status is ImportStatus.Reading
-                  or ImportStatus.NoResult
-                  or ImportStatus.NotResultLink
-                  or ImportStatus.NoMatchingTable
-                  or ImportStatus.ScanError
-                  or ImportStatus.FileScanFailed
-                  or ImportStatus.ScanTruncated;
+    // After a successful Apply (camera / hand-scanner / image modes), the success banner shows
+    // for this long before the panel auto-continues. Clipboard waits for the user instead.
+    private const int AutoContinueAfterApplyMs = 1200;
+    private System.Threading.CancellationTokenSource? autoContinueCts;
 
     private async Task RefocusScanInput()
     {
@@ -326,7 +327,6 @@
 
     public void Dispose()
     {
-        // Fire-and-forget: stop the scanner if it's still running (e.g. user navigated away).
         _ = StopQrScannerIfRunning();
         if (scanCaptureAttached)
         {
@@ -335,11 +335,10 @@
         }
         scannerRef?.Dispose();
         inactivityCts?.Cancel();
-        autoReturnCts?.Cancel();
+        autoContinueCts?.Cancel();
     }
 
-    /// <summary>Restarts the idle countdown that closes the panel after <see cref="InactivityTimeoutMs"/>.
-    /// Call from every code path triggered by user activity.</summary>
+    /// <summary>Restarts the idle countdown that closes the panel after <see cref="InactivityTimeoutMs"/>.</summary>
     private void ResetInactivityTimer()
     {
         inactivityCts?.Cancel();
@@ -362,61 +361,86 @@
     {
         if (!showPanel)
         {
-            lastAutoFocusedStatus = null;
-            scanCaptureAttached = false; // textarea gone; its listeners die with it
-            return;
-        }
-        if (!ShouldRenderScanInput)
-        {
-            // Camera / file-decode states: the textarea isn't in the DOM right now.
             scanCaptureAttached = false;
+            handScanFocused = false;
             return;
         }
 
-        scannerRef ??= DotNetObjectReference.Create(this);
-        // Bind the JS keystroke capture to the textarea once per appearance. attachScanCapture
-        // is idempotent (it detaches any prior binding first), so a stray re-call is harmless.
-        if (!scanCaptureAttached)
+        // HID capture lives only in HandScanning: bind the JS listeners once and focus on entry.
+        if (status == ImportStatus.HandScanning)
         {
-            try { scanCaptureAttached = await JS.InvokeAsync<bool>("attachScanCapture", scanInputRef, scannerRef); }
-            catch { /* element not ready yet — retry next render */ }
+            scannerRef ??= DotNetObjectReference.Create(this);
+            if (!scanCaptureAttached)
+            {
+                try { scanCaptureAttached = await JS.InvokeAsync<bool>("attachScanCapture", scanInputRef, scannerRef); }
+                catch { /* element not ready yet — retry next render */ }
+            }
+            // Focus once per entry. The flag guard keeps OnScanProgress's mid-burst re-render
+            // from re-focusing/clearing the in-flight capture.
+            if (!handScanFocused)
+            {
+                try
+                {
+                    await JS.InvokeVoidAsync("focusAndClearScanInput", scanInputRef, false);
+                    handScanFocused = true;
+                }
+                catch { /* element not ready yet — retry next render */ }
+            }
+        }
+        else
+        {
+            scanCaptureAttached = false; // textarea not in DOM; its listeners died with it
+            handScanFocused = false;
         }
 
-        // Re-focus (and clear) on every transition INTO a waiting state so the next scan lands
-        // in an empty, focused box. Never fires mid-scan: a scan in flight does no .NET calls,
-        // so there's no re-render between keystrokes to trigger this.
-        if (ShouldAutoFocusScanInput && lastAutoFocusedStatus != status)
+        // Focus the primary button so the Enter key activates it (clipboard "Next", or the
+        // "Read image" button after an image import).
+        if (pendingFocus != FocusTarget.None)
         {
+            var target = pendingFocus;
+            pendingFocus = FocusTarget.None;
             try
             {
-                await JS.InvokeVoidAsync("focusAndClearScanInput", scanInputRef, false);
-                lastAutoFocusedStatus = status;
+                if (target == FocusTarget.Next) await nextButtonRef.FocusAsync();
+                else if (target == FocusTarget.ReadImage) await readImageButtonRef.FocusAsync();
             }
-            catch { /* element not ready yet — retry next render */ }
+            catch { /* element not present — harmless */ }
         }
     }
 
-    /// <summary>Called from JS (attachScanCapture) once a complete scan / paste / typed URL
-    /// has been assembled — framed input commits on `]]`, unframed input on Enter or idle.
-    /// The full string crosses to .NET exactly once, so a slow event loop can't truncate it.</summary>
+    // --- Capture callbacks from JS (HandScanning) ---
+
+    /// <summary>The complete scan/paste/typed URL, assembled JS-side and delivered in one call.</summary>
     [JSInvokable]
     public async Task OnScanComplete(string text)
     {
         ResetInactivityTimer();
-        autoReturnCts?.Cancel();
+        autoContinueCts?.Cancel();
+        isScanning = false;
         if (string.IsNullOrWhiteSpace(text)) return;
         await ProcessText(text);
     }
 
-    /// <summary>Called from JS when the buffer ended with the closing `]]` but never had the
-    /// opening `[[` — focus arrived after the HID scan started, so we missed the head.</summary>
+    /// <summary>Buffer ended with the closing `]]` but never had the opening `[[` — focus arrived
+    /// after the HID scan started, so we missed the head.</summary>
     [JSInvokable]
     public Task OnScanTruncated()
     {
         ResetInactivityTimer();
-        autoReturnCts?.Cancel();
+        autoContinueCts?.Cancel();
+        isScanning = false;
         status = ImportStatus.ScanTruncated;
         StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Burst start/end transitions (not per keystroke) — toggles the bar animation.</summary>
+    [JSInvokable]
+    public Task OnScanProgress(bool scanning)
+    {
+        if (scanning) ResetInactivityTimer();
+        isScanning = scanning;
+        if (status == ImportStatus.HandScanning) StateHasChanged();
         return Task.CompletedTask;
     }
 
@@ -425,49 +449,89 @@
 
     private static string FormatPoints(int value) => (value / 1000.0).ToString("0.0;-0.0;0.0");
 
-    private async Task OpenPanel()
+    // --- Panel lifecycle ---
+
+    private void OpenPanel()
     {
         showPanel = true;
-        status = ImportStatus.Reading;
-        pendingResult = null;
-        pendingLookup = null;
-        StateHasChanged();
+        ReturnToNeutralCore();
         ResetInactivityTimer();
-        // Silent clipboard check on open: an empty clipboard leaves the panel in Reading
-        // with just the scan input, not a "no result link" alert the user didn't ask for.
-        await TryClipboard(isExplicitCheck: false);
+        StateHasChanged();
     }
 
     private async Task ClosePanel()
     {
         inactivityCts?.Cancel();
-        autoReturnCts?.Cancel();
+        autoContinueCts?.Cancel();
         await StopQrScannerIfRunning();
         showPanel = false;
-        status = ImportStatus.Reading;
-        pendingResult = null;
-        pendingLookup = null;
+        ReturnToNeutralCore();
     }
 
-    private async Task TryClipboard(bool isExplicitCheck = true)
+    /// <summary>Back to the resting state with the four method buttons. Stops the camera if live.</summary>
+    private async Task ReturnToNeutral()
+    {
+        await StopQrScannerIfRunning();
+        ReturnToNeutralCore();
+        ResetInactivityTimer();
+        StateHasChanged();
+    }
+
+    private void ReturnToNeutralCore()
+    {
+        autoContinueCts?.Cancel();
+        status = ImportStatus.Neutral;
+        method = InputMethod.None;
+        pendingResult = null;
+        pendingLookup = null;
+        isScanning = false;
+    }
+
+    // --- Method entry points (from the neutral / error button row) ---
+
+    private async Task StartClipboard()
     {
         ResetInactivityTimer();
-        autoReturnCts?.Cancel();
-        status = ImportStatus.Reading;
+        autoContinueCts?.Cancel();
+        method = InputMethod.Clipboard;
+        status = ImportStatus.Neutral;
         pendingResult = null;
         pendingLookup = null;
         StateHasChanged();
 
         string? clip = null;
         try { clip = await JS.InvokeAsync<string?>("readClipboardText"); }
-        catch { /* permission denied or unsupported — fall through to NoResult on explicit check */ }
-
-        // On panel-open (implicit check), stay in Reading if the clipboard has nothing
-        // useful — don't alert the user about an emptiness they didn't ask to verify.
-        if (!isExplicitCheck && string.IsNullOrWhiteSpace(clip))
-            return;
+        catch { /* permission denied or unsupported — falls through to NoResult */ }
 
         await ProcessText(clip);
+    }
+
+    private async Task StartCamera()
+    {
+        method = InputMethod.Camera;
+        await StartQrScan();
+    }
+
+    private void StartHandScan()
+    {
+        ResetInactivityTimer();
+        autoContinueCts?.Cancel();
+        method = InputMethod.HandScanner;
+        BeginHandScan();
+    }
+
+    private void BeginHandScan()
+    {
+        status = ImportStatus.HandScanning;
+        isScanning = false;
+        handScanFocused = false; // re-focus the capture input on (re-)entry
+        StateHasChanged();
+    }
+
+    private async Task StartImage()
+    {
+        method = InputMethod.Image;
+        await PickQrImage();
     }
 
     // --- QR-camera scanning ---
@@ -475,14 +539,13 @@
     private async Task StartQrScan()
     {
         ResetInactivityTimer();
-        autoReturnCts?.Cancel();
+        autoContinueCts?.Cancel();
         scanErrorMessage = null;
         scanElapsedSeconds = 0;
         status = ImportStatus.Scanning;
         StateHasChanged();
 
-        // Wait one render tick so the #qr-scanner-view div is in the DOM before html5-qrcode
-        // tries to attach to it.
+        // Wait one render tick so #qr-scanner-view is in the DOM before html5-qrcode attaches.
         await Task.Yield();
 
         scannerRef ??= DotNetObjectReference.Create(this);
@@ -516,13 +579,6 @@
         });
     }
 
-    private async Task CancelQrScan()
-    {
-        await StopQrScannerIfRunning();
-        status = ImportStatus.NoResult;
-        StateHasChanged();
-    }
-
     private async Task StopQrScannerIfRunning()
     {
         scanTimerCts?.Cancel();
@@ -534,8 +590,7 @@
     [JSInvokable]
     public async Task OnQrScanned(string decodedText)
     {
-        // The scanner has already stopped itself on first decode. Route the decoded text
-        // through the same pipeline as the clipboard path.
+        // Scanner stopped itself on first decode. Route through the shared pipeline.
         scanTimerCts?.Cancel();
         scanTimerCts = null;
         await ProcessText(decodedText);
@@ -552,9 +607,9 @@
     private async Task PickQrImage()
     {
         ResetInactivityTimer();
-        autoReturnCts?.Cancel();
-        // JS opens the file picker. We don't transition state here — if the user cancels
-        // we'd be stuck. JS calls OnQrFileSelected once a file is actually picked.
+        autoContinueCts?.Cancel();
+        // JS opens the file picker; it calls OnQrFileSelected once a file is actually picked
+        // (so cancelling the picker doesn't strand us in a decoding state).
         scannerRef ??= DotNetObjectReference.Create(this);
         try
         {
@@ -577,12 +632,9 @@
 
     private async Task ProcessText(string? text)
     {
-        // Any inbound text (clipboard, scan, paste, camera, file) counts as activity —
-        // valid OR invalid, per the spec.
         ResetInactivityTimer();
 
-        // Log every capture verbatim (no-op when logging is disabled). Fire-and-forget so a
-        // storage hiccup can't block the import flow.
+        // Log every capture verbatim (no-op when logging is disabled).
         _ = ScanLog.AddAsync(text);
 
         if (string.IsNullOrWhiteSpace(text))
@@ -592,8 +644,6 @@
             return;
         }
 
-        // Frame-strip + unescape + invite-detect + payload-extract + decode, shared with the
-        // scan-log page so both interpret captures identically.
         var parsed = ScanResultParser.TryParse(text, out var looksLikeInvite);
         if (parsed == null)
         {
@@ -613,8 +663,6 @@
 
         pendingResult = parsed;
         pendingLookup = lookup;
-        // If the target already has scores, surface that in the preview view so the user
-        // knows the Apply button overwrites.
         status = lookup.Context.Table.Score != null
                  && lookup.Context.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
             ? ImportStatus.AlreadyScored
@@ -638,43 +686,63 @@
         }
 
         status = ImportStatus.Applied;
+        pendingResult = null;
+        pendingLookup = null;
         StateHasChanged();
 
         if (OnApplied.HasDelegate)
             await OnApplied.InvokeAsync();
 
-        // Auto-arm for the next scan: keep the success banner up for a beat, then return
-        // to Reading so the input is focused and ready. Any user button click in the
-        // meantime cancels this (see autoReturnCts.Cancel calls in user-action handlers).
-        ScheduleAutoReturnToReading();
+        if (method == InputMethod.Clipboard)
+        {
+            // Wait for the user. Focus "Next" so Enter repeats the clipboard read.
+            pendingFocus = FocusTarget.Next;
+            StateHasChanged();
+        }
+        else
+        {
+            // Camera / hand scanner / image: show the banner briefly, then auto-continue.
+            ScheduleAutoContinue();
+        }
     }
 
-    private void ScheduleAutoReturnToReading()
+    /// <summary>After the success banner, continue per method: restart the camera, re-arm the hand
+    /// scanner, or (image / anything else) drop back to neutral with the Read-image button focused.</summary>
+    private void ScheduleAutoContinue()
     {
-        autoReturnCts?.Cancel();
+        autoContinueCts?.Cancel();
         var cts = new System.Threading.CancellationTokenSource();
-        autoReturnCts = cts;
+        autoContinueCts = cts;
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(AutoReturnAfterApplyMs, cts.Token);
+                await Task.Delay(AutoContinueAfterApplyMs, cts.Token);
                 if (cts.IsCancellationRequested) return;
-                await InvokeAsync(() =>
+                await InvokeAsync(async () =>
                 {
                     if (!showPanel || status != ImportStatus.Applied) return;
-                    status = ImportStatus.Reading;
-                    pendingResult = null;
-                    pendingLookup = null;
-                    StateHasChanged();
-                    // Deliberately NOT re-reading the clipboard here. In a multi-scan
-                    // workflow the clipboard still holds the URL we just applied, and
-                    // re-processing it would loop the user back into AlreadyScored. The
-                    // textarea is auto-focused by OnAfterRenderAsync so the next scan or
-                    // paste lands directly in the buffer.
+                    switch (method)
+                    {
+                        case InputMethod.Camera:
+                            await StartQrScan();
+                            break;
+                        case InputMethod.HandScanner:
+                            BeginHandScan();
+                            break;
+                        case InputMethod.Image:
+                            pendingFocus = FocusTarget.ReadImage;
+                            ReturnToNeutralCore();
+                            StateHasChanged();
+                            break;
+                        default:
+                            ReturnToNeutralCore();
+                            StateHasChanged();
+                            break;
+                    }
                 });
             }
-            catch (TaskCanceledException) { /* user clicked something before we fired */ }
+            catch (TaskCanceledException) { /* user acted before we fired */ }
         });
     }
 }

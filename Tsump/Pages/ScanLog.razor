@@ -46,11 +46,27 @@ else
 {
     @foreach (var vm in entries)
     {
-        var headerClass = vm.Result != null && vm.Recognized ? "bg-light" : "bg-warning-subtle";
+        @* Three-tier header colour:
+             • red    — couldn't be decoded at all (invite link / garbage)
+             • amber  — decoded but NOT importable (unknown context, or table regenerated/gone)
+             • plain  — decoded and importable into a live local table *@
+        var headerClass = vm.Result == null ? "bg-danger-subtle"
+                        : !vm.Importable ? "bg-warning-subtle"
+                        : "bg-light";
         <div class="card mb-3">
-            <div class="card-header @headerClass d-flex align-items-center flex-wrap gap-2">
-                <span class="flex-grow-1 fw-semibold">@HeaderLabel(vm)</span>
-                <span class="text-muted small">@vm.Entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span>
+            <div class="card-header @headerClass">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <span class="flex-grow-1 fw-semibold">@HeaderLabel(vm)</span>
+                    <span class="text-muted small">@vm.Entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span>
+                </div>
+                @if (vm.Result != null && !vm.Importable)
+                {
+                    @* Full session/tournament-session id, copyable for emergency recovery. *@
+                    <div class="small mt-1">
+                        <span class="text-muted">@Lang.Get("ScanLogContextId"):</span>
+                        <code class="text-break user-select-all">@vm.Result.ContextId</code>
+                    </div>
+                }
             </div>
             <div class="card-body">
                 <code class="d-block small text-break mb-2">@vm.Entry.Raw</code>
@@ -118,8 +134,13 @@ else
         public bool Expanded { get; set; }
         public ScoreImportService.DecodePreview? Preview { get; set; }
 
-        // Only results whose container AND table still exist can render a score preview.
-        public bool CanDecode => Result != null && Recognized && TableFound;
+        // Any decodable result is ScoreTable-worthy: when the local container/table exists the
+        // preview uses real names, otherwise a synthetic positional table is shown.
+        public bool CanDecode => Result != null;
+
+        // Importable = can be applied to a live local table (its container and table both exist).
+        // Decodable-but-not-importable results get the red header + the copyable context id.
+        public bool Importable => Result != null && Recognized && TableFound;
     }
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
@@ -164,8 +185,9 @@ else
         {
             if (vm.Recognized && vm.Label != null)
                 return vm.TableFound ? vm.Label : $"{vm.Label} — {Lang.Get("ScanLogTableGone")}";
-            // Decodes as a result but no local container owns the ContextId (e.g. another organizer).
-            return $"{Lang.Get("Table")} {vm.Result.TableNumber} · {vm.Result.ContextId.ToString()[..8]}…";
+            // Decodes as a result but no local container owns the ContextId (e.g. another
+            // organizer). Full ContextId is shown separately in the header for recovery.
+            return $"{Lang.Get("Table")} {vm.Result.TableNumber} · {Lang.Get("ScanLogUnknownContext")}";
         }
         return vm.LooksLikeInvite ? Lang.Get("ScanLogInvite") : Lang.Get("ScanLogUnrecognized");
     }

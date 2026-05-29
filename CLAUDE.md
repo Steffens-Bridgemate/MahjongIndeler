@@ -42,6 +42,8 @@ git push                           # auto-deploys the scoring app
 
 For wire-format breaking changes deploy MahjongScoring **first** if any active scoring links exist in WhatsApp; otherwise order doesn't matter.
 
+**Before the organizer push:** refresh the `docs/` files (`docs/domain.md`, `docs/score-apply.md`, `docs/score-import-ui.md`, `docs/pages.md`) to match the changes being deployed, and commit them in the same push.
+
 **Never push without an explicit ask.** Push = deploy = live users.
 
 ## Coding practices
@@ -52,6 +54,7 @@ For wire-format breaking changes deploy MahjongScoring **first** if any active s
 - **Never commit or push without explicit approval.** Build locally first; then ask.
 - **Comments are for *why*, not *what*.** Skip docstrings that restate the signature. Note non-obvious invariants, workarounds, surprising decisions.
 - **`Tsump.Shared` cannot reference `Tsump`.** Components that need `TournamentService` etc. must live in `Tsump/Components/`. Pure Razor (no Tsump-side deps) can live in `Tsump.Shared/Components/`.
+- **Dutch term for "session" is "Zitting"** (not "Sessie"). Use it in `nl` strings in [LanguageService.cs](Tsump.Shared/Services/LanguageService.cs).
 
 ## Gotchas
 

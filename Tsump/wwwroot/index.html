@@ -271,8 +271,20 @@
 
             let idleTimer = null;
             const clearIdle = function () { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } };
+
+            // Signal "scanning" vs "waiting" to .NET, but ONLY on transitions — never per
+            // keystroke — so a burst still costs at most two round-trips (start + end) and can't
+            // overrun the event loop.
+            let scanning = false;
+            const setScanning = function (v) {
+                if (scanning === v) return;
+                scanning = v;
+                dotNetRef.invokeMethodAsync('OnScanProgress', v);
+            };
+
             const submit = function (text) {
                 clearIdle();
+                setScanning(false);
                 el.value = ''; // only ever cleared at commit time, never mid-burst
                 dotNetRef.invokeMethodAsync('OnScanComplete', text);
             };
@@ -280,12 +292,14 @@
             const onInput = function () {
                 const value = el.value;
                 const trimmed = value.trim();
-                if (trimmed.length === 0) { clearIdle(); return; }
+                if (trimmed.length === 0) { clearIdle(); setScanning(false); return; }
+                setScanning(true);                                     // a burst is arriving
                 const hasStart = trimmed.startsWith(FRAME_START);
                 const hasEnd = trimmed.endsWith(FRAME_END);
                 if (hasStart && hasEnd) { submit(value); return; }     // complete framed scan
                 if (hasEnd && !hasStart) {                              // front-truncated: focus arrived late
                     clearIdle();
+                    setScanning(false);
                     el.value = '';
                     dotNetRef.invokeMethodAsync('OnScanTruncated');
                     return;

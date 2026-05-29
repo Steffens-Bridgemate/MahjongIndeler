@@ -61,15 +61,18 @@ record ResolvedContext(
     TableAssignment Table,
     int StartingPoints,
     List<int> Uma3Players,
-    List<int> Uma4Players);
+    List<int> Uma4Players,
+    List<string> PlayerNames);   // names in Table.PlayerIds order (members / participants)
 ```
+
+`PlayerNames` lets a consumer render names without knowing the container kind — used by the scan-log decode preview. `HanchanScoreContextResolver` resolves them via `MemberService`; `TournamentScoreContextResolver` via `tournament.Participants`.
 
 Two implementations, both DI-registered in [Program.cs](../Tsump/Program.cs):
 
 - `HanchanScoreContextResolver` — `SessionService` lookup. Reads weekly settings from `SettingsService` for `StartingPoints` / Uma.
 - `TournamentScoreContextResolver` — `TournamentService` lookup. Iterates `tournament.Sessions` to find the one whose `Id == contextId`. **Falls back to club weekly settings** when per-tournament overrides (`Tournament.StartingPoints` / `UmaXPlayers`) are null.
 
-`ScoreImportService` ([ScoreImportService.cs](../Tsump/Services/ScoreImportService.cs)) takes `IEnumerable<IScoreContextResolver>` and iterates them in order; first `Found` wins. Adding a new context kind = add a new resolver + register it. No caller changes.
+`ScoreImportService` ([ScoreImportService.cs](../Tsump/Services/ScoreImportService.cs)) takes `IEnumerable<IScoreContextResolver>` (plus `SettingsService`, for the synthetic-preview defaults below) and iterates the resolvers in order; first `Found` wins. Adding a new context kind = add a new resolver + register it. No caller changes.
 
 ### `ContainerOnly` vs `NotMine`
 
@@ -91,20 +94,30 @@ Two implementations, both DI-registered in [Program.cs](../Tsump/Program.cs):
 7. **Persist.** `resolver.SaveAsync(context)` — Hanchan resolver calls `SessionService.SaveAsync`, Tournament resolver calls `TournamentService.SaveAsync` on the whole tournament.
 8. **Return** `ApplyOutcome(Success, Reason, ResolvedContext?)`.
 
+Steps 3–6 (initialise → apply by position → derive Mr. X → compute Uma) live in a private `WriteScoresIntoTable(context, result, langGet)` shared with `BuildPreviewAsync` (below), so a preview renders scores exactly as an apply would. It returns `false` on a player-count mismatch.
+
 ## What `ApplyAsync` does NOT do
 
 - It doesn't refresh any UI state — callers reload data after a successful outcome (`ReloadTournament` in TournamentDetail; `ApplyImportPreview` in WeeklySessionPage).
 - It doesn't initialise `Score` on other tables in the container. UI re-loaders must call `ScoreTable.InitializeScores` on all tables themselves to keep them visible (the score-null gotcha).
 - It can't validate that the player **identities** still match (no PlayerIds in the wire format). If the assignments were regenerated and the new table has the same player *count* but different players, the result silently writes onto whichever players sit at those positions now. Count mismatch is caught (`NoMatchingTable`); identity drift is not.
 
-## Find vs Apply
+## Find / Preview / Describe (read-only)
 
-`ScoreImportService.FindAsync(ScoringResult)` is a read-only lookup used by the import UI to preview before applying. Same resolver iteration as `ApplyAsync` but no mutation, no save.
+Three read-only helpers, no mutation of stored data, no save:
+
+- `FindAsync(ScoringResult)` — resolver lookup used by the import UI to preview before applying. Returns `Lookup?`.
+- `DescribeAsync(contextId, tableNumber)` — used by the scan-log header. Returns `ScanDescription(Label, Recognized, TableFound)`: friendly label when any resolver recognises the id (from `Found` *or* `ContainerOnly`), and whether the table still exists.
+- `BuildPreviewAsync(ScoringResult, langGet)` — renders a decoded result as a read-only `ScoreTable` for the scan-log "Decode" button. Returns `DecodePreview(Context, NameResolver, TableMismatch)`.
+  - When a resolver recognises the id, it uses the real table (mutating only the transient, freshly-deserialised instance — never saved) and `Context.PlayerNames`.
+  - When **no** resolver owns the id (foreign organizer, or a regenerated/deleted session), it fabricates a synthetic table from the result itself — one player id per score row (so 3-player tables still derive Mr. X), club-default starting points/Uma from `SettingsService`, and parenthesised positional names `(Player 1)`, `(Player 2)`… So any valid `ScoringResult` is inspectable, importable or not.
 
 ## Callers
 
 | Caller | Path | What it does after `ApplyAsync` |
 |---|---|---|
 | [ImportScorePage.razor](../Tsump/Pages/ImportScorePage.razor) | `/import-score#r=…` deep link | Renders applied banner, link back to session |
-| [WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor) `ApplyImportPreview` | inline import panel (Phase A holdover) | Reloads `hanchansOnDate`, re-points `currentHanchan`, re-inits scores, bumps `scoreTableVersion` |
-| [ScoreImportPanel.razor](../Tsump/Components/ScoreImportPanel.razor) `Apply` | the new component | Invokes `OnApplied` callback; consumer ( `TournamentDetail.ReloadTournament`) reloads and re-inits scores |
+| [WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor) `ApplyImportPreview` | older inlined import panel (pending Phase B migration) | Reloads `hanchansOnDate`, re-points `currentHanchan`, re-inits scores, bumps `scoreTableVersion` |
+| [ScoreImportPanel.razor](../Tsump/Components/ScoreImportPanel.razor) `Apply` | the shared component | Invokes `OnApplied` (consumer e.g. `TournamentDetail.ReloadTournament` reloads + re-inits scores), then continues per input method — see [score-import-ui.md](score-import-ui.md) |
+
+`BuildPreviewAsync` / `DescribeAsync` are also consumed by [ScanLog.razor](../Tsump/Pages/ScanLog.razor) (read-only; no apply).
