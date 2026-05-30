@@ -1,0 +1,60 @@
+@using Tsump.Services
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject LanguageService Lang
+
+@* Shown only when a new service-worker version is waiting. The update is applied on the
+   user's click — never mid-action — eliminating the abrupt reloads that corrupted data.
+   The JS side (registerAppUpdateCallback / applyAppUpdate) lives in each app's index.html. *@
+@if (updateAvailable)
+{
+    <div style="position:fixed;left:0;right:0;bottom:0;z-index:1080;background:#0d6efd;color:#fff;
+                padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;
+                flex-wrap:wrap;box-shadow:0 -2px 8px rgba(0,0,0,.25);">
+        <span><i class="bi bi-arrow-clockwise me-2"></i>@Lang.Get("UpdateAvailable")</span>
+        <span class="d-flex gap-2">
+            <button class="btn btn-sm btn-light" @onclick="ApplyUpdate">@Lang.Get("UpdateNow")</button>
+            <button class="btn btn-sm btn-outline-light" @onclick="Dismiss">@Lang.Get("UpdateLater")</button>
+        </span>
+    </div>
+}
+
+@code {
+    private bool updateAvailable;
+    private DotNetObjectReference<AppUpdateBanner>? selfRef;
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        selfRef = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("registerAppUpdateCallback", selfRef); }
+        catch { /* service worker / JS unavailable — simply no update prompts */ }
+    }
+
+    // Called from JS when a newer worker has finished installing and is waiting.
+    [JSInvokable]
+    public void OnUpdateAvailable()
+    {
+        if (updateAvailable) return;
+        updateAvailable = true;
+        StateHasChanged();
+    }
+
+    private async Task ApplyUpdate()
+    {
+        // Hands control to the waiting worker; the page then reloads via 'controllerchange'.
+        try { await JS.InvokeVoidAsync("applyAppUpdate"); }
+        catch { /* nothing we can do — leave the banner up */ }
+    }
+
+    private void Dismiss() => updateAvailable = false;
+
+    public ValueTask DisposeAsync()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+        selfRef?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

@@ -4,6 +4,9 @@ self.importScripts('./service-worker-assets.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
+// The page posts 'SKIP_WAITING' only when the user clicks "Update now" in the banner, so the
+// new worker takes over (and the page reloads) at a moment the user chose — never mid-action.
+self.addEventListener('message', event => { if (event.data === 'SKIP_WAITING') self.skipWaiting(); });
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
@@ -26,8 +29,8 @@ async function onInstall(event) {
         }
     }
 
-    // Activate new version immediately instead of waiting for all tabs to close
-    self.skipWaiting();
+    // Intentionally NOT calling skipWaiting() here: the new worker installs and then waits.
+    // The running app keeps using the current version until the user opts in via the banner.
 }
 
 async function onActivate(event) {

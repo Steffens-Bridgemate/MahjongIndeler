@@ -46,6 +46,11 @@ public class LanguageService
         ["TournamentModeDesc"] = "Toernooien met eenmalige inschrijving.",
         ["SwitchMode"] = "Wissel modus",
 
+        // App update prompt (AppUpdateBanner)
+        ["UpdateAvailable"] = "Er is een nieuwe versie beschikbaar.",
+        ["UpdateNow"] = "Nu bijwerken",
+        ["UpdateLater"] = "Later",
+
         // Tournament sub-nav
         ["TournamentParticipants"] = "Deelnemers",
         ["TournamentAssignments"] = "Tafels",
@@ -456,6 +461,11 @@ public class LanguageService
         ["WeeklyModeDesc"] = "Manage weekly sessions, members, and history.",
         ["TournamentModeDesc"] = "Tournaments with participants, assignments, and guidesheets.",
         ["SwitchMode"] = "Switch mode",
+
+        // App update prompt (AppUpdateBanner)
+        ["UpdateAvailable"] = "A new version is available.",
+        ["UpdateNow"] = "Update now",
+        ["UpdateLater"] = "Later",
 
         // Tournament sub-nav
         ["TournamentParticipants"] = "Participants",

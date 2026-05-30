@@ -391,16 +391,60 @@
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script>
-        navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then(function (reg) {
-            // When a new service worker takes over, reload to get the latest version
+        // Controlled PWA update: a new version installs quietly and waits; the AppUpdateBanner
+        // offers "Update now", and only then do we activate it + reload. No more mid-action reloads.
+        (function () {
+            if (!('serviceWorker' in navigator)) return;
+
+            var dotNetRef = null;      // the Blazor AppUpdateBanner, once it registers
+            var updatePending = false; // an update was detected (maybe before the banner mounted)
+            var waitingWorker = null;  // the installed-and-waiting new worker
             var refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-                if (!refreshing) {
-                    refreshing = true;
-                    window.location.reload();
+
+            window.registerAppUpdateCallback = function (ref) {
+                dotNetRef = ref;
+                if (updatePending) notifyBanner();
+            };
+
+            // Called by the banner's "Update now". controllerchange (below) then reloads the page.
+            window.applyAppUpdate = function () {
+                if (waitingWorker) waitingWorker.postMessage('SKIP_WAITING');
+            };
+
+            function notifyBanner() {
+                updatePending = true;
+                if (dotNetRef) {
+                    try { dotNetRef.invokeMethodAsync('OnUpdateAvailable'); } catch (e) { /* banner not mounted */ }
                 }
+            }
+
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+                if (!refreshing) { refreshing = true; window.location.reload(); }
             });
-        });
+
+            navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then(function (reg) {
+                function watch(worker) {
+                    if (!worker) return;
+                    worker.addEventListener('statechange', function () {
+                        // 'installed' while a controller already exists ⇒ an UPDATE, not first install.
+                        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                            waitingWorker = worker;
+                            notifyBanner();
+                        }
+                    });
+                }
+
+                if (reg.waiting && navigator.serviceWorker.controller) {
+                    waitingWorker = reg.waiting;   // already waiting when the page loaded
+                    notifyBanner();
+                }
+                watch(reg.installing);
+                reg.addEventListener('updatefound', function () { watch(reg.installing); });
+
+                // Check for a new deploy whenever the user returns to the tab.
+                window.addEventListener('focus', function () { reg.update().catch(function () { }); });
+            }).catch(function (e) { console.warn('Service worker registration failed:', e); });
+        })();
     </script>
 </body>
 
