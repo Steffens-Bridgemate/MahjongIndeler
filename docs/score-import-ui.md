@@ -22,7 +22,7 @@ Opening the panel lands in a **neutral state** showing four explicit method butt
 | State | Meaning | UI |
 |---|---|---|
 | `Neutral` | Resting; awaiting a method choice | Prompt + four method buttons |
-| `HandScanning` | HID capture armed | QR icon + waiting/scanning bar + Cancel |
+| `HandScanning` | HID capture armed | Click-to-re-arm QR indicator + waiting/scanning bar (or a "not listening" badge when focus is lost) |
 | `Scanning` | Camera scanner live | Live view + tips + Cancel |
 | `FileDecoding` | Picked image, html5-qrcode decoding | Spinner |
 | `Preview` | Decoded + table found, awaiting confirm | Preview table + Apply / Cancel |
@@ -56,7 +56,7 @@ State `Scanning` → JS `startQrScanner("qr-scanner-view", scannerRef)`. JS call
 
 ### 3. Hand scanner (`StartHandScan` → `BeginHandScan`, `bi-upc-scan`)
 
-State `HandScanning`. Arms the **JS-side capture** (below) and shows the QR icon + progress bar. This is the only state where the capture input exists. Cancel → `ReturnToNeutral`.
+State `HandScanning`. Arms the **JS-side capture** (below) and shows the QR indicator + progress bar. This is the only state where the capture input exists. There is no in-body Cancel — the header **Close** collapses the panel. The QR indicator doubles as a **click-to-re-arm** button (see focus tracking below).
 
 ### 4. Read image (`StartImage` → `PickQrImage`, `bi-image`)
 
@@ -81,8 +81,15 @@ So capture lives in JS ([Tsump/wwwroot/index.html](../Tsump/wwwroot/index.html))
 - `OnScanProgress(bool)` — fired **only on the two burst transitions** (start / end), never per keystroke, so a burst costs at most two round-trips. Toggles `isScanning`, which switches the progress bar between its two animations:
   - **waiting** — indeterminate Bootstrap striped sweep (`progress-bar-striped progress-bar-animated`).
   - **scanning** — a fill that repeatedly grows left→right, ~1s/cycle (`.scan-fill` + `@keyframes scan-fill-grow`).
+- `OnScanFocusChanged(bool)` — the capture field gained/lost keyboard focus (→ `captureHasFocus`); see focus tracking below.
 
 The capture `<textarea>` is offscreen-but-focusable (`.scan-capture-hidden`: `position:fixed; 1×1px; opacity:0; pointer-events:none`). A focused invisible element still receives keystrokes; the raw URL is no longer shown on screen (it's recorded to the Log instead — below). `OnAfterRenderAsync` attaches the listeners once per `HandScanning` entry and focuses once (`handScanFocused` guard), so `OnScanProgress`'s mid-burst re-render never re-focuses or clears the in-flight capture.
+
+### Focus tracking (armed vs "not listening")
+
+The capture field must keep keyboard focus to receive scanner keystrokes, but the user can lose it by clicking elsewhere or switching apps (e.g. a Teams chat). `attachScanCapture` also binds `focus`/`blur` on the textarea **plus** `window` `blur`/`focus`, and reports genuine changes to `OnScanFocusChanged(bool)`. The blur handler is **debounced (~200 ms)** and checks `el.isConnected`, `document.activeElement` and `document.hasFocus()`, so it ignores the panel's own clear+refocus cycle, the post-burst re-arm, and element removal on state changes — only a real loss flips the indicator. (`hasFocus()` is what catches "switched to another app", where some browsers keep `activeElement` on the textarea while the window is unfocused.)
+
+When focus is lost the indicator greys the QR glyph and shows a high-contrast `bg-warning` **"not listening — click to resume"** badge. Clicking the indicator (`RefocusScanInput` → `focusAndClearScanInput(force: true)`) re-arms it. JS **cannot** steal OS focus back from another application, so the user must click once they're back in the browser — which the indicator handles. The glyph sits in a fixed-height box (with a fixed min-height message box below) so it stays centered and doesn't jump as the state changes.
 
 ## Pipeline: `ProcessText`
 
@@ -99,14 +106,14 @@ The capture `<textarea>` is offscreen-but-focusable (`.scan-capture-hidden`: `po
 |---|---|---|
 | **Clipboard** | Banner + **Next** button (repeats the clipboard read); Next is focused so **Enter** triggers it | → neutral |
 | **Camera** | Banner ~1.2s → **auto-restarts the camera** | → neutral |
-| **HandScanner** | Banner ~1.2s → **auto re-arms** the capture (`BeginHandScan`) | → neutral |
+| **HandScanner** | Banner ~1.2s → **auto re-arms** the capture (`BeginHandScan`) | no in-body cancel; header **Close** |
 | **Image** | Banner ~1.2s → **neutral**, with the Read-image button focused (Enter repeats) | → neutral |
 
 `ScheduleAutoContinue` runs the ~1.2s (`AutoContinueAfterApplyMs`) timer for camera/hand-scanner/image; clipboard has no timer (waits for the user). Any cancel/close cancels the timer (`autoContinueCts`).
 
 **Enter binding** is native: `pendingFocus` is set when entering a state with a "primary" button (clipboard `Applied` → `Next`; post-image neutral → `Read image`); `OnAfterRenderAsync` calls `FocusAsync()` on the matching `ElementReference`, and a focused `<button>` activates on Enter.
 
-`ReturnToNeutral` is the universal in-body cancel: stops the camera if live, resets to `Neutral`/`None`, clears pending result. The header button is **Close** (`ClosePanel`) which collapses the whole panel.
+`ReturnToNeutral` is the in-body cancel for the camera/preview states: stops the camera if live, resets to `Neutral`/`None`, clears pending result. `HandScanning` has **no** in-body cancel — the header **Close** (`ClosePanel`) collapses the whole panel. Close uses `@onmousedown:preventDefault` so clicking it doesn't blur the armed capture field (without that, the first click was consumed by the focus change and it took two clicks), and `ClosePanel` flips `showPanel` + re-renders *before* the scanner-teardown `await`, so it closes on the first click.
 
 ## Scan logging
 
