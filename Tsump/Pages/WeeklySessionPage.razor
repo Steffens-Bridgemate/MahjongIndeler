@@ -71,7 +71,7 @@
                 <i class="bi bi-plus-lg me-1"></i>@Lang.Get("AddHanchan")
             </button>
         }
-        @if (hanchansOnDate.Count(s => s.Tables.Count > 0) > 1)
+        @if (hanchansOnDate.Count > 1)
         {
             @if (showExportAll)
             {
@@ -212,34 +212,72 @@ else
 
     @if (!IsLockedPastSession)
     {
-        <div class="mb-3">
+        <div class="d-flex align-items-center flex-wrap gap-1 mb-3">
             @if (tables.Count == 0)
             {
-                <button class="btn btn-primary me-2" @onclick="GenerateTables" disabled="@(presentIds.Count < 3)">
+                <button class="btn btn-primary" @onclick="GenerateTables" disabled="@(presentIds.Count < 3)">
                     @Lang.Get("GenerateTableAssignments")
                 </button>
                 @if (PreviousHanchanWithTables() != null)
                 {
-                    <button class="btn btn-outline-primary me-2" @onclick="CopyTablesFromPrevious">
+                    <button class="btn btn-outline-primary" @onclick="CopyTablesFromPrevious">
                         @Lang.Get("CopyTables")
                     </button>
                 }
-                <button class="btn btn-outline-secondary me-2" @onclick="ShowCopyFromHistory">
+                <button class="btn btn-outline-secondary" @onclick="ShowCopyFromHistory">
                     <i class="bi bi-clipboard-plus me-1"></i>@Lang.Get("CopyFromHistory")
                 </button>
             }
             @if (workflowStepKey != null)
             {
-                <button class="btn @(saved ? "btn-primary" : "btn-outline-secondary") ms-2"
+                <button class="btn @(saved ? "btn-primary" : "btn-outline-secondary")"
                         disabled="@(!saved)" @onclick="BackToWorkflow">
                     &larr; @Lang.Get("BackToWorkflow")
                 </button>
             }
             @if (tables.Count > 0 && activeTab == "tables")
             {
+                @* Exporting the assignment is the primary workflow step — full-size, primary outline. *@
+                @if (showExportSingle)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="CopyTablesToClipboard">
+                        <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="OpenSingleHanchan">
+                        <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="DownloadSingleHanchan">
+                        <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-outline-primary" @onclick="() => showExportSingle = true">
+                        <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
+                    </button>
+                }
+                @if (scoreEntryEnabled)
+                {
+                    @if (showExportScoresheetsSingle)
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="PrintScoresheetsSingle">
+                            <i class="bi bi-printer me-1"></i>@Lang.Get("PrintScoresheets")
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="DownloadScoresheetsSingle">
+                            <i class="bi bi-download me-1"></i>@Lang.Get("DownloadScoresheets")
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-outline-primary" @onclick="() => showExportScoresheetsSingle = true">
+                            <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
+                        </button>
+                    }
+                }
+                @* Regenerate is a secondary action — reduced to an icon button with tooltip. *@
                 @if (showRegenerateConfirm)
                 {
-                    <span class="alert alert-warning d-inline-block ms-2 mb-0 py-1">
+                    <span class="alert alert-warning d-inline-block mb-0 py-1">
                         @Lang.Get("RegenerateConfirm")
                         <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
                         <button class="btn btn-sm btn-secondary" @onclick="CancelRegenerate">@Lang.Get("Cancel")</button>
@@ -247,8 +285,8 @@ else
                 }
                 else
                 {
-                    <button class="btn btn-outline-primary ms-2" @onclick="RequestRegenerate" disabled="@(presentIds.Count < 3)">
-                        <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("Regenerate")
+                    <button class="btn btn-sm btn-outline-primary" @onclick="RequestRegenerate" disabled="@(presentIds.Count < 3)" title="@Lang.Get("Regenerate")">
+                        <i class="bi bi-arrow-repeat"></i>
                     </button>
                 }
             }
@@ -256,7 +294,7 @@ else
             {
                 @if (showDeleteConfirm)
                 {
-                    <span class="alert alert-danger d-inline-block ms-2 mb-0 py-1">
+                    <span class="alert alert-danger d-inline-block mb-0 py-1">
                         @Lang.Get("DeleteHanchanConfirm")
                         <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDeleteHanchan">@Lang.Get("YesDelete")</button>
                         <button class="btn btn-sm btn-secondary" @onclick="CancelDeleteHanchan">@Lang.Get("Cancel")</button>
@@ -264,8 +302,8 @@ else
                 }
                 else
                 {
-                    <button class="btn btn-outline-danger ms-2" @onclick="RequestDeleteHanchan">
-                        <i class="bi bi-trash me-1"></i>@Lang.Get("DeleteHanchan")
+                    <button class="btn btn-sm btn-outline-danger" @onclick="RequestDeleteHanchan" title="@Lang.Get("DeleteHanchan")">
+                        <i class="bi bi-trash"></i>
                     </button>
                 }
             }
@@ -365,45 +403,6 @@ else
     }
     else if (tables.Count > 0)
     {
-        @if (activeTab == "tables")
-        {
-        <div class="d-flex align-items-center mb-2 flex-wrap gap-1 ms-2">
-            @if (showExportSingle)
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyTablesToClipboard">
-                    <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenSingleHanchan">
-                    <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadSingleHanchan">
-                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
-                </button>
-            }
-            else
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportSingle = true">
-                    <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
-                </button>
-            }
-            @if (showExportScoresheetsSingle)
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="PrintScoresheetsSingle">
-                    <i class="bi bi-printer me-1"></i>@Lang.Get("PrintScoresheets")
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadScoresheetsSingle">
-                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadScoresheets")
-                </button>
-            }
-            else
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportScoresheetsSingle = true">
-                    <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
-                </button>
-            }
-        </div>
-        }
-
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
                 @{
@@ -621,6 +620,7 @@ else
     private bool showExportScoresheetsSingle;
     private bool showExportRankings;
     private bool externalScoringEnabled;
+    private bool scoreEntryEnabled;
 
     // Bumped on each successful import; included in @key on ScoreTable so Blazor
     // disposes the stale instance and re-renders with the freshly written model.
@@ -666,6 +666,7 @@ else
             uma4Players = new List<int>(clubSettings.WeeklyUma4Players);
             uma3Players = new List<int>(clubSettings.WeeklyUma3Players);
             externalScoringEnabled = clubSettings.EnableExternalScoring;
+            scoreEntryEnabled = clubSettings.EnableScoreEntry;
 
             members = await MemberService.GetAllAsync();
             activeMembers = members.Where(m => m.IsActive).ToList();
