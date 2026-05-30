@@ -46,15 +46,12 @@ else
          button moves into the assignments card, on the Import-result row). --- *@
     @if (!tournament.IsGenerated)
     {
-        <div class="mb-3">
-            <button class="btn btn-primary me-2" @onclick="GenerateSessions"
-                    disabled="@(tournament.Participants.Count < 13)">
+        <div class="d-flex align-items-center flex-wrap gap-1 mb-3">
+            <button class="btn btn-primary" @onclick="GenerateSessions"
+                    disabled="@(tournament.Participants.Count < 13)"
+                    title="@(tournament.Participants.Count < 13 ? Lang.Get("NeedAtLeast13") : null)">
                 <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("GenerateAllHanchans")
             </button>
-            @if (tournament.Participants.Count < 13)
-            {
-                <span class="text-warning">@Lang.Get("NeedAtLeast13")</span>
-            }
         </div>
     }
 
@@ -79,7 +76,7 @@ else
         <div class="d-flex align-items-start flex-wrap gap-2 mb-3">
             @if (showRegenerateConfirm)
             {
-                <div class="alert alert-warning d-inline-block mb-0 py-2">
+                <div class="alert alert-warning d-inline-block mb-0 py-1">
                     @Lang.Get("RegenerateConfirmTournament")
                     <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
                     <button class="btn btn-sm btn-secondary" @onclick="() => showRegenerateConfirm = false">@Lang.Get("Cancel")</button>
@@ -102,15 +99,9 @@ else
             <li class="nav-item">
                 @{
                     var tablesActive = tournamentActiveTab == "tables";
-                    // btn-primary isn't a bg-* utility, so it ignores --bs-bg-opacity (the trick the
-                    // scores tabs use), and the .nav-tabs.active rule would otherwise blank the
-                    // selected tab. Set the background inline to the *themed* btn-primary blue
-                    // (app.css overrides .btn-primary to #004b8d, not Bootstrap's default), dimming
-                    // only the background to 0.2 when not active (text-white keeps the label white).
-                    var tablesOpacity = tablesActive ? "1" : "0.2";
                 }
-                <a class="nav-link btn-primary text-white @(tablesActive ? "active" : "")"
-                   style="background-color: rgba(0, 75, 141, @tablesOpacity) !important;"
+                <a class="nav-link @(tablesActive ? "active" : "")"
+                   style="@ScoreStatusHelper.TabStyle(tablesActive)"
                    href="javascript:void(0)" @onclick='() => tournamentActiveTab = "tables"'>
                     @Lang.Get("Assignments")
                 </a>
@@ -162,39 +153,15 @@ else
         @if (tournamentActiveTab == "tables")
         {
         <div class="d-flex align-items-center mb-3 flex-wrap gap-1">
-            @if (showExportAll)
-            {
-                <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="CopyAllToClipboard">
-                    <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenAllHanchans">
-                    <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadAllHanchans">
-                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
-                </button>
-            }
-            else
-            {
-                <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="() => showExportAll = true">
-                    <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
-                </button>
-            }
-            @if (showExportScoresheetsAll)
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="PrintScoresheetsAll">
-                    <i class="bi bi-printer me-1"></i>@Lang.Get("PrintScoresheets")
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadScoresheetsAll">
-                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadScoresheets")
-                </button>
-            }
-            else
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportScoresheetsAll = true">
-                    <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
-                </button>
-            }
+            <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-stack" Small="true"
+                               TriggerClass="btn-outline-secondary"
+                               @bind-Expanded="showExportAll"
+                               OnCopy="CopyAllToClipboard" Copied="copiedToClipboard"
+                               OnPrint="OpenAllHanchans" OnDownload="DownloadAllHanchans" />
+            <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
+                               TriggerClass="btn-outline-secondary"
+                               @bind-Expanded="showExportScoresheetsAll"
+                               OnPrint="PrintScoresheetsAll" OnDownload="DownloadScoresheetsAll" />
         </div>
 
         @if (selectedPlayerIds.Count > 0)
@@ -205,7 +172,7 @@ else
                 </span>
                 @if (selectedPlayerIds.Count == 2)
                 {
-                    <button class="btn btn-sm btn-warning me-1" @onclick="SwapSelectedPlayers">
+                    <button class="btn btn-sm btn-primary me-1" @onclick="SwapSelectedPlayers">
                         @Lang.Get("SwapPlayers")
                     </button>
                 }
@@ -243,41 +210,19 @@ else
                         <option value="@mm">@mm.ToString("D2")</option>
                     }
                 </select>
-                @if (exportSingleHanchan == sn)
-                {
-                    <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="() => CopySingleHanchanToClipboard(sn)">
-                        <i class="bi bi-clipboard me-1"></i>@(copiedSingleHanchan == sn ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => OpenSingleHanchan(sn)">
-                        <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => DownloadSingleHanchan(sn)">
-                        <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
-                    </button>
-                }
-                else
-                {
-                    <button class="btn btn-sm btn-outline-secondary ms-3" @onclick="() => exportSingleHanchan = sn">
-                        <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
-                    </button>
-                }
-                @if (exportScoresheetSingleHanchan == sn)
-                {
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => PrintScoresheetsSingle(sn)">
-                        <i class="bi bi-printer me-1"></i>@Lang.Get("PrintScoresheets")
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => DownloadScoresheetsSingle(sn)">
-                        <i class="bi bi-download me-1"></i>@Lang.Get("DownloadScoresheets")
-                    </button>
-                }
-                else
-                {
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => exportScoresheetSingleHanchan = sn">
-                        <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
-                    </button>
-                }
-                <button class="btn btn-sm btn-outline-dark ms-3" @onclick="() => ToggleHanchan(sn)" style="font-size:1.1em;line-height:1;padding:2px 8px;">
-                    @(isHanchanExpanded ? "\u25B2" : "\u25BC")
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-table" Small="true"
+                                   TriggerClass="btn-outline-secondary"
+                                   Expanded="exportSingleHanchan == sn"
+                                   ExpandedChanged="(bool v) => exportSingleHanchan = v ? sn : (int?)null"
+                                   OnCopy="() => CopySingleHanchanToClipboard(sn)" Copied="copiedSingleHanchan == sn"
+                                   OnPrint="() => OpenSingleHanchan(sn)" OnDownload="() => DownloadSingleHanchan(sn)" />
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
+                                   TriggerClass="btn-outline-secondary"
+                                   Expanded="exportScoresheetSingleHanchan == sn"
+                                   ExpandedChanged="(bool v) => exportScoresheetSingleHanchan = v ? sn : (int?)null"
+                                   OnPrint="() => PrintScoresheetsSingle(sn)" OnDownload="() => DownloadScoresheetsSingle(sn)" />
+                <button class="btn btn-sm btn-outline-dark ms-3" @onclick="() => ToggleHanchan(sn)">
+                    <i class="bi @(isHanchanExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
                 </button>
             </div>
             @if (isHanchanExpanded)
@@ -290,7 +235,7 @@ else
                     <div class="col-md-4 mb-3">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
                             <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
-                                @Lang.Get("Table") @table.TableNumber (@table.PlayerCount @Lang.Get("players"))
+                                @Lang.Get("Table") @table.TableNumber
                             </div>
                             <ul class="list-group list-group-flush">
                                 @foreach (var playerId in table.PlayerIds)
@@ -340,8 +285,8 @@ else
                     {
                         <span class="fw-bold" style="font-size:1.25rem;">@session.StartTime.Value.ToString(@"hh\:mm")</span>
                     }
-                    <button class="btn btn-sm btn-outline-dark ms-2" @onclick="() => ToggleHanchan(sn)" style="font-size:1.1em;line-height:1;padding:2px 8px;">
-                        @(isHanchanExpanded ? "\u25B2" : "\u25BC")
+                    <button class="btn btn-sm btn-outline-dark ms-2" @onclick="() => ToggleHanchan(sn)">
+                        <i class="bi @(isHanchanExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
                     </button>
                 </div>
                 @if (isHanchanExpanded)

@@ -68,7 +68,7 @@ else
                                 <span class="badge bg-success ms-2">&#10003;</span>
                             }
                         </p>
-                        <button class="btn btn-primary btn-sm me-2" @onclick="() => OpenTournament(t.Id)">
+                        <button class="btn btn-primary btn-sm me-2" @onclick="() => OpenTournament(t)">
                             @Lang.Get("OpenTournament")
                         </button>
                         @if (deleteConfirmId == t.Id)
@@ -135,9 +135,13 @@ else
         Nav.NavigateTo($"tournament/{tournament.Id}/participants");
     }
 
-    private void OpenTournament(Guid id)
+    private void OpenTournament(Tournament tournament)
     {
-        Nav.NavigateTo($"tournament/{id}/participants");
+        // A generated tournament has table assignments — land on the Assignments view
+        // (which defaults to the Tables tab); otherwise start on Participants.
+        Nav.NavigateTo(tournament.IsGenerated
+            ? $"tournament/{tournament.Id}"
+            : $"tournament/{tournament.Id}/participants");
     }
 
     private async Task ConfirmDelete(Guid id)
