@@ -237,42 +237,62 @@ else
             }
             @if (tables.Count > 0 && activeTab == "tables")
             {
-                @* Exporting the assignment is the primary workflow step — full-size, primary outline. *@
+                @* Exporting the assignment is the primary workflow step — full-size, primary outline.
+                   When expanded the trigger collapses to an icon and its options take a dedicated row. *@
                 @if (showExportSingle)
                 {
+                    <button class="btn btn-outline-primary" @onclick="() => showExportSingle = false" title="@Lang.Get("ExportAssignments")">
+                        <i class="bi bi-table"></i>
+                    </button>
                     <button class="btn btn-outline-secondary" @onclick="CopyTablesToClipboard">
-                        <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
+                        <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("Copy"))
                     </button>
                     <button class="btn btn-outline-secondary" @onclick="OpenSingleHanchan">
-                        <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
+                        <i class="bi bi-printer me-1"></i>@Lang.Get("Print")
                     </button>
                     <button class="btn btn-outline-secondary" @onclick="DownloadSingleHanchan">
-                        <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
+                        <i class="bi bi-download me-1"></i>@Lang.Get("Download")
                     </button>
                 }
                 else
                 {
-                    <button class="btn btn-outline-primary" @onclick="() => showExportSingle = true">
+                    <button class="btn btn-outline-primary" @onclick="ExpandExportAssignments">
                         <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
                     </button>
+                }
+                @if (showExportSingle || showExportScoresheetsSingle)
+                {
+                    <div class="w-100"></div>
                 }
                 @if (scoreEntryEnabled)
                 {
                     @if (showExportScoresheetsSingle)
                     {
+                        <button class="btn btn-outline-primary" @onclick="() => showExportScoresheetsSingle = false" title="@Lang.Get("ExportScoresheets")">
+                            <i class="bi bi-card-checklist"></i>
+                        </button>
                         <button class="btn btn-outline-secondary" @onclick="PrintScoresheetsSingle">
-                            <i class="bi bi-printer me-1"></i>@Lang.Get("PrintScoresheets")
+                            <i class="bi bi-printer me-1"></i>@Lang.Get("Print")
                         </button>
                         <button class="btn btn-outline-secondary" @onclick="DownloadScoresheetsSingle">
-                            <i class="bi bi-download me-1"></i>@Lang.Get("DownloadScoresheets")
+                            <i class="bi bi-download me-1"></i>@Lang.Get("Download")
                         </button>
                     }
                     else
                     {
-                        <button class="btn btn-outline-primary" @onclick="() => showExportScoresheetsSingle = true">
+                        <button class="btn btn-outline-primary" @onclick="ExpandExportScoresheets">
                             <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
                         </button>
                     }
+                    @if (showExportSingle || showExportScoresheetsSingle)
+                    {
+                        <div class="w-100"></div>
+                    }
+                }
+                else if (showExportSingle || showExportScoresheetsSingle)
+                {
+                    @* No scoresheets group, but still drop Regenerate/Delete to their own row. *@
+                    <div class="w-100"></div>
                 }
                 @* Regenerate is a secondary action — reduced to an icon button with tooltip. *@
                 @if (showRegenerateConfirm)
@@ -1178,6 +1198,20 @@ else
             }
         }
         StateHasChanged();
+    }
+
+    // The two export groups expand in place; opening one collapses the other so only a
+    // single set of options is visible at a time.
+    private void ExpandExportAssignments()
+    {
+        showExportSingle = true;
+        showExportScoresheetsSingle = false;
+    }
+
+    private void ExpandExportScoresheets()
+    {
+        showExportScoresheetsSingle = true;
+        showExportSingle = false;
     }
 
     private async Task CopyTablesToClipboard()
