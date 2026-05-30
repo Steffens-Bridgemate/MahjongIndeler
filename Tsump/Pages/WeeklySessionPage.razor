@@ -73,11 +73,27 @@
         }
         @if (hanchansOnDate.Count > 1 && activeTab == "tables")
         {
+            @* Each export-all group takes its own row when expanded. *@
             <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-stack" Small="true"
                                TriggerClass="btn-outline-secondary"
                                @bind-Expanded="showExportAll"
                                OnCopy="CopyAllHanchansToClipboard" Copied="copiedAllToClipboard"
                                OnPrint="OpenAllHanchans" OnDownload="DownloadAllHanchans" />
+            @if (showExportAll || showExportAllScoresheets)
+            {
+                <div class="w-100"></div>
+            }
+            @if (scoreEntryEnabled)
+            {
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
+                                   TriggerClass="btn-outline-secondary"
+                                   @bind-Expanded="showExportAllScoresheets"
+                                   OnPrint="PrintScoresheetsAll" OnDownload="DownloadScoresheetsAll" />
+                @if (showExportAll || showExportAllScoresheets)
+                {
+                    <div class="w-100"></div>
+                }
+            }
         }
     </div>
     <ul class="nav nav-tabs mb-0">
@@ -571,6 +587,7 @@ else
     private bool copiedAllToClipboard;
     private bool showExportSingle;
     private bool showExportAll;
+    private bool showExportAllScoresheets;
     private bool showExportScoresheetsSingle;
     private bool showExportRankings;
     private bool externalScoringEnabled;
@@ -1200,6 +1217,40 @@ else
         var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
         var subtitle = BuildHanchanSubtitle();
         var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, subtitle), Lang.Get);
+        var filename = $"scoresheets_{sessionDate:yyyy-MM-dd}.html";
+        await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
+    }
+
+    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildAllHanchansScoresheetTables()
+    {
+        var ordered = hanchansOnDate
+            .Where(h => h.Tables.Count > 0)
+            .OrderBy(h => h.StartTime ?? TimeSpan.Zero)
+            .ToList();
+        var result = new List<ScoresheetHtmlBuilder.ScoresheetTable>();
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            var h = ordered[i];
+            var timeStr = h.StartTime is { } st ? st.ToString(@"hh\:mm") : "";
+            var label = $"{Lang.Get("Hanchan")} {i + 1} {timeStr}".Trim();
+            result.AddRange(BuildScoresheetTables(h.Tables, label));
+        }
+        return result;
+    }
+
+    private async Task PrintScoresheetsAll()
+    {
+        if (members == null) return;
+        var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, Lang.FormatDate(sessionDate), BuildAllHanchansScoresheetTables(), Lang.Get, includePrintButton: true);
+        await JS.InvokeVoidAsync("openHtmlInNewTab", doc);
+    }
+
+    private async Task DownloadScoresheetsAll()
+    {
+        if (members == null) return;
+        var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, Lang.FormatDate(sessionDate), BuildAllHanchansScoresheetTables(), Lang.Get);
         var filename = $"scoresheets_{sessionDate:yyyy-MM-dd}.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
     }

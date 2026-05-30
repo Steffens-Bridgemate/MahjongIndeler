@@ -146,15 +146,24 @@ else
         @if (tournamentActiveTab == "tables")
         {
         <div class="d-flex align-items-center mb-3 flex-wrap gap-1">
+            @* Each export-all group takes its own row when expanded. *@
             <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-stack" Small="true"
                                TriggerClass="btn-outline-secondary"
                                @bind-Expanded="showExportAll"
                                OnCopy="CopyAllToClipboard" Copied="copiedToClipboard"
                                OnPrint="OpenAllHanchans" OnDownload="DownloadAllHanchans" />
+            @if (showExportAll || showExportScoresheetsAll)
+            {
+                <div class="w-100"></div>
+            }
             <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
                                TriggerClass="btn-outline-secondary"
                                @bind-Expanded="showExportScoresheetsAll"
                                OnPrint="PrintScoresheetsAll" OnDownload="DownloadScoresheetsAll" />
+            @if (showExportAll || showExportScoresheetsAll)
+            {
+                <div class="w-100"></div>
+            }
         </div>
 
         @if (selectedPlayerIds.Count > 0)
