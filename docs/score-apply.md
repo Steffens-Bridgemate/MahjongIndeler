@@ -7,7 +7,8 @@ The organizer side of the score round-trip. Companion to [score-import-ui.md](sc
 [Tsump.Shared/Scoring/ScoringPayload.cs](../Tsump.Shared/Scoring/ScoringPayload.cs)
 
 ```csharp
-// Field names are minified ([JsonPropertyName("c")] etc.) to keep encoded QRs small.
+// Encoded to a compact binary form (see "Encoding" below) to keep QRs small. The
+// [JsonPropertyName] attrs on the records are now only documentation, not the size lever.
 record ScoringInvite(
     Guid ContextId,                    // c
     int TableNumber,                   // t
@@ -35,9 +36,13 @@ const int ScorePenalty   = 2;
 - `Uma` is sent in the outbound invite (the scoring app shows it), but **omitted** from the inbound result — the organizer recomputes Uma from its own settings to avoid drift if Uma config changes between invite send and result return.
 - `OrganizerUrl` carries `Nav.BaseUri` so the scoring app can build a return URL back to whichever organizer instance issued the invite.
 
-JSON via `System.Text.Json` with `DefaultIgnoreCondition = WhenWritingNull`, base64url-encoded into the URL fragment (`#p=…` outbound, `#r=…` inbound). Minified field names + array-form score entries cut the result URL to ~35% of its prior length, which materially helps hardware 2D scanners decode the QR.
+### Encoding
 
-History: `HanchanId` / `HanchanNumber` were earlier names from before tournaments. Renamed to `ContextId` / `SessionNumber`. Field names minified and `PlayerResultEntry` collapsed into a 3-int array in a later coordinated deploy. No back-compat shim — relied on no outstanding scoring links in the wild.
+`ScoringPayloadCodec` packs each record into a **compact binary buffer** — 16-byte `Guid`, zig-zag varints for the ints, length-prefixed UTF-8 for the strings — then **optionally Deflate-compresses** it (kept only when it actually shrinks the body), prepends a 1-byte header (low nibble = type, bit `0x10` = compressed body), and Base64Url-encodes the result into the URL fragment (`#p=…` outbound, `#r=…` inbound; the result QR is additionally wrapped in `[[ … ]]` scan-frame markers).
+
+Binary packing is the main size win: the `Guid` drops from a 36-char string to 16 bytes and all JSON syntax/field-names vanish. Compression then squeezes the text-heavy **invite** (player names, title, organizer URL); the dense **result** (mostly Guid + small ints) is left raw because Deflate wouldn't shrink it (the header records which was used, so decode is unambiguous). There is no JSON on the wire any more — the `[JsonPropertyName]` attributes on the records are retained only as field documentation.
+
+History: `HanchanId` / `HanchanNumber` were earlier names from before tournaments. Renamed to `ContextId` / `SessionNumber`. Field names were minified and `PlayerResultEntry` collapsed into a 3-int array in a later coordinated deploy. Later still, the JSON-text encoding was replaced wholesale by the binary codec above. Every one of these was a clean break with **no back-compat shim** — each relied on there being no outstanding scoring links in the wild at deploy time.
 
 ## Resolver strategy
 
