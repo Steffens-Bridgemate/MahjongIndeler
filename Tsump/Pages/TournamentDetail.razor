@@ -149,16 +149,16 @@ else
             @* Each export-all group takes its own row when expanded. *@
             <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-stack" Small="true"
                                TriggerClass="btn-outline-secondary"
-                               @bind-Expanded="showExportAll"
+                               Expanded="showExportAll" ExpandedChanged="SetExportAll"
                                OnCopy="CopyAllToClipboard" Copied="copiedToClipboard"
                                OnPrint="OpenAllHanchans" OnDownload="DownloadAllHanchans" />
             @if (showExportAll || showExportScoresheetsAll)
             {
                 <div class="w-100"></div>
             }
-            <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
+            <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-stack" Small="true"
                                TriggerClass="btn-outline-secondary"
-                               @bind-Expanded="showExportScoresheetsAll"
+                               Expanded="showExportScoresheetsAll" ExpandedChanged="SetExportScoresheetsAll"
                                OnPrint="PrintScoresheetsAll" OnDownload="DownloadScoresheetsAll" />
             @if (showExportAll || showExportScoresheetsAll)
             {
@@ -212,20 +212,28 @@ else
                         <option value="@mm">@mm.ToString("D2")</option>
                     }
                 </select>
-                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-table" Small="true"
-                                   TriggerClass="btn-outline-secondary"
-                                   Expanded="exportSingleHanchan == sn"
-                                   ExpandedChanged="(bool v) => exportSingleHanchan = v ? sn : (int?)null"
-                                   OnCopy="() => CopySingleHanchanToClipboard(sn)" Copied="copiedSingleHanchan == sn"
-                                   OnPrint="() => OpenSingleHanchan(sn)" OnDownload="() => DownloadSingleHanchan(sn)" />
-                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
-                                   TriggerClass="btn-outline-secondary"
-                                   Expanded="exportScoresheetSingleHanchan == sn"
-                                   ExpandedChanged="(bool v) => exportScoresheetSingleHanchan = v ? sn : (int?)null"
-                                   OnPrint="() => PrintScoresheetsSingle(sn)" OnDownload="() => DownloadScoresheetsSingle(sn)" />
                 <button class="btn btn-sm btn-outline-dark ms-3" @onclick="() => ToggleHanchan(sn)">
                     <i class="bi @(isHanchanExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
                 </button>
+            </div>
+            @* The two per-hanchan export buttons share their own row; each takes its own row when
+               expanded, and opening one collapses the other. *@
+            <div class="d-flex align-items-center flex-wrap gap-1 mb-2">
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-table" Small="true"
+                                   TriggerClass="btn-outline-secondary"
+                                   Expanded="exportSingleHanchan == sn"
+                                   ExpandedChanged="(bool v) => SetExportSingleHanchan(sn, v)"
+                                   OnCopy="() => CopySingleHanchanToClipboard(sn)" Copied="copiedSingleHanchan == sn"
+                                   OnPrint="() => OpenSingleHanchan(sn)" OnDownload="() => DownloadSingleHanchan(sn)" />
+                @if (exportSingleHanchan == sn || exportScoresheetSingleHanchan == sn)
+                {
+                    <div class="w-100"></div>
+                }
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
+                                   TriggerClass="btn-outline-secondary"
+                                   Expanded="exportScoresheetSingleHanchan == sn"
+                                   ExpandedChanged="(bool v) => SetExportScoresheetSingleHanchan(sn, v)"
+                                   OnPrint="() => PrintScoresheetsSingle(sn)" OnDownload="() => DownloadScoresheetsSingle(sn)" />
             </div>
             @if (isHanchanExpanded)
             {
@@ -954,6 +962,32 @@ else
         var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(session.Tables, subtitle), Lang.Get);
         var filename = $"scoresheets_{tournament.Name.Replace(" ", "_")}_hanchan{sessionNumber}.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
+    }
+
+    // Export groups expand in place; opening one collapses its sibling so only one option set
+    // shows at a time. The per-hanchan flags hold the session number of the open group (or null).
+    private void SetExportAll(bool expanded)
+    {
+        showExportAll = expanded;
+        if (expanded) showExportScoresheetsAll = false;
+    }
+
+    private void SetExportScoresheetsAll(bool expanded)
+    {
+        showExportScoresheetsAll = expanded;
+        if (expanded) showExportAll = false;
+    }
+
+    private void SetExportSingleHanchan(int sessionNumber, bool expanded)
+    {
+        exportSingleHanchan = expanded ? sessionNumber : (int?)null;
+        if (expanded) exportScoresheetSingleHanchan = null;
+    }
+
+    private void SetExportScoresheetSingleHanchan(int sessionNumber, bool expanded)
+    {
+        exportScoresheetSingleHanchan = expanded ? sessionNumber : (int?)null;
+        if (expanded) exportSingleHanchan = null;
     }
 
     private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildAllScoresheetTables()

@@ -76,7 +76,7 @@
             @* Each export-all group takes its own row when expanded. *@
             <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-stack" Small="true"
                                TriggerClass="btn-outline-secondary"
-                               @bind-Expanded="showExportAll"
+                               Expanded="showExportAll" ExpandedChanged="SetExportAll"
                                OnCopy="CopyAllHanchansToClipboard" Copied="copiedAllToClipboard"
                                OnPrint="OpenAllHanchans" OnDownload="DownloadAllHanchans" />
             @if (showExportAll || showExportAllScoresheets)
@@ -85,9 +85,9 @@
             }
             @if (scoreEntryEnabled)
             {
-                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist" Small="true"
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-stack" Small="true"
                                    TriggerClass="btn-outline-secondary"
-                                   @bind-Expanded="showExportAllScoresheets"
+                                   Expanded="showExportAllScoresheets" ExpandedChanged="SetExportAllScoresheets"
                                    OnPrint="PrintScoresheetsAll" OnDownload="DownloadScoresheetsAll" />
                 @if (showExportAll || showExportAllScoresheets)
                 {
@@ -1163,6 +1163,19 @@ else
     {
         showExportScoresheetsSingle = expanded;
         if (expanded) showExportSingle = false;
+    }
+
+    // Same mutual-exclusion for the all-hanchans export groups.
+    private void SetExportAll(bool expanded)
+    {
+        showExportAll = expanded;
+        if (expanded) showExportAllScoresheets = false;
+    }
+
+    private void SetExportAllScoresheets(bool expanded)
+    {
+        showExportAllScoresheets = expanded;
+        if (expanded) showExportAll = false;
     }
 
     private async Task CopyTablesToClipboard()
