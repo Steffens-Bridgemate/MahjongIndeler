@@ -5,6 +5,7 @@
 @inject SettingsService SettingsService
 @inject LanguageService Lang
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>@Lang.Get("Rankings") - Tsumo!</PageTitle>
@@ -40,6 +41,14 @@ else
         </li>
     </ul>
 
+    <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
+        <ExportButtonGroup TriggerLabel="@Lang.Get("ExportRankings")" TriggerIcon="bi-list-ol" Small="true"
+                           TriggerClass="btn-outline-secondary"
+                           @bind-Expanded="showExportRankings"
+                           OnCopy="CopyRankingsToClipboard" Copied="copiedRankingsToClipboard"
+                           OnPrint="OpenRankings" OnDownload="DownloadRankings" />
+    </div>
+
     <RankingTable Entries="BuildTournamentRankings()" />
 }
 
@@ -47,6 +56,8 @@ else
     [Parameter] public Guid Id { get; set; }
 
     private Tournament? tournament;
+    private bool showExportRankings;
+    private bool copiedRankingsToClipboard;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -80,5 +91,41 @@ else
 
         var allParticipantIds = tournament.Participants.Select(p => p.Id).ToHashSet();
         return RankingTable.BuildRankings(hanchans, GetParticipantDisplay, allParticipantIds);
+    }
+
+    private (string html, string text) BuildRankingsContent()
+    {
+        var title = $"{Lang.Get("Rankings")} — {tournament?.Name}";
+        return RankingTable.BuildExportContent(BuildTournamentRankings(), title, Lang);
+    }
+
+    private async Task CopyRankingsToClipboard()
+    {
+        var (html, text) = BuildRankingsContent();
+        await JS.InvokeVoidAsync("copyToClipboard", html, text);
+        copiedRankingsToClipboard = true;
+        _ = ResetCopiedRankingsFlag();
+    }
+
+    private async Task OpenRankings()
+    {
+        var (html, _) = BuildRankingsContent();
+        var title = $"{Lang.Get("Rankings")} — {tournament?.Name}";
+        await JS.InvokeVoidAsync("openHtmlInNewTab", RankingTable.WrapAsHtmlDocument(title, html, includePrintButton: true));
+    }
+
+    private async Task DownloadRankings()
+    {
+        var (html, _) = BuildRankingsContent();
+        var title = $"{Lang.Get("Rankings")} — {tournament?.Name}";
+        var filename = $"rankings_{tournament?.Name}.html";
+        await JS.InvokeVoidAsync("downloadHtmlFile", filename, RankingTable.WrapAsHtmlDocument(title, html));
+    }
+
+    private async Task ResetCopiedRankingsFlag()
+    {
+        await Task.Delay(2000);
+        copiedRankingsToClipboard = false;
+        await InvokeAsync(StateHasChanged);
     }
 }

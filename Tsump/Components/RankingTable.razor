@@ -46,6 +46,106 @@ else
 
     private static string FormatScore(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
 
+    // Builds the rich-HTML + fixed-width plain-text representations of a ranking. Shared by the
+    // weekly-session and tournament rankings export. The plain-text variant pads columns and wraps
+    // them in WhatsApp/Markdown monospace fences (```), so the per-hanchan columns stay aligned.
+    public static (string html, string text) BuildExportContent(List<RankingEntry> entries, string title, LanguageService lang)
+    {
+        var html = new System.Text.StringBuilder();
+        var text = new System.Text.StringBuilder();
+
+        html.Append($"<div style=\"font-family:Verdana,sans-serif;font-size:14px;font-weight:bold;margin-bottom:8px;\">{title}</div>");
+        text.AppendLine($"*{title}*");
+        text.AppendLine();
+
+        var hanchanLabels = entries.Count > 0 ? entries[0].HanchanScores.Select(h => h.Label).ToList() : new List<string>();
+
+        html.Append("<table style=\"border-collapse:collapse;font-family:Verdana,sans-serif;font-size:12px;\">");
+        html.Append("<thead><tr>");
+        html.Append($"<th style=\"border:1px solid #999;padding:4px 8px;background:#f5f5f5;\">{lang.Get("Rank")}</th>");
+        html.Append($"<th style=\"border:1px solid #999;padding:4px 8px;background:#f5f5f5;\">{lang.Get("Name")}</th>");
+        html.Append($"<th style=\"border:1px solid #999;padding:4px 8px;background:#f5f5f5;text-align:center;\">{lang.Get("TotalScore")}</th>");
+        foreach (var label in hanchanLabels)
+            html.Append($"<th style=\"border:1px solid #999;padding:4px 8px;background:#f5f5f5;text-align:center;\">{label}</th>");
+        html.Append("</tr></thead><tbody>");
+
+        // Names are clipped to 20 chars so the plain-text columns stay aligned on phones.
+        const int NameWidth = 20;
+        const int ScoreWidth = 6;
+        const int RankWidth = 3;
+        int hanchanWidth = Math.Max(ScoreWidth, hanchanLabels.Count > 0 ? hanchanLabels.Max(l => l.Length) : ScoreWidth);
+
+        string Clip(string s, int w) => s.Length <= w ? s : s.Substring(0, w);
+        string PadR(string s, int w) => Clip(s, w).PadRight(w);
+        string PadL(string s, int w) => Clip(s, w).PadLeft(w);
+
+        // Names arrive as "<number>. <real name>" (number 1–99). Right-align the number to two
+        // columns so the real names start at the same position whether the number is one or two
+        // digits ("1. Ann" / "12. Ann" → " 1. Ann" / "12. Ann").
+        string AlignName(string name)
+        {
+            var dot = name.IndexOf(". ", StringComparison.Ordinal);
+            return dot is 1 or 2 && int.TryParse(name.Substring(0, dot), out _)
+                ? name.PadLeft(name.Length + (2 - dot))
+                : name;
+        }
+
+        var textLines = new List<string>();
+        var header = PadL(lang.Get("Rank"), RankWidth)
+                     + " " + PadR(lang.Get("Name"), NameWidth)
+                     + " " + PadL(lang.Get("TotalScore"), ScoreWidth);
+        foreach (var label in hanchanLabels)
+            header += " " + PadL(label, hanchanWidth);
+        textLines.Add(header);
+        textLines.Add(new string('-', header.Length));
+
+        int rank = 1;
+        foreach (var entry in entries)
+        {
+            html.Append("<tr>");
+            html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;\">{rank}</td>");
+            html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;\">{entry.Name}</td>");
+            html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;text-align:center;font-weight:bold;\">{FormatScore(entry.Total)}</td>");
+            foreach (var hs in entry.HanchanScores)
+            {
+                var cell = hs.Score.HasValue ? FormatScore(hs.Score.Value) : "—";
+                html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;text-align:center;\">{cell}</td>");
+            }
+            html.Append("</tr>");
+
+            var line = PadL(rank.ToString(), RankWidth)
+                       + " " + PadR(AlignName(entry.Name), NameWidth)
+                       + " " + PadL(FormatScore(entry.Total), ScoreWidth);
+            foreach (var hs in entry.HanchanScores)
+                line += " " + PadL(hs.Score.HasValue ? FormatScore(hs.Score.Value) : "-", hanchanWidth);
+            textLines.Add(line);
+            rank++;
+        }
+        html.Append("</tbody></table>");
+
+        text.AppendLine("```");
+        foreach (var line in textLines)
+            text.AppendLine(line);
+        text.AppendLine("```");
+
+        return (html.ToString(), text.ToString().TrimEnd());
+    }
+
+    // Wraps an HTML fragment in a standalone, print-friendly document. includePrintButton adds an
+    // on-screen Print button (hidden when printing) for the "open in tab" path; the download path
+    // omits it so the saved file has no stray button.
+    public static string WrapAsHtmlDocument(string title, string body, bool includePrintButton = false)
+    {
+        var printButton = includePrintButton
+            ? "<button onclick=\"window.print()\" class=\"no-print\" style=\"margin-bottom:12px;padding:6px 12px;font-size:14px;cursor:pointer;\">Print</button>"
+            : "";
+        var printStyle = includePrintButton
+            ? "<style>@media print { .no-print { display:none; } }</style>"
+            : "";
+        return $"<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>{title}</title>{printStyle}</head>"
+            + $"<body style=\"font-family:Verdana,sans-serif;margin:20px;\">{printButton}{body}</body></html>";
+    }
+
     public record HanchanScore(string Label, int? Score);
     public record RankingEntry(string Name, int Total, List<HanchanScore> HanchanScores);
 

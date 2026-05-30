@@ -79,3 +79,4 @@ Loaded on demand. Read the one(s) relevant to the current task:
 - [docs/score-apply.md](docs/score-apply.md) — payload codec, `IScoreContextResolver` strategy, `ScoreImportService.ApplyAsync` flow.
 - [docs/score-import-ui.md](docs/score-import-ui.md) — `ScoreImportPanel` state machine, four input methods (clipboard / HID scanner / camera / file), inactivity timer, auto-return, QR overlays.
 - [docs/pages.md](docs/pages.md) — page-specific behaviour worth knowing (only where non-obvious cross-file behaviour exists).
+- [docs/export-copy-print-download.md](docs/export-copy-print-download.md) — the Copy/Print/Download export pattern: the real `window.*` JS function names in `index.html`, `ExportButtonGroup`, the shared rankings builder in `RankingTable`, and the per-page `WrapAsHtmlDocument` gotcha.

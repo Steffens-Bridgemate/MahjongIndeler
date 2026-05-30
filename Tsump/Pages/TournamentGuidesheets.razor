@@ -78,7 +78,7 @@ else
         }
     }
 
-    private string BuildGuidesheetHtml()
+    private string BuildGuidesheetHtml(bool includePrintButton)
     {
         if (tournament == null) return "";
 
@@ -107,10 +107,13 @@ else
         sb.Append("}");
         sb.Append("</style></head><body>");
 
-        sb.Append("<div class=\"no-print\" style=\"padding:10px;margin-bottom:10px;background:#f0f0f0;\">");
-        sb.Append($"<strong>{tournament.Name}</strong> — {Lang.FormatDate(tournament.Date)} &middot; ");
-        sb.Append("<button onclick=\"window.print()\" style=\"padding:4px 12px;cursor:pointer;\">Print</button>");
-        sb.Append("</div>");
+        if (includePrintButton)
+        {
+            sb.Append("<div class=\"no-print\" style=\"padding:10px;margin-bottom:10px;background:#f0f0f0;\">");
+            sb.Append($"<strong>{tournament.Name}</strong> — {Lang.FormatDate(tournament.Date)} &middot; ");
+            sb.Append("<button onclick=\"window.print()\" style=\"padding:4px 12px;cursor:pointer;\">Print</button>");
+            sb.Append("</div>");
+        }
 
         sb.Append("<div class=\"page\">");
 
@@ -173,13 +176,13 @@ else
 
     private async Task OpenGuidesheets()
     {
-        var html = BuildGuidesheetHtml();
+        var html = BuildGuidesheetHtml(includePrintButton: true);
         await JS.InvokeVoidAsync("openHtmlInNewTab", html);
     }
 
     private async Task DownloadGuidesheets()
     {
-        var html = BuildGuidesheetHtml();
+        var html = BuildGuidesheetHtml(includePrintButton: false);
         var filename = $"{tournament?.Name ?? "guidesheets"}_guidesheets.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, html);
     }

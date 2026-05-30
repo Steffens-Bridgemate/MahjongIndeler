@@ -14,7 +14,23 @@
       "Bash(ls Tsump.Scoring/*.csproj)",
       "Bash(git commit -m '@ *)",
       "Bash(git commit *)",
-      "PowerShell(dotnet build Tsump/Tsump.csproj -nologo -clp:ErrorsOnly)"
+      "PowerShell(dotnet build Tsump/Tsump.csproj -nologo -clp:ErrorsOnly)",
+      "PowerShell($p=\"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Pages\\\\TournamentGuidesheets.razor\"; $c=Get-Content $p; \"TOTAL: $\\($c.Count\\)\"; \\($c | ForEach-Object -Begin {$i=1} -Process { \"{0}: {1}\" -f $i,$_; $i++ }\\) -join \"`n\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\wwwroot\" -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.js','.html' } | ForEach-Object { $_.FullName })",
+      "PowerShell($o = dotnet build \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Tsump.csproj\" -c Debug --nologo 2>&1; \\($o | Select-Object -Last 12\\) -join \"`n\")",
+      "PowerShell($o = dotnet build \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Tsump.csproj\" -c Debug --nologo 2>&1; \\($o | Select-String -Pattern \"error|Build succeeded|Build FAILED|Warning\\\\\\(s\\\\\\)|Error\\\\\\(s\\\\\\)\"\\) -join \"`n\")",
+      "Bash(sed -n '1110,1132p' Tsump/Pages/WeeklySessionPage.razor)",
+      "Bash(sed -n '1190,1206p' Tsump/Pages/WeeklySessionPage.razor)",
+      "Bash(sed -n '1308,1326p' Tsump/Pages/WeeklySessionPage.razor)",
+      "Bash(sed -n '43,111p' Tsump/Components/RankingTable.razor)",
+      "PowerShell(\"probe-ps\")",
+      "PowerShell(\"probe-ps2\")",
+      "PowerShell(\"probe-ps3\")",
+      "PowerShell(\"probe-ps4\")",
+      "PowerShell(\"probe-ps5\")",
+      "PowerShell(\"probe-ps6\")",
+      "PowerShell($o = dotnet build \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Tsump.csproj\" -c Debug --nologo 2>&1; \\($o | Select-String -Pattern \"error CS|Build succeeded|Build FAILED|[0-9]+ Warning|[0-9]+ Error\"\\) -join \"`n\")",
+      "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb.txt\" | Select-String \"error CS|Build succeeded|Build FAILED|Warning\\\\\\(s\\\\\\)|Error\\\\\\(s\\\\\\)\"\\) -join \"`n\")"
     ]
   }
 }
