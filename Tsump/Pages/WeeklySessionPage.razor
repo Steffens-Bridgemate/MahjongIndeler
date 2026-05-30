@@ -71,26 +71,13 @@
                 <i class="bi bi-plus-lg me-1"></i>@Lang.Get("AddHanchan")
             </button>
         }
-        @if (hanchansOnDate.Count > 1)
+        @if (hanchansOnDate.Count > 1 && activeTab == "tables")
         {
-            @if (showExportAll)
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyAllHanchansToClipboard">
-                    <i class="bi bi-clipboard me-1"></i>@(copiedAllToClipboard? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenAllHanchans">
-                    <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadAllHanchans">
-                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
-                </button>
-            }
-            else
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportAll = true">
-                    <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
-                </button>
-            }
+            <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-stack" Small="true"
+                               TriggerClass="btn-outline-secondary"
+                               @bind-Expanded="showExportAll"
+                               OnCopy="CopyAllHanchansToClipboard" Copied="copiedAllToClipboard"
+                               OnPrint="OpenAllHanchans" OnDownload="DownloadAllHanchans" />
         }
     </div>
     <ul class="nav nav-tabs mb-0">
@@ -237,53 +224,21 @@ else
             }
             @if (tables.Count > 0 && activeTab == "tables")
             {
-                @* Exporting the assignment is the primary workflow step — full-size, primary outline.
-                   When expanded the trigger collapses to an icon and its options take a dedicated row. *@
-                @if (showExportSingle)
-                {
-                    <button class="btn btn-outline-primary" @onclick="() => showExportSingle = false" title="@Lang.Get("ExportAssignments")">
-                        <i class="bi bi-table"></i>
-                    </button>
-                    <button class="btn btn-outline-secondary" @onclick="CopyTablesToClipboard">
-                        <i class="bi bi-clipboard me-1"></i>@(copiedToClipboard ? Lang.Get("Copied") : Lang.Get("Copy"))
-                    </button>
-                    <button class="btn btn-outline-secondary" @onclick="OpenSingleHanchan">
-                        <i class="bi bi-printer me-1"></i>@Lang.Get("Print")
-                    </button>
-                    <button class="btn btn-outline-secondary" @onclick="DownloadSingleHanchan">
-                        <i class="bi bi-download me-1"></i>@Lang.Get("Download")
-                    </button>
-                }
-                else
-                {
-                    <button class="btn btn-outline-primary" @onclick="ExpandExportAssignments">
-                        <i class="bi bi-table me-1"></i>@Lang.Get("ExportAssignments")
-                    </button>
-                }
+                @* Exporting the assignment is the primary workflow step. Each export group takes
+                   its own row when expanded, so Regenerate/Delete drop below. *@
+                <ExportButtonGroup TriggerLabel="@Lang.Get("ExportAssignments")" TriggerIcon="bi-table"
+                                   Expanded="showExportSingle" ExpandedChanged="SetExportSingle"
+                                   OnCopy="CopyTablesToClipboard" Copied="copiedToClipboard"
+                                   OnPrint="OpenSingleHanchan" OnDownload="DownloadSingleHanchan" />
                 @if (showExportSingle || showExportScoresheetsSingle)
                 {
                     <div class="w-100"></div>
                 }
                 @if (scoreEntryEnabled)
                 {
-                    @if (showExportScoresheetsSingle)
-                    {
-                        <button class="btn btn-outline-primary" @onclick="() => showExportScoresheetsSingle = false" title="@Lang.Get("ExportScoresheets")">
-                            <i class="bi bi-card-checklist"></i>
-                        </button>
-                        <button class="btn btn-outline-secondary" @onclick="PrintScoresheetsSingle">
-                            <i class="bi bi-printer me-1"></i>@Lang.Get("Print")
-                        </button>
-                        <button class="btn btn-outline-secondary" @onclick="DownloadScoresheetsSingle">
-                            <i class="bi bi-download me-1"></i>@Lang.Get("Download")
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="btn btn-outline-primary" @onclick="ExpandExportScoresheets">
-                            <i class="bi bi-card-checklist me-1"></i>@Lang.Get("ExportScoresheets")
-                        </button>
-                    }
+                    <ExportButtonGroup TriggerLabel="@Lang.Get("ExportScoresheets")" TriggerIcon="bi-card-checklist"
+                                       Expanded="showExportScoresheetsSingle" ExpandedChanged="SetExportScoresheets"
+                                       OnPrint="PrintScoresheetsSingle" OnDownload="DownloadScoresheetsSingle" />
                     @if (showExportSingle || showExportScoresheetsSingle)
                     {
                         <div class="w-100"></div>
@@ -374,8 +329,8 @@ else
             }
             else
             {
-                <button class="btn btn-outline-danger" @onclick="RequestDeleteHanchan">
-                    <i class="bi bi-trash me-1"></i>@Lang.Get("DeleteHanchan")
+                <button class="btn btn-sm btn-outline-danger" @onclick="RequestDeleteHanchan" title="@Lang.Get("DeleteHanchan")">
+                    <i class="bi bi-trash"></i>
                 </button>
             }
         </div>
@@ -386,24 +341,11 @@ else
     @if (activeTab == "rankings")
     {
         <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
-            @if (showExportRankings)
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyRankingsToClipboard">
-                    <i class="bi bi-clipboard me-1"></i>@(copiedRankingsToClipboard ? Lang.Get("Copied") : Lang.Get("CopyToClipboard"))
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="OpenRankings">
-                    <i class="bi bi-printer me-1"></i>@Lang.Get("OpenPrint")
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="DownloadRankings">
-                    <i class="bi bi-download me-1"></i>@Lang.Get("DownloadHtml")
-                </button>
-            }
-            else
-            {
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => showExportRankings = true">
-                    <i class="bi bi-list-ol me-1"></i>@Lang.Get("ExportRankings")
-                </button>
-            }
+            <ExportButtonGroup TriggerLabel="@Lang.Get("ExportRankings")" TriggerIcon="bi-list-ol" Small="true"
+                               TriggerClass="btn-outline-secondary"
+                               @bind-Expanded="showExportRankings"
+                               OnCopy="CopyRankingsToClipboard" Copied="copiedRankingsToClipboard"
+                               OnPrint="OpenRankings" OnDownload="DownloadRankings" />
         </div>
         <RankingTable Entries="BuildWeeklyRankings()" />
     }
@@ -428,7 +370,7 @@ else
                 @{
                     var tablesActive = activeTab == "tables";
                 }
-                <a class="nav-link bg-primary text-white @(tablesActive ? "active" : "")"
+                <a class="nav-link @(tablesActive ? "active" : "")"
                    style="@ScoreStatusHelper.TabStyle(tablesActive)"
                    href="javascript:void(0)" @onclick='() => activeTab = "tables"'>
                     @Lang.Get("Assignments")
@@ -471,7 +413,7 @@ else
                     </span>
                     @if (selectedPlayerIds.Count == 2)
                     {
-                        <button class="btn btn-sm btn-warning me-1" @onclick="SwapSelectedPlayers">
+                        <button class="btn btn-sm btn-primary me-1" @onclick="SwapSelectedPlayers">
                             @Lang.Get("SwapPlayers")
                         </button>
                     }
@@ -1202,16 +1144,16 @@ else
 
     // The two export groups expand in place; opening one collapses the other so only a
     // single set of options is visible at a time.
-    private void ExpandExportAssignments()
+    private void SetExportSingle(bool expanded)
     {
-        showExportSingle = true;
-        showExportScoresheetsSingle = false;
+        showExportSingle = expanded;
+        if (expanded) showExportScoresheetsSingle = false;
     }
 
-    private void ExpandExportScoresheets()
+    private void SetExportScoresheets(bool expanded)
     {
-        showExportScoresheetsSingle = true;
-        showExportSingle = false;
+        showExportScoresheetsSingle = expanded;
+        if (expanded) showExportSingle = false;
     }
 
     private async Task CopyTablesToClipboard()

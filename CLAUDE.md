@@ -48,6 +48,10 @@ For wire-format breaking changes deploy MahjongScoring **first** if any active s
 
 ## Coding practices
 
+- **MUST READ before any UI/markup change: [docs/styles.md](docs/styles.md).** It is the house
+  style (button colour semantics, sizing, flex action rows, `ExportButtonGroup`, inline-confirm,
+  tabs, view-gating, auto-save). Match it rather than inventing new patterns; if a new pattern is
+  truly needed, add it to that file in the same change.
 - **Refactor to components and services to minimise duplication.** When the same logic appears in two pages, extract before adding a third. Recent precedents: [TableShareActions.razor](Tsump/Components/TableShareActions.razor), [ScoreImportPanel.razor](Tsump/Components/ScoreImportPanel.razor), [ScoreInviteService.cs](Tsump/Services/ScoreInviteService.cs), [IScoreContextResolver.cs](Tsump/Services/IScoreContextResolver.cs).
 - **Use Segoe Fluent Icons / Bootstrap Icons** for button glyphs — not raw text or emoji.
 - **Never bulk-rename strings** the user deliberately left at their current values. Ask if unsure.
@@ -70,6 +74,7 @@ For wire-format breaking changes deploy MahjongScoring **first** if any active s
 
 Loaded on demand. Read the one(s) relevant to the current task:
 
+- [docs/styles.md](docs/styles.md) — **UI house style (must-read for any markup change)**: button colour semantics, sizing, flex action rows, `ExportButtonGroup`, inline confirmations, tabs, view-gating, auto-save.
 - [docs/domain.md](docs/domain.md) — data model: `Hanchan` vs `TournamentSession`, `Member` vs `TournamentParticipant`, `TableAssignment`, Mr. X, Uma, score-status classification.
 - [docs/score-apply.md](docs/score-apply.md) — payload codec, `IScoreContextResolver` strategy, `ScoreImportService.ApplyAsync` flow.
 - [docs/score-import-ui.md](docs/score-import-ui.md) — `ScoreImportPanel` state machine, four input methods (clipboard / HID scanner / camera / file), inactivity timer, auto-return, QR overlays.

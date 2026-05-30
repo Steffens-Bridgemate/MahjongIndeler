@@ -1,0 +1,51 @@
+@using Tsump.Services
+@inject LanguageService Lang
+
+@* Collapsed: a single trigger button. Expanded: the trigger shrinks to an icon (click to
+   collapse) followed by the Copy/Print/Download options. Layout (row breaks, collapsing a
+   sibling group) is left to the caller via the two-way bound Expanded parameter. *@
+@if (!Expanded)
+{
+    <button class="btn @SizeClass @TriggerClass" @onclick="Expand">
+        <i class="bi @TriggerIcon me-1"></i>@TriggerLabel
+    </button>
+}
+else
+{
+    <button class="btn @SizeClass @TriggerClass" @onclick="Collapse" title="@TriggerLabel">
+        <i class="bi @TriggerIcon"></i>
+    </button>
+    @if (OnCopy.HasDelegate)
+    {
+        <button class="btn @SizeClass btn-outline-secondary" @onclick="OnCopy">
+            <i class="bi bi-clipboard me-1"></i>@(Copied ? Lang.Get("Copied") : Lang.Get("Copy"))
+        </button>
+    }
+    <button class="btn @SizeClass btn-outline-secondary" @onclick="OnPrint">
+        <i class="bi bi-printer me-1"></i>@Lang.Get("Print")
+    </button>
+    <button class="btn @SizeClass btn-outline-secondary" @onclick="OnDownload">
+        <i class="bi bi-download me-1"></i>@Lang.Get("Download")
+    </button>
+}
+
+@code {
+    [Parameter, EditorRequired] public string TriggerLabel { get; set; } = "";
+    [Parameter, EditorRequired] public string TriggerIcon { get; set; } = "";
+    [Parameter] public string TriggerClass { get; set; } = "btn-outline-primary";
+    [Parameter] public bool Small { get; set; }
+
+    [Parameter] public bool Expanded { get; set; }
+    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
+
+    // OnCopy is optional — groups without a clipboard variant (e.g. scoresheets) omit it.
+    [Parameter] public EventCallback OnCopy { get; set; }
+    [Parameter] public bool Copied { get; set; }
+    [Parameter] public EventCallback OnPrint { get; set; }
+    [Parameter] public EventCallback OnDownload { get; set; }
+
+    private string SizeClass => Small ? "btn-sm" : "";
+
+    private Task Expand() => ExpandedChanged.InvokeAsync(true);
+    private Task Collapse() => ExpandedChanged.InvokeAsync(false);
+}

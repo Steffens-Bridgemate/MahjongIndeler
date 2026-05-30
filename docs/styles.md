@@ -1,0 +1,111 @@
+# UI style pattern — MUST READ before touching any page's markup
+
+This is the house style for the organizer app, distilled from the redesigned
+[WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor). It is the reference every
+page should converge on. When you add or change UI, match these patterns rather than inventing
+new ones. If a genuinely new pattern is needed, add it here in the same change.
+
+Bootstrap 5 + Bootstrap Icons (`bi bi-*`) only. No raw-text or emoji glyphs.
+
+## 1. Button colour = meaning (semantic, not decorative)
+
+| Intent | Class | Examples |
+|---|---|---|
+| The one primary generative action in a view | `btn btn-primary` (solid) | Generate Tables |
+| A primary *workflow step* the user is expected to take next | `btn btn-outline-primary` | Export Assignments, Export Scoresheets |
+| Neutral / secondary action | `btn btn-outline-secondary` | Copy from history, global/secondary exports |
+| Additive / positive | `btn btn-outline-success` | Add Hanchan, All Present |
+| Destructive (trigger) | `btn btn-outline-danger` | Delete Hanchan |
+| Destructive / caution **confirmation** step | solid `btn btn-danger` / `btn btn-warning` | Yes-delete, Yes-regenerate |
+
+- **Reserve yellow (`warning` / `bg-warning`) for genuine caution**, not ordinary actions. On this
+  page yellow already means "3-player table" and "are you sure?" — don't dilute it (a plain Swap is
+  `btn-primary`, not `btn-warning`).
+- **Don't stack two `primary`-coloured buttons** next to each other; only the single most important
+  action in a row should read as primary.
+
+## 2. Button size & prominence
+
+- Full-size `btn` for prominent / primary actions and the main workflow steps.
+- `btn btn-sm` for secondary toolbars (export toolbars, attendance toggles) and for **icon-only**
+  buttons.
+- **De-emphasise secondary actions to icon-only `btn btn-sm` buttons** with a `title` tooltip and a
+  single `<i class="bi …">` (no label). Precedent: Regenerate (`bi-arrow-repeat`) and Delete
+  (`bi-trash`) on the action row. Destructive icon buttons still expand to a full inline confirm
+  (see §5), so the icon never deletes on a single click.
+
+## 3. Action rows = flex, not margins
+
+Group buttons in a flex container, never per-button `me-2`/`ms-2`:
+
+```razor
+<div class="d-flex align-items-center flex-wrap gap-1 mb-3"> … </div>
+```
+
+- `align-items-center` so mixed full-size and `btn-sm` icon buttons line up vertically.
+- `flex-wrap gap-1` for uniform spacing and graceful wrapping on narrow screens.
+- Force a deliberate row break with `<div class="w-100"></div>` (e.g. so an expanded export group
+  and the Regenerate/Delete icons each get their own row).
+
+## 4. Export buttons → `ExportButtonGroup`
+
+Use the shared [ExportButtonGroup.razor](../Tsump/Components/ExportButtonGroup.razor) for every
+copy/print/download export. Never hand-roll the expand/collapse trio again.
+
+- Collapsed: one trigger button. Expanded: the trigger shrinks to its icon (click to collapse),
+  followed by **Copy / Print / Download** (short labels — `Lang.Get("Copy"|"Print"|"Download")`,
+  not the long `CopyToClipboard`/`OpenPrint`/`DownloadHtml` strings).
+- `OnCopy` is optional (omit for export groups with no clipboard variant, e.g. scoresheets).
+- `TriggerClass` carries the §1 colour (`btn-outline-primary` for a workflow step,
+  `btn-outline-secondary` for a secondary/global export); `Small="true"` for `btn-sm` toolbars.
+- Distinguish scope by icon: `bi-table` (one hanchan) vs `bi-stack` (all hanchans),
+  `bi-card-checklist` (scoresheets), `bi-list-ol` (rankings).
+- Opening one of two sibling groups should collapse the other (one option set visible at a time).
+
+## 5. Confirmation = inline alert, not modal
+
+Destructive / regenerate actions reveal an inline confirm in place of the trigger:
+
+```razor
+<span class="alert alert-danger d-inline-block mb-0 py-1">
+    @Lang.Get("DeleteHanchanConfirm")
+    <button class="btn btn-sm btn-danger ms-2 me-1" @onclick="ConfirmDelete">@Lang.Get("YesDelete")</button>
+    <button class="btn btn-sm btn-secondary" @onclick="CancelDelete">@Lang.Get("Cancel")</button>
+</span>
+```
+
+`alert-warning` for regenerate/attendance-reset, `alert-danger` for delete. `alert-info` for
+neutral explanations (e.g. status help, unassigned-player notices).
+
+## 6. Tabs
+
+Standard Bootstrap `nav nav-tabs`. **Active state is driven by `.active` only** — never hard-code
+`bg-primary text-white` on a tab (that makes it read as selected when it isn't). Status colouring
+goes through `ScoreStatusHelper.TabClass` / `TabStyle`.
+
+## 7. Show only actions relevant to the current view
+
+Gate actions to the active tab/view. Assignment-only actions (Regenerate, Delete, Export
+Assignments, the global all-hanchans export) appear only on the assignment view
+(`activeTab == "tables"`), not on Scores/Rankings. Feature-gated actions follow `ClubSettings`
+(e.g. scoresheets behind `EnableScoreEntry`, share/QR behind `EnableExternalScoring`).
+
+## 8. Don't over-explain to the user
+
+- No persistent manual **Save** button — persist on change (auto-save). See the auto-save handlers
+  in `WeeklySessionPage` and CLAUDE.md's stale-reference gotcha.
+- Don't spell out constraints the UI already enforces. A disabled button + tooltip beats a sentence
+  ("need at least 3 players", "save first" were removed). Use `disabled="@(…)"` + `title`.
+
+## 9. Cards (table assignments)
+
+Per-table cards encode player count by colour: 4-player = `border-success` + `bg-success text-white`
+header; 3-player = `border-warning` + `bg-warning text-dark`. Headers omit the "(N players)" suffix on
+the assignment view; the Scores view keeps it (rendered by `ScoreTable`).
+
+## 10. i18n
+
+All user-facing text via `Lang.Get(...)` with keys in both `nl` and `en` blocks of
+[LanguageService.cs](../Tsump.Shared/Services/LanguageService.cs). Dutch "session" = **Zitting**.
+Prefer reusing an existing short key (`Copy`, `Print`, `Download`, `Assignments`) over adding a
+near-duplicate. Don't bulk-rename strings the user deliberately set.
