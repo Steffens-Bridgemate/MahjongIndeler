@@ -25,24 +25,40 @@ The paired scoring app lives in the [MahjongScoring](https://github.com/Steffens
 
 Push to `master` in this repo auto-triggers `.github/workflows/deploy.yml`, which bumps `Tsump/AppVersion.cs`, publishes, and deploys to Pages.
 
-### Deploying a shared-code change
+### Deploy commands — what to do when the user asks
 
-After the organizer push lands at `origin/master`:
+These phrases map to **exact** procedures. Do all the steps, in order, in one go — don't stop to re-derive or investigate unless a command actually errors. A push is still gated on the user explicitly asking (which these phrases are).
 
+| User says | Do exactly this |
+|---|---|
+| **"deploy organizer"** / "push organizer" | Commit + push organizer `master` (steps 1–2 below). Stop there. |
+| **"deploy scoring"** / "push scoring" | Bump the MahjongScoring submodule + push (step 3 below). Stop there. |
+| **"deploy both"** / **"full push"** / "full deploy" | **Both, in order: steps 1 → 2 → 3 below.** This is the default for any shared-code (`Tsump.Shared`) change, because a `Tsump.Shared` edit is not live until *both* repos redeploy. |
+
+**Step 1 — refresh docs (organizer).** Update the `docs/` files touched by the change (`docs/domain.md`, `docs/score-apply.md`, `docs/score-import-ui.md`, `docs/pages.md`, etc.) so they match what's deploying. Stage them in the same commit.
+
+**Step 2 — commit + push organizer.**
+```powershell
+cd c:\Users\aners\source\repos\MahjongIndeler
+git add <changed files>          # not .claude/settings.local.json
+git commit -m "…"               # end with the Co-Authored-By trailer
+git push origin master          # if rejected "fetch first": git stash push -- .claude/settings.local.json; git pull --rebase origin master; git push; git stash pop
+```
+The deploy workflow then adds its own `Bump version [skip ci]` commit — so the remote advancing under you is normal, and the rebase-on-reject above is the expected path, not a problem to investigate.
+
+**Step 3 — bump the scoring submodule (only after step 2 has landed at `origin/master`).**
 ```powershell
 cd c:\Users\aners\source\repos\MahjongScoring
 git submodule update --remote external/MahjongIndeler
-git submodule status               # verify pointer moved
+git submodule status               # verify pointer moved to the new organizer origin/master
 # If any MahjongScoring callsite uses renamed payload fields / new classes,
 # update Tsump.Scoring/Pages/ScorePage.razor in the same commit
 git add external/MahjongIndeler [other-files]
-git commit -m "Bump shared: …"
-git push                           # auto-deploys the scoring app
+git commit -m "Bump shared: …"     # end with the Co-Authored-By trailer
+git push                            # auto-deploys the scoring app
 ```
 
-For wire-format breaking changes deploy MahjongScoring **first** if any active scoring links exist in WhatsApp; otherwise order doesn't matter.
-
-**Before the organizer push:** refresh the `docs/` files (`docs/domain.md`, `docs/score-apply.md`, `docs/score-import-ui.md`, `docs/pages.md`) to match the changes being deployed, and commit them in the same push.
+For wire-format **breaking** changes, deploy MahjongScoring **first** *only if* active scoring links exist in WhatsApp; otherwise the 1→2→3 order above is fine.
 
 **Never push without an explicit ask.** Push = deploy = live users.
 
