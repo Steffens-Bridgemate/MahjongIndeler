@@ -3,7 +3,18 @@
     "allow": [
       "Read(//c/Users/aners/source/repos/MahjongMeetingsManagement/**)",
       "Bash(dotnet build *)",
-      "Bash(grep -rln 'bs-primary\\\\|btn-primary\\\\|--bs-primary-rgb\\\\|$primary' Tsump/wwwroot/)"
+      "Bash(grep -rln 'bs-primary\\\\|btn-primary\\\\|--bs-primary-rgb\\\\|$primary' Tsump/wwwroot/)",
+      "Bash(git -C \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongScoring\" status --short)",
+      "Bash(git -C \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongScoring\" submodule status external/MahjongIndeler)",
+      "Bash(git -C \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongScoring\" rev-parse --abbrev-ref HEAD)",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)",
+      "PowerShell(gh run list --workflow=deploy.yml --limit 3 --repo Steffens-Bridgemate/MahjongIndeler 2>&1)",
+      "Bash(ls *.sln)",
+      "Bash(ls Tsump.Scoring/*.csproj)",
+      "Bash(git commit -m '@ *)",
+      "Bash(git commit *)",
+      "PowerShell(dotnet build Tsump/Tsump.csproj -nologo -clp:ErrorsOnly)"
     ]
   }
 }
