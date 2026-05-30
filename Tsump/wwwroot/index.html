@@ -289,6 +289,38 @@
                 dotNetRef.invokeMethodAsync('OnScanComplete', text);
             };
 
+            // Focus tracking: tell .NET when the capture field loses/gains keyboard focus, so the
+            // panel can show an "armed vs not listening" indicator. Debounced, because the normal
+            // clear+refocus cycle (focusAndClearScanInput) and the post-burst re-arm both blur then
+            // immediately refocus. A real loss = the field is still in the DOM but no longer the
+            // active element, or the whole window lost focus (user switched to another app such as
+            // Teams) — in which case the HID keystrokes go elsewhere and JS cannot pull focus back.
+            const FOCUS_DEBOUNCE_MS = 200;
+            let focusTimer = null;
+            let focusLost = false;
+            const clearFocusTimer = function () { if (focusTimer) { clearTimeout(focusTimer); focusTimer = null; } };
+            const reportFocus = function (hasFocus) {
+                if (focusLost === !hasFocus) return;               // no change since last report
+                focusLost = !hasFocus;
+                dotNetRef.invokeMethodAsync('OnScanFocusChanged', hasFocus);
+            };
+            const onFocus = function () { clearFocusTimer(); reportFocus(true); };
+            const onBlur = function () {
+                clearFocusTimer();
+                focusTimer = setTimeout(function () {
+                    focusTimer = null;
+                    if (!el.isConnected) return;                    // element removed by a state change — not a real loss
+                    // Switching apps blurs the window but some browsers keep activeElement on the
+                    // textarea, so check hasFocus() too rather than activeElement alone.
+                    var armed = document.activeElement === el && document.hasFocus();
+                    if (!armed) reportFocus(false);
+                }, FOCUS_DEBOUNCE_MS);
+            };
+            const onWindowBlur = function () { onBlur(); };
+            const onWindowFocus = function () {
+                if (el.isConnected && document.activeElement === el && document.hasFocus()) onFocus();
+            };
+
             const onInput = function () {
                 const value = el.value;
                 const trimmed = value.trim();
@@ -322,7 +354,11 @@
 
             el.addEventListener('input', onInput);
             el.addEventListener('keydown', onKeyDown);
-            el._scanCapture = { onInput: onInput, onKeyDown: onKeyDown };
+            el.addEventListener('focus', onFocus);
+            el.addEventListener('blur', onBlur);
+            window.addEventListener('blur', onWindowBlur);
+            window.addEventListener('focus', onWindowFocus);
+            el._scanCapture = { onInput, onKeyDown, onFocus, onBlur, onWindowBlur, onWindowFocus, clearFocusTimer };
             return true;
         };
 
@@ -331,6 +367,11 @@
             try {
                 el.removeEventListener('input', el._scanCapture.onInput);
                 el.removeEventListener('keydown', el._scanCapture.onKeyDown);
+                el.removeEventListener('focus', el._scanCapture.onFocus);
+                el.removeEventListener('blur', el._scanCapture.onBlur);
+                window.removeEventListener('blur', el._scanCapture.onWindowBlur);
+                window.removeEventListener('focus', el._scanCapture.onWindowFocus);
+                el._scanCapture.clearFocusTimer();
             } catch (_) { }
             el._scanCapture = null;
         };

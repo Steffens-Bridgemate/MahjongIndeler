@@ -21,7 +21,11 @@
             <div class="card">
                 <div class="card-header d-flex align-items-center">
                     <h6 class="mb-0 flex-grow-1">@Lang.Get("ImportResultPanelTitle")</h6>
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClosePanel">@Lang.Get("Close")</button>
+                    @* preventDefault on mousedown stops this button from blurring the armed HID
+                       capture field; without it, while scanning the first click is consumed by the
+                       focus change and the panel only closes on the second click. *@
+                    <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="ClosePanel"
+                            @onmousedown:preventDefault="true">@Lang.Get("Close")</button>
                 </div>
                 <div class="card-body">
                     @if (status == ImportStatus.HandScanning)
@@ -32,27 +36,41 @@
                            can't truncate it. Only present in this state. *@
                         <textarea @ref="scanInputRef" class="scan-capture-hidden" rows="1"
                                   autocomplete="off" aria-label="@Lang.Get("ReadyToScan")" />
-                        <div class="text-center my-3" role="button" tabindex="-1"
-                             @onclick="RefocusScanInput" title="@Lang.Get("ReadyToScan")">
-                            <i class="bi bi-qr-code text-primary" style="font-size: 3rem; line-height: 1;"></i>
-                            <div class="progress mt-3 mx-auto" style="height: 6px; max-width: 240px;">
-                                @if (isScanning)
+                        @* Fixed-height icon box + fixed-height message box keep the QR glyph perfectly
+                           centered and stop it jumping when the content below changes between states. *@
+                        <div class="text-center my-3 scan-indicator" role="button" tabindex="-1"
+                             @onclick="RefocusScanInput"
+                             title="@(captureHasFocus ? Lang.Get("ReadyToScan") : Lang.Get("ScanFocusLost"))">
+                            <div class="d-flex align-items-center justify-content-center" style="height: 3.5rem;">
+                                <i class="bi bi-qr-code @(captureHasFocus ? "text-primary" : "text-muted")"
+                                   style="font-size: 3rem; line-height: 1;"></i>
+                            </div>
+                            <div class="d-flex flex-column align-items-center justify-content-center mt-2"
+                                 style="min-height: 3rem;">
+                                @if (captureHasFocus)
                                 {
-                                    @* Scanning: a fill that repeatedly grows left→right (~1s/cycle). *@
-                                    <div class="progress-bar scan-fill"></div>
+                                    <div class="progress" style="height: 6px; width: 240px; max-width: 100%;">
+                                        @if (isScanning)
+                                        {
+                                            @* Scanning: a fill that repeatedly grows left→right (~1s/cycle). *@
+                                            <div class="progress-bar scan-fill"></div>
+                                        }
+                                        else
+                                        {
+                                            @* Waiting: indeterminate striped sweep. *@
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%;"></div>
+                                        }
+                                    </div>
+                                    <div class="text-muted small mt-2">@(isScanning ? Lang.Get("ScanningNow") : Lang.Get("ReadyToScan"))</div>
                                 }
                                 else
                                 {
-                                    @* Waiting: indeterminate striped sweep. *@
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%;"></div>
+                                    @* Focus lost (clicked elsewhere / switched app): one high-contrast badge says it all. *@
+                                    <span class="badge bg-warning text-dark fs-6">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>@Lang.Get("ScanFocusLost")
+                                    </span>
                                 }
                             </div>
-                            <div class="text-muted small mt-2">@(isScanning ? Lang.Get("ScanningNow") : Lang.Get("ReadyToScan"))</div>
-                        </div>
-                        <div class="text-center">
-                            <button class="btn btn-outline-secondary" @onclick="ReturnToNeutral">
-                                <i class="bi bi-x-lg me-1"></i>@Lang.Get("Cancel")
-                            </button>
                         </div>
                     }
                     else if (status == ImportStatus.Preview || status == ImportStatus.AlreadyScored)
@@ -255,6 +273,10 @@
     .scan-fill {
         animation: scan-fill-grow 1s linear infinite;
     }
+
+    /* The QR indicator doubles as a "click to re-arm" button. */
+    .scan-indicator { cursor: pointer; }
+    .scan-indicator:hover .bi-qr-code { opacity: 0.85; }
 </style>
 
 @code {
@@ -314,6 +336,10 @@
     private bool isScanning;
     // True once we've focused the capture input for the current HandScanning entry.
     private bool handScanFocused;
+    // Whether the hidden capture field currently holds keyboard focus. When false (user clicked
+    // away or switched app) HID keystrokes aren't reaching us, so the indicator prompts a click to
+    // re-arm. Driven by OnScanFocusChanged from the JS blur/focus listeners.
+    private bool captureHasFocus = true;
 
     // Closes the panel after this much idle time. Any user activity resets the countdown.
     private const int InactivityTimeoutMs = 5 * 60 * 1000;
@@ -450,6 +476,18 @@
         return Task.CompletedTask;
     }
 
+    /// <summary>The hidden capture field gained/lost keyboard focus (JS blur/focus listeners).
+    /// A loss means the user clicked elsewhere or switched to another app, so the indicator shows
+    /// a "click to resume" prompt. We can't steal focus back from another application — the user
+    /// must click first, which the indicator (RefocusScanInput) then handles.</summary>
+    [JSInvokable]
+    public Task OnScanFocusChanged(bool hasFocus)
+    {
+        captureHasFocus = hasFocus;
+        if (status == ImportStatus.HandScanning) StateHasChanged();
+        return Task.CompletedTask;
+    }
+
     private string ResolveName(Guid id)
         => PlayerNameResolver?.Invoke(id) ?? id.ToString();
 
@@ -469,9 +507,12 @@
     {
         inactivityCts?.Cancel();
         autoContinueCts?.Cancel();
-        await StopQrScannerIfRunning();
+        // Close on the first click: flip the panel off and render before the scanner-teardown
+        // interop round-trip, so the close isn't gated on that await completing.
         showPanel = false;
         ReturnToNeutralCore();
+        StateHasChanged();
+        await StopQrScannerIfRunning();
     }
 
     /// <summary>Back to the resting state with the four method buttons. Stops the camera if live.</summary>
@@ -531,6 +572,7 @@
         status = ImportStatus.HandScanning;
         isScanning = false;
         handScanFocused = false; // re-focus the capture input on (re-)entry
+        captureHasFocus = true;  // assume armed until JS reports a blur
         StateHasChanged();
     }
 
