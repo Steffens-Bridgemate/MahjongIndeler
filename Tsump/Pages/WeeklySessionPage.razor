@@ -235,7 +235,7 @@ else
                     &larr; @Lang.Get("BackToWorkflow")
                 </button>
             }
-            @if (tables.Count > 0)
+            @if (tables.Count > 0 && activeTab == "tables")
             {
                 @if (showRegenerateConfirm)
                 {
@@ -252,7 +252,7 @@ else
                     </button>
                 }
             }
-            @if (currentHanchan != null)
+            @if (currentHanchan != null && activeTab == "tables")
             {
                 @if (showDeleteConfirm)
                 {
@@ -365,7 +365,9 @@ else
     }
     else if (tables.Count > 0)
     {
-        <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
+        @if (activeTab == "tables")
+        {
+        <div class="d-flex align-items-center mb-2 flex-wrap gap-1 ms-2">
             @if (showExportSingle)
             {
                 <button class="btn btn-sm btn-outline-secondary" @onclick="CopyTablesToClipboard">
@@ -400,6 +402,7 @@ else
                 </button>
             }
         </div>
+        }
 
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
@@ -409,7 +412,7 @@ else
                 <a class="nav-link bg-primary text-white @(tablesActive ? "active" : "")"
                    style="@ScoreStatusHelper.TabStyle(tablesActive)"
                    href="javascript:void(0)" @onclick='() => activeTab = "tables"'>
-                    @Lang.Get("TableAssignments")
+                    @Lang.Get("Assignments")
                 </a>
             </li>
             <li class="nav-item">
@@ -465,7 +468,7 @@ else
                     <div class="col-md-4 mb-3">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
                             <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
-                                @Lang.Get("Table") @table.TableNumber (@table.PlayerCount @Lang.Get("players"))
+                                @Lang.Get("Table") @table.TableNumber
                             </div>
                             <ul class="list-group list-group-flush">
                                 @foreach (var playerId in table.PlayerIds)
