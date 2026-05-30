@@ -207,9 +207,9 @@ else
     private MarkupString SortIndicator(string column)
     {
         if (sortColumn == column)
-            return new MarkupString($"<span class='text-primary'>{(sortDescending ? "▼" : "▲")}</span>");
+            return new MarkupString($"<i class='bi {(sortDescending ? "bi-caret-down-fill" : "bi-caret-up-fill")} text-primary'></i>");
         if (secondarySortColumn == column)
-            return new MarkupString($"<span class='text-muted' style='font-size:0.75em;'>{(secondarySortDescending ? "▼" : "▲")}<sup>2</sup></span>");
+            return new MarkupString($"<span class='text-muted' style='font-size:0.75em;'><i class='bi {(secondarySortDescending ? "bi-caret-down-fill" : "bi-caret-up-fill")}'></i><sup>2</sup></span>");
         return new MarkupString("");
     }
 

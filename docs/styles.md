@@ -77,6 +77,14 @@ Destructive / regenerate actions reveal an inline confirm in place of the trigge
 `alert-warning` for regenerate/attendance-reset, `alert-danger` for delete. `alert-info` for
 neutral explanations (e.g. status help, unassigned-player notices).
 
+## 5b. Collapsible sections → `CollapsibleCard`
+
+Use the shared [CollapsibleCard.razor](../Tsump/Components/CollapsibleCard.razor) for any card whose
+body collapses behind a clickable header (attendance, assignments, 3-player distribution, meeting
+matrix, scoring overrides, …). It renders the header, the chevron (`bi-chevron-up/down` — never a
+`▲/▼` text glyph), and the body. `Title` is the header text, `@bind-Expanded` owns the open flag,
+`TitleClass` overrides the heading size (default `h5 mb-0`), `CssClass` the card margins.
+
 ## 6. Tabs
 
 Standard Bootstrap `nav nav-tabs`. **Active state is driven by `.active` only** — never hard-code
@@ -109,3 +117,19 @@ All user-facing text via `Lang.Get(...)` with keys in both `nl` and `en` blocks 
 [LanguageService.cs](../Tsump.Shared/Services/LanguageService.cs). Dutch "session" = **Zitting**.
 Prefer reusing an existing short key (`Copy`, `Print`, `Download`, `Assignments`) over adding a
 near-duplicate. Don't bulk-rename strings the user deliberately set.
+
+## Exceptions
+
+Deliberate departures from the rules above — don't "fix" these:
+
+- **Record-edit forms keep an explicit Save button.** The "no manual Save / auto-save" rule (§8)
+  is *session-scoped* (hanchan/tournament editing). A form that edits a discrete record — e.g. the
+  member form in [Members.razor](../Tsump/Pages/Members.razor) — legitimately uses an explicit
+  Save (`btn-success`); auto-saving every keystroke there would be wrong.
+- **Confirmation-step buttons may be solid `btn-warning`/`btn-danger`.** §1 reserves *warning* for
+  caution, but the "Yes, continue / Yes, delete" button inside an inline confirm (§5) is correctly
+  a solid warning/danger button. That's not the "warning for an ordinary action" misuse.
+- **[ImportScorePage.razor](../Tsump/Pages/ImportScorePage.razor) has no in-app navigation link.**
+  It's a deep-link landing page that decodes a scoring result from the URL fragment
+  (`/import-score#r=…`) when a phone opens a scanned result link. No nav reference is expected — it
+  is *not* dead code.

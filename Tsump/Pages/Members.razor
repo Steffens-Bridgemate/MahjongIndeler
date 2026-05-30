@@ -149,7 +149,7 @@ else
                 <th class="@ColClass("leagueId", "col-hide-md")">@Lang.Get("LeagueId")</th>
                 <th class="@ColClass("joined", "col-hide-lg")">@Lang.Get("Joined")</th>
                 <th class="@ColClass("active", "col-hide-xl") text-center" style="cursor:pointer;" @onclick="() => activeSortDescending = !activeSortDescending">
-                    @Lang.Get("Active") <span>@(activeSortDescending ? "\u25BC" : "\u25B2")</span>
+                    @Lang.Get("Active") <i class="bi @(activeSortDescending ? "bi-caret-down-fill" : "bi-caret-up-fill")"></i>
                 </th>
             </tr>
         </thead>

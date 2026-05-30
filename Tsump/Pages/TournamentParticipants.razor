@@ -181,14 +181,7 @@ else
     </div>
 
     @* --- Scoring overrides --- *@
-    <div class="card mt-4">
-        <div class="card-header d-flex align-items-center" style="cursor:pointer;" @onclick="() => scoringExpanded = !scoringExpanded">
-            <h5 class="mb-0 flex-grow-1">@Lang.Get("ScoringOverrides")</h5>
-            <span class="ms-2">@(scoringExpanded ? "\u25B2" : "\u25BC")</span>
-        </div>
-        @if (scoringExpanded)
-        {
-            <div class="card-body">
+    <CollapsibleCard Title="@Lang.Get("ScoringOverrides")" CssClass="mt-4" @bind-Expanded="scoringExpanded">
                 <p class="text-muted">@Lang.Get("ScoringOverridesDesc")</p>
                 <div class="row mb-2">
                     <div class="col-md-4 mb-2">
@@ -227,9 +220,7 @@ else
                     </div>
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" @onclick="ResetScoringOverrides">@Lang.Get("UseDefaults")</button>
-            </div>
-        }
-    </div>
+    </CollapsibleCard>
 }
 
 @code {

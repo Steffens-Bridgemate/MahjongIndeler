@@ -151,14 +151,8 @@ else
     <div class="tab-content-panel">
     @if (activeTab != "rankings" && activeTab != "allscores")
     {
-    <div class="card mb-4">
-        <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="() => attendanceExpanded = !attendanceExpanded">
-            <h5 class="mb-0 flex-grow-1">@Lang.Get("Attendance") (@presentIds.Count @Lang.Get("present") @Lang.Get("of") @activeMembers.Count @Lang.Get("active"))</h5>
-            <span class="ms-2">@(attendanceExpanded ? "\u25B2" : "\u25BC")</span>
-        </div>
-        @if (attendanceExpanded)
-        {
-            <div class="card-body">
+    <CollapsibleCard CssClass="mb-4" @bind-Expanded="attendanceExpanded"
+                     Title="@($"{Lang.Get("Attendance")} ({presentIds.Count} {Lang.Get("present")} {Lang.Get("of")} {activeMembers.Count} {Lang.Get("active")})")">
                 @if (showAttendanceWarning)
                 {
                     <div class="alert alert-warning py-2 mb-2">
@@ -193,9 +187,7 @@ else
                         </div>
                     }
                 </div>
-            </div>
-        }
-    </div>
+    </CollapsibleCard>
 
     @if (!IsLockedPastSession)
     {
