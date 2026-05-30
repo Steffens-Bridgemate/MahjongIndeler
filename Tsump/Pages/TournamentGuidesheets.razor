@@ -88,6 +88,7 @@ else
         sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
         sb.Append($"<title>{Lang.Get("Guidesheets")} — {tournament.Name}</title>");
         sb.Append("<style>");
+        sb.Append("@page { margin: 10mm 8mm 0 8mm; }");
         sb.Append("* { box-sizing: border-box; margin: 0; padding: 0; }");
         sb.Append("body { font-family: Verdana, Arial, sans-serif; font-size: 11px; }");
         sb.Append(".page { display: flex; flex-wrap: wrap; gap: 12px; padding: 10px; }");
@@ -101,7 +102,9 @@ else
         sb.Append("td.opponents { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }");
         sb.Append("@media print { ");
         sb.Append("  body { margin: 0; } ");
-        sb.Append("  .page { gap: 8px; padding: 5mm; } ");
+        // No top padding here — the only top spacing must come from @page so every printed
+        // page (not just the first) shares the same upper margin. Sheets are cut from a stack.
+        sb.Append("  .page { gap: 8px; padding: 0; } ");
         sb.Append("  .sheet { width: calc(50% - 4px); } ");
         sb.Append("  .no-print { display: none; } ");
         sb.Append("}");

@@ -31,7 +31,12 @@
       "PowerShell(\"probe-ps6\")",
       "PowerShell($o = dotnet build \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Tsump.csproj\" -c Debug --nologo 2>&1; \\($o | Select-String -Pattern \"error CS|Build succeeded|Build FAILED|[0-9]+ Warning|[0-9]+ Error\"\\) -join \"`n\")",
       "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb.txt\" | Select-String \"error CS|Build succeeded|Build FAILED|Warning\\\\\\(s\\\\\\)|Error\\\\\\(s\\\\\\)\"\\) -join \"`n\")",
-      "PowerShell($p=\"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Components\\\\ScoreImportPanel.razor\"; $c=Get-Content $p; \"TOTAL: $\\($c.Count\\)\"; \\($c | ForEach-Object -Begin {$i=1} -Process { \"{0}: {1}\" -f $i,$_; $i++ }\\) -join \"`n\")"
+      "PowerShell($p=\"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongIndeler\\\\Tsump\\\\Components\\\\ScoreImportPanel.razor\"; $c=Get-Content $p; \"TOTAL: $\\($c.Count\\)\"; \\($c | ForEach-Object -Begin {$i=1} -Process { \"{0}: {1}\" -f $i,$_; $i++ }\\) -join \"`n\")",
+      "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-String \"error|Build succeeded|Build FAILED|Warning\\\\\\(s\\\\\\)|Error\\\\\\(s\\\\\\)\"\\) -join \"`n\")",
+      "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-String \"error|succeeded|FAILED|Warning|Error\"\\) -join \"`n\")",
+      "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb7.txt\"\\) -join \"`n\")",
+      "PowerShell(if \\(Test-Path \"$env:TEMP\\\\tb7.txt\"\\) { \\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-Object -Last 8\\) -join \"`n\" } else { \"no file\" })",
+      "PowerShell(if \\(Test-Path \"$env:TEMP\\\\tb7.txt\"\\) { \\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-Object -Last 6\\) -join \"`n\" } else { \"no file\" })"
     ]
   }
 }
