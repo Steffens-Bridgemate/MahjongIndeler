@@ -297,14 +297,26 @@
 
 <div class="@(activeTab == "style" ? "" : "d-none")">
 
-    @* Action bar — explicit save (no autosave); changes only touch localStorage on Save. *@
+    @* Action bar — explicit commit (no autosave); changes only touch localStorage on Commit,
+       which is gated by a confirm because it overwrites the saved style irrecoverably. *@
     <div class="d-flex align-items-center flex-wrap gap-1 mb-2">
-        <button class="btn btn-success" disabled="@(!styleDirty)" @onclick="SaveStyle">
-            <i class="bi bi-check-lg me-1"></i>@Lang.Get("Save")
-        </button>
-        <button class="btn btn-outline-secondary" disabled="@(!styleDirty)" @onclick="DiscardStyle">
-            <i class="bi bi-arrow-counterclockwise me-1"></i>@Lang.Get("DiscardChanges")
-        </button>
+        @if (confirmCommit)
+        {
+            <span class="alert alert-warning d-inline-block mb-0 py-1">
+                @Lang.Get("CommitStyleConfirm")
+                <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmCommit">@Lang.Get("YesCommit")</button>
+                <button class="btn btn-sm btn-secondary" @onclick="() => confirmCommit = false">@Lang.Get("Cancel")</button>
+            </span>
+        }
+        else
+        {
+            <button class="btn btn-success" disabled="@(!styleDirty)" @onclick="() => confirmCommit = true">
+                <i class="bi bi-check-lg me-1"></i>@Lang.Get("CommitStyle")
+            </button>
+            <button class="btn btn-outline-secondary" disabled="@(!styleDirty)" @onclick="DiscardStyle">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>@Lang.Get("DiscardChanges")
+            </button>
+        }
         <div class="w-100"></div>
         <button class="btn btn-sm btn-outline-secondary mt-1" @onclick="ExportStyle">
             <i class="bi bi-box-arrow-down me-1"></i>@Lang.Get("ExportStyle")
@@ -569,6 +581,7 @@
     private bool styleSaved;
     private string? styleError;
     private bool confirmReset;
+    private bool confirmCommit;
 
     // Colour-from-image eyedropper (reference image is transient — never persisted).
     private const int PickerMaxDim = 900;
@@ -757,10 +770,18 @@
         styleDirty = true;
         styleSaved = false;
         styleError = null;
+        confirmCommit = false;   // any further edit cancels a pending commit confirmation
     }
 
-    // The only path that persists style to localStorage. SettingsService.OnChanged then fires, so
-    // MainLayout and NavMenu re-read and re-apply (colours/brand/link/banner update app-wide).
+    // Confirmed commit (after the warning). The only path that persists style to localStorage.
+    private async Task ConfirmCommit()
+    {
+        confirmCommit = false;
+        await SaveStyle();
+    }
+
+    // Persists style. SettingsService.OnChanged then fires, so MainLayout and NavMenu re-read and
+    // re-apply (colours/brand/link/banner update app-wide). Reached only via ConfirmCommit.
     private async Task SaveStyle()
     {
         await Save();
@@ -771,13 +792,14 @@
         styleSaved = true;
     }
 
-    // Throw away unsaved edits: restore the persisted snapshot and revert the live preview.
+    // Throw away uncommitted edits: restore the persisted snapshot and revert the live preview.
     private async Task DiscardStyle()
     {
         style = savedStyle.Clone();
         styleDirty = false;
         styleSaved = false;
         confirmReset = false;
+        confirmCommit = false;
         styleError = null;
         await ApplyStyle();
     }
