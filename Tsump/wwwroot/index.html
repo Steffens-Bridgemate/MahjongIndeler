@@ -391,24 +391,27 @@
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script>
-        // Controlled PWA update: a new version installs quietly and waits; the AppUpdateBanner
-        // offers "Update now", and only then do we activate it + reload. No more mid-action reloads.
+        // Restart-to-update PWA flow: a new version installs quietly and WAITS — it is never
+        // activated in place, so the running app is never reloaded mid-action. The new version
+        // takes effect the next time the app is launched fresh. The AppUpdateBanner just informs
+        // the user and offers a best-effort "close now" to help on devices that stay open forever.
         (function () {
             if (!('serviceWorker' in navigator)) return;
 
             var dotNetRef = null;      // the Blazor AppUpdateBanner, once it registers
             var updatePending = false; // an update was detected (maybe before the banner mounted)
-            var waitingWorker = null;  // the installed-and-waiting new worker
-            var refreshing = false;
 
             window.registerAppUpdateCallback = function (ref) {
                 dotNetRef = ref;
                 if (updatePending) notifyBanner();
             };
 
-            // Called by the banner's "Update now". controllerchange (below) then reloads the page.
-            window.applyAppUpdate = function () {
-                if (waitingWorker) waitingWorker.postMessage('SKIP_WAITING');
+            // Best-effort close so the waiting worker can activate on next launch. Resolves false
+            // only if the window is still here shortly after (close blocked — common on mobile);
+            // if it actually closed, the promise never resolves because the page is gone.
+            window.closeAppForUpdate = function () {
+                try { window.close(); } catch (e) { /* ignore */ }
+                return new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 700); });
             };
 
             function notifyBanner() {
@@ -418,30 +421,20 @@
                 }
             }
 
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-                if (!refreshing) { refreshing = true; window.location.reload(); }
-            });
-
             navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' }).then(function (reg) {
                 function watch(worker) {
                     if (!worker) return;
                     worker.addEventListener('statechange', function () {
                         // 'installed' while a controller already exists ⇒ an UPDATE, not first install.
-                        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                            waitingWorker = worker;
-                            notifyBanner();
-                        }
+                        if (worker.state === 'installed' && navigator.serviceWorker.controller) notifyBanner();
                     });
                 }
 
-                if (reg.waiting && navigator.serviceWorker.controller) {
-                    waitingWorker = reg.waiting;   // already waiting when the page loaded
-                    notifyBanner();
-                }
+                if (reg.waiting && navigator.serviceWorker.controller) notifyBanner();
                 watch(reg.installing);
                 reg.addEventListener('updatefound', function () { watch(reg.installing); });
 
-                // Check for a new deploy whenever the user returns to the tab.
+                // Check for a new deploy whenever the user returns to the app.
                 window.addEventListener('focus', function () { reg.update().catch(function () { }); });
             }).catch(function (e) { console.warn('Service worker registration failed:', e); });
         })();
