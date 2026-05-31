@@ -22,7 +22,15 @@ Sections appear only for pages with cross-file behaviour worth recording. Pages 
 - **Dual scoring config**: weekly defaults (`WeeklyStartingPoints` / `WeeklyUma{3,4}Players`) and tournament defaults (`TournamentStartingPoints` / `TournamentUma{3,4}Players`) are independent. A tournament can additionally have its own per-tournament overrides — those fall back to the tournament-defaults from settings only via `TournamentScoreContextResolver`'s null-coalesce. The Settings page only edits the club-wide defaults, not per-tournament overrides.
 - **Scoring app URL is compile-time**: `Tsump.Scoring.ScoringAppConfig.DeployedUrl` ([Tsump.Shared/Scoring/ScoringAppConfig.cs](../Tsump.Shared/Scoring/ScoringAppConfig.cs)) is a `const string`. Not user-configurable — PWA-installed instances hide the address bar so users can't be expected to type a URL. Pointing at a different scoring app deployment requires editing the constant and redeploying.
 - **Schedule** drives `SettingsService.GetNextScheduledSlotAsync` — used by the workflow page to pre-fill the next club-night's date/time.
-- **Three tabs** (`activeTab`): **Club event** (`SettingsTabClubEvent` — "Club bijeenkomst", *not* "Clubavond": a club can play in the afternoon), **Tournament**, **Style**. Each tab is a `<div>` toggled with `d-none`, not a routed page. Competition period sits under Club event.
+- **Four tabs** (`activeTab`): **Club event** (`SettingsTabClubEvent` — "Club bijeenkomst", *not* "Clubavond": a club can play in the afternoon), **Tournament**, **Style**, **Language**. Each tab is a `<div>` toggled with `d-none`, not a routed page. Competition period sits under Club event.
+
+### Language (primary + always-English secondary)
+
+- **Four languages**: `LanguageService.SupportedLanguages` = nl/en/fr/de, each a full dictionary in [LanguageService.cs](../Tsump.Shared/Services/LanguageService.cs). `Get` looks up the active dict, then **falls back to English**, then the raw key — so a missing translation degrades gracefully.
+- **Primary vs active**: the club's **primary** language is `ClubSettings.PrimaryLanguage` (default `nl`); the **secondary is always English**. `Lang.Configure(primary)` runs on MainLayout's first render and sets the active display language to the primary. The top-row toggle (`SetLanguage`) flips the *active* language between primary and English and is **session-only** (resets to primary on reload — not persisted).
+- **Top-row buttons** show the primary + English as flag buttons ([FlagIcon.razor](../Tsump.Shared/Components/FlagIcon.razor), inline SVG — Windows can't render emoji flags). When the primary **is** English, a single selected EN button remains as a reminder that the language is configurable.
+- **Language tab** picks the primary via flag buttons; selecting one auto-saves `ClubSettings.PrimaryLanguage` and calls `Lang.SetPrimaryLanguage` (switches the whole app immediately). The "secondary is always English" note is shown as an `alert-info`.
+- **Shared with the scoring app**: `LanguageService` lives in `Tsump.Shared`; the new members are additive (the scoring app keeps working unchanged), but the fr/de strings only go live there after MahjongScoring redeploys.
 
 ### Style theming (Club branding)
 

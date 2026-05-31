@@ -93,6 +93,24 @@ a:hover, .btn-link:hover {
     padding-top: 1.1rem;
 }
 
+/* Inline SVG language flags (FlagIcon). Default size ~1.4×1em; callers may override via Style. */
+.flag-icon {
+    display: inline-block;
+    width: 1.4em;
+    height: 1em;
+    line-height: 0;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 2px;
+    overflow: hidden;
+    vertical-align: -0.15em;
+}
+
+.flag-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 .card {
     border-radius: 3px;
     border-color: #ddd;

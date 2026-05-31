@@ -43,7 +43,9 @@ public class ScoreInviteService
             sessionNumber);
 
         var encoded = ScoringPayloadCodec.EncodeInvite(invite);
-        return $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}";
+        // Carry the club's primary language as a fragment param so the scoring app shows the same
+        // language as the organizer. Not part of the binary payload — just an `&l=` on the fragment.
+        return $"{ScoringAppConfig.DeployedUrl.TrimEnd('/')}/score#p={encoded}&l={_lang.PrimaryLanguage}";
     }
 
     /// <summary>Formats the WhatsApp-friendly message that's copied to the clipboard:

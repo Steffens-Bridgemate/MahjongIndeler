@@ -42,6 +42,10 @@ public class ClubSettings
     // club's, so the live deployment is unchanged out of the box; the Style tab edits these and
     // "Reset to neutral" swaps in ClubStyle.Neutral().
     public ClubStyle Style { get; set; } = new();
+
+    // The club's primary display language (one of LanguageService.SupportedLanguages). The
+    // secondary language is always English. Default "nl" keeps the Tsumo deployment unchanged.
+    public string PrimaryLanguage { get; set; } = "nl";
 }
 
 public class ClubStyle

@@ -199,6 +199,11 @@
         var settings = await SettingsService.GetAsync();
         var tournaments = await TournamentService.GetAllAsync();
 
+        // The primary language is a local UI preference, not shared club data — strip it from the
+        // export so importing a club file never changes the importer's language. (settings is a
+        // throwaway copy from GetAsync, so mutating it here is safe.)
+        settings.PrimaryLanguage = "";
+
         var exportData = new
         {
             ExportDate = DateTime.Now.ToString("o"),
@@ -291,6 +296,9 @@
             var members = JsonSerializer.Deserialize<List<Member>>(root.GetProperty("Members").GetRawText(), options);
             var sessions = JsonSerializer.Deserialize<List<Hanchan>>(root.GetProperty("Sessions").GetRawText(), options);
 
+            // Preserve the local language preference across the import (it's not club data).
+            var localPrimaryLanguage = (await SettingsService.GetAsync()).PrimaryLanguage;
+
             await ClearAllStoredData();
 
             if (members != null)
@@ -302,7 +310,11 @@
             {
                 var settings = JsonSerializer.Deserialize<ClubSettings>(settingsEl.GetRawText(), options);
                 if (settings != null)
+                {
+                    // Keep the importer's own language regardless of what the file carries.
+                    settings.PrimaryLanguage = localPrimaryLanguage;
                     await SettingsService.SaveAsync(settings);
+                }
             }
 
             if (root.TryGetProperty("Tournaments", out var tournamentsEl))

@@ -1,0 +1,56 @@
+@* Inline SVG country flags for the language picker. Pure markup (no deps) so it works offline
+   and renders identically on every platform — Windows in particular does not render emoji flags.
+   "en" uses the Union Jack; its clip-path ids are made unique per instance so multiple flags on
+   one page don't collide. *@
+
+<span class="flag-icon" style="@Style" aria-hidden="true">
+    @switch (Code)
+    {
+        case "nl":
+            <svg viewBox="0 0 9 6" preserveAspectRatio="none">
+                <rect width="9" height="6" fill="#21468B" />
+                <rect width="9" height="4" fill="#fff" />
+                <rect width="9" height="2" fill="#AE1C28" />
+            </svg>
+            break;
+        case "fr":
+            <svg viewBox="0 0 3 2" preserveAspectRatio="none">
+                <rect width="3" height="2" fill="#fff" />
+                <rect width="1" height="2" fill="#0055A4" />
+                <rect x="2" width="1" height="2" fill="#EF4135" />
+            </svg>
+            break;
+        case "de":
+            <svg viewBox="0 0 5 3" preserveAspectRatio="none">
+                <rect width="5" height="3" fill="#FFCE00" />
+                <rect width="5" height="2" fill="#D00" />
+                <rect width="5" height="1" fill="#000" />
+            </svg>
+            break;
+        case "en":
+            <svg viewBox="0 0 60 30" preserveAspectRatio="none">
+                <clipPath id="@_s"><path d="M0,0 v30 h60 v-30 z" /></clipPath>
+                <clipPath id="@_t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z" /></clipPath>
+                <g clip-path="url(#@_s)">
+                    <path d="M0,0 v30 h60 v-30 z" fill="#012169" />
+                    <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6" />
+                    <path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#@_t)" stroke="#C8102E" stroke-width="4" />
+                    <path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10" />
+                    <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6" />
+                </g>
+            </svg>
+            break;
+    }
+</span>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>Extra inline style for the wrapping span (e.g. a custom size).</summary>
+    [Parameter] public string? Style { get; set; }
+
+    // Per-instance unique ids so multiple Union Jacks on one page don't share clip-path ids.
+    private readonly string _uid = Guid.NewGuid().ToString("N")[..8];
+    private string _s => $"uj-s-{_uid}";
+    private string _t => $"uj-t-{_uid}";
+}

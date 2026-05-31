@@ -14,10 +14,21 @@
 
     <main>
         <div class="top-row px-4">
-            @* Keep NL/EN as one flex unit so the narrow-screen space-between can't split them. *@
-            <div class="d-flex">
-                <button class="btn btn-sm @(Lang.IsDutch ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("nl")'>NL</button>
-                <button class="btn btn-sm @(Lang.IsEnglish ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("en")'>EN</button>
+            @* Keep the language buttons as one flex unit so the narrow-screen space-between can't
+               split them. When the primary language IS English, show a single (selected) button —
+               a reminder that the language is configurable in Settings. *@
+            <div class="d-flex gap-1">
+                @if (Lang.PrimaryLanguage != "en")
+                {
+                    <button class="btn btn-sm @(Lang.Language == Lang.PrimaryLanguage ? "btn-primary" : "btn-outline-secondary") d-flex align-items-center gap-1"
+                            @onclick="() => SetLanguage(Lang.PrimaryLanguage)">
+                        <FlagIcon Code="@Lang.PrimaryLanguage" /><span>@Lang.PrimaryLanguage.ToUpper()</span>
+                    </button>
+                }
+                <button class="btn btn-sm @(Lang.IsEnglish ? "btn-primary" : "btn-outline-secondary") d-flex align-items-center gap-1"
+                        @onclick='() => SetLanguage("en")'>
+                    <FlagIcon Code="en" /><span>EN</span>
+                </button>
             </div>
             @if (!string.IsNullOrWhiteSpace(style.WebsiteUrl))
             {
@@ -54,6 +65,9 @@
     {
         var settings = await SettingsService.GetAsync();
         style = settings.Style;
+        // Set the club's primary language; the active display language follows it on each load
+        // (the top-row toggle to English is session-only).
+        Lang.Configure(settings.PrimaryLanguage);
         await JS.InvokeVoidAsync("applyClubStyle", style.PrimaryColor, style.LinkColor);
         StateHasChanged();
     }
