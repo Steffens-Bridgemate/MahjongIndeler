@@ -10,8 +10,16 @@
 
 .navbar-brand {
     font-size: 1.1rem;
-    color: #004b8d;
+    color: var(--club-primary, #004b8d);
     font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.navbar-brand img {
+    max-height: 2.2rem;
+    width: auto;
 }
 
 .bi {
@@ -92,14 +100,14 @@
     }
 
 .nav-item ::deep a.active {
-    background-color: rgba(0, 75, 141, 0.1);
-    color: #004b8d;
+    background-color: var(--club-primary-soft, rgba(0, 75, 141, 0.1));
+    color: var(--club-primary, #004b8d);
     font-weight: bold;
 }
 
 .nav-item ::deep a:hover {
-    background-color: rgba(0, 75, 141, 0.05);
-    color: #004b8d;
+    background-color: var(--club-primary-softer, rgba(0, 75, 141, 0.05));
+    color: var(--club-primary, #004b8d);
 }
 
 @media (min-width: 641px) {

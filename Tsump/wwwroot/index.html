@@ -78,6 +78,176 @@
         window.triggerFileInput = function (inputId) {
             document.getElementById(inputId).click();
         };
+
+        // --- Club style theming ---
+        // Sets the --club-* CSS custom properties on <html> from the two brand colours the user
+        // picked. Hover and translucent variants are derived here so the settings UI only has to
+        // store two hex values. Also overrides Bootstrap's --bs-primary so utility classes
+        // (text-primary, border-primary on the Home cards) track the club colour.
+        window.applyClubStyle = function (primary, link) {
+            var root = document.documentElement;
+            function parseHex(hex, fallback) {
+                if (!hex) return fallback;
+                var m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+                if (!m) return fallback;
+                var n = parseInt(m[1], 16);
+                return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+            }
+            function toHex(c) {
+                return '#' + [c.r, c.g, c.b].map(function (v) {
+                    return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+                }).join('');
+            }
+            function darken(c, f) { return { r: c.r * f, g: c.g * f, b: c.b * f }; }
+            function rgba(c, a) { return 'rgba(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ',' + a + ')'; }
+
+            var p = parseHex(primary, { r: 0, g: 75, b: 141 });
+            var l = parseHex(link, { r: 0, g: 136, b: 204 });
+            root.style.setProperty('--club-primary', toHex(p));
+            root.style.setProperty('--club-primary-hover', toHex(darken(p, 0.82)));
+            root.style.setProperty('--club-primary-soft', rgba(p, 0.1));
+            root.style.setProperty('--club-primary-softer', rgba(p, 0.05));
+            root.style.setProperty('--club-link', toHex(l));
+            root.style.setProperty('--club-link-hover', toHex(darken(l, 0.7)));
+            root.style.setProperty('--bs-primary', toHex(p));
+            root.style.setProperty('--bs-primary-rgb', p.r + ',' + p.g + ',' + p.b);
+
+            // Contrast decision: on a light primary fill a white tick/dot washes out, so flip the
+            // form-check glyph to black. YIQ perceived brightness, threshold ~150 (biased toward
+            // black on borderline colours). The glyphs are the same paths Bootstrap 5.3 ships,
+            // only the stroke/fill colour differs.
+            var yiq = (p.r * 299 + p.g * 587 + p.b * 114) / 1000;
+            var glyph = yiq > 150 ? '%23000' : '%23fff';
+            root.style.setProperty('--club-check-image',
+                "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='" + glyph + "' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e\")");
+            root.style.setProperty('--club-radio-image',
+                "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='" + glyph + "'/%3e%3c/svg%3e\")");
+        };
+
+        // --- Colour picker from a reference image (Style tab) ---
+        // The user pastes (Ctrl+V) a Snipping Tool capture of their club's website, or uploads an
+        // image, and clicks a pixel to sample its colour. The reference image is transient (never
+        // stored) and is downscaled to maxDim so a large snip can't blow up the canvas.
+        window.clubPicker = (function () {
+            var canvas = null, dotNetRef = null, pasteHandler = null, hasImage = false, maxBytes = 20 * 1024 * 1024;
+
+            function draw(img, maxDim) {
+                var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+                var scale = Math.min(1, maxDim / Math.max(iw, ih));
+                var w = Math.max(1, Math.round(iw * scale)), h = Math.max(1, Math.round(ih * scale));
+                canvas.width = w; canvas.height = h;
+                var ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.clearRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                hasImage = true;
+            }
+
+            function loadUrl(src, maxDim) {
+                return new Promise(function (resolve) {
+                    var img = new Image();
+                    img.onload = function () { try { draw(img, maxDim); resolve(true); } catch (e) { resolve(false); } };
+                    img.onerror = function () { resolve(false); };
+                    img.src = src;
+                });
+            }
+
+            function loadBlob(blob, maxDim) {
+                if (!blob || blob.size > maxBytes) return Promise.resolve(false);
+                var url = URL.createObjectURL(blob);
+                return loadUrl(url, maxDim).then(function (ok) { URL.revokeObjectURL(url); return ok; });
+            }
+
+            function toHex(r, g, b) {
+                return '#' + [r, g, b].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+            }
+
+            return {
+                init: function (canvasId, ref, maxDim) {
+                    canvas = document.getElementById(canvasId);
+                    dotNetRef = ref; hasImage = false;
+                    if (!canvas) return;
+                    canvas.addEventListener('click', function (e) {
+                        if (!hasImage) return;
+                        var rect = canvas.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0) return;
+                        // Map the click from displayed (CSS) pixels to the canvas's intrinsic pixels.
+                        var x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
+                        var y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
+                        var d = canvas.getContext('2d', { willReadFrequently: true }).getImageData(x, y, 1, 1).data;
+                        dotNetRef.invokeMethodAsync('OnColorPicked', toHex(d[0], d[1], d[2]));
+                    });
+                    // Global paste: only consumed when the clipboard actually holds an image, so it
+                    // never interferes with pasting text into the other Settings fields.
+                    pasteHandler = function (e) {
+                        var items = (e.clipboardData && e.clipboardData.items) || [];
+                        for (var i = 0; i < items.length; i++) {
+                            if (items[i].type && items[i].type.indexOf('image/') === 0) {
+                                var blob = items[i].getAsFile();
+                                if (!blob) continue;
+                                e.preventDefault();
+                                loadBlob(blob, maxDim).then(function (ok) {
+                                    dotNetRef.invokeMethodAsync('OnPickerImageLoaded', ok);
+                                });
+                                return;
+                            }
+                        }
+                    };
+                    window.addEventListener('paste', pasteHandler);
+                },
+                loadFromInput: function (inputId, maxDim) {
+                    var input = document.getElementById(inputId);
+                    var file = input && input.files && input.files[0];
+                    if (input) input.value = '';
+                    if (!file || file.type.indexOf('image/') !== 0) return Promise.resolve(false);
+                    return loadBlob(file, maxDim);
+                },
+                dispose: function () {
+                    if (pasteHandler) window.removeEventListener('paste', pasteHandler);
+                    pasteHandler = null; canvas = null; dotNetRef = null; hasImage = false;
+                }
+            };
+        })();
+
+        // Reads the file currently selected on the given <input type="file">, downscales it to
+        // maxWidth (preserving aspect ratio), and returns a data: URL. asJpeg=true encodes as
+        // JPEG q0.85 (smaller — used for the wide banner); otherwise PNG (keeps logo transparency).
+        // Returns null when no file is selected or it isn't an image. Clears the input afterwards
+        // so picking the same file again still fires.
+        window.readImageAsDataUrl = function (inputId, maxWidth, asJpeg) {
+            return new Promise(function (resolve) {
+                var input = document.getElementById(inputId);
+                var file = input && input.files && input.files[0];
+                if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+                    if (input) input.value = '';
+                    resolve(null);
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function () {
+                    var img = new Image();
+                    img.onload = function () {
+                        var scale = img.naturalWidth > maxWidth ? maxWidth / img.naturalWidth : 1;
+                        var w = Math.round(img.naturalWidth * scale);
+                        var h = Math.round(img.naturalHeight * scale);
+                        var canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        input.value = '';
+                        try {
+                            resolve(asJpeg ? canvas.toDataURL('image/jpeg', 0.85) : canvas.toDataURL('image/png'));
+                        } catch (e) {
+                            resolve(null);
+                        }
+                    };
+                    img.onerror = function () { input.value = ''; resolve(null); };
+                    img.src = reader.result;
+                };
+                reader.onerror = function () { input.value = ''; resolve(null); };
+                reader.readAsDataURL(file);
+            });
+        };
         window.focusElement = function (id) {
             var el = document.getElementById(id);
             if (el) el.focus();

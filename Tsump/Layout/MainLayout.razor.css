@@ -26,12 +26,12 @@ main {
         white-space: nowrap;
         margin-left: 1.5rem;
         text-decoration: none;
-        color: #0088cc;
+        color: var(--club-link, #0088cc);
     }
 
     .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
         text-decoration: underline;
-        color: #005e8d;
+        color: var(--club-link-hover, #005e8d);
     }
 
     .top-row ::deep a:first-child {

@@ -1,15 +1,40 @@
 @page "/settings"
 @using Tsump.Models
 @using Tsump.Services
+@using Microsoft.JSInterop
 @inject SettingsService SettingsService
 @inject LanguageService Lang
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>@Lang.Get("Settings") - Tsumo!</PageTitle>
 
 <h1><i class="bi bi-gear-fill me-2"></i>@Lang.Get("Settings")</h1>
 
-@* --- Competition period --- *@
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link @(activeTab == "clubevent" ? "active" : "")"
+           href="javascript:void(0)" @onclick='() => activeTab = "clubevent"'>
+            <i class="bi bi-calendar-event me-1"></i>@Lang.Get("SettingsTabClubEvent")
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(activeTab == "tournament" ? "active" : "")"
+           href="javascript:void(0)" @onclick='() => activeTab = "tournament"'>
+            <i class="bi bi-trophy me-1"></i>@Lang.Get("SettingsTabTournament")
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(activeTab == "style" ? "active" : "")"
+           href="javascript:void(0)" @onclick='() => activeTab = "style"'>
+            <i class="bi bi-palette me-1"></i>@Lang.Get("SettingsTabStyle")
+        </a>
+    </li>
+</ul>
+
+@* --- Club event tab --- *@
+
+<div class="@(activeTab == "clubevent" ? "" : "d-none")">
 
 <div class="card mb-4">
     <div class="card-body">
@@ -19,10 +44,6 @@
                @onchange="OnCompetitionPeriodChanged" />
     </div>
 </div>
-
-@* --- Club night settings --- *@
-
-<h4 class="mt-3 mb-3">@Lang.Get("WeeklyMode")</h4>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -182,9 +203,11 @@
     </div>
 </div>
 
-@* --- Tournament settings --- *@
+</div>
 
-<h4 class="mt-3 mb-3">@Lang.Get("TournamentMode")</h4>
+@* --- Tournament tab --- *@
+
+<div class="@(activeTab == "tournament" ? "" : "d-none")">
 
 <div class="card mb-3">
     <div class="card-body">
@@ -268,8 +291,260 @@
     </div>
 </div>
 
+</div>
+
+@* --- Style tab --- *@
+
+<div class="@(activeTab == "style" ? "" : "d-none")">
+
+    @* Action bar — explicit save (no autosave); changes only touch localStorage on Save. *@
+    <div class="d-flex align-items-center flex-wrap gap-1 mb-2">
+        <button class="btn btn-success" disabled="@(!styleDirty)" @onclick="SaveStyle">
+            <i class="bi bi-check-lg me-1"></i>@Lang.Get("Save")
+        </button>
+        <button class="btn btn-outline-secondary" disabled="@(!styleDirty)" @onclick="DiscardStyle">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>@Lang.Get("DiscardChanges")
+        </button>
+        <div class="w-100"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-1" @onclick="ExportStyle">
+            <i class="bi bi-box-arrow-down me-1"></i>@Lang.Get("ExportStyle")
+        </button>
+        <button class="btn btn-sm btn-outline-secondary mt-1" @onclick='() => triggerFileInput("styleFile")'>
+            <i class="bi bi-box-arrow-up me-1"></i>@Lang.Get("ImportStyle")
+        </button>
+        <InputFile id="styleFile" style="display:none" accept=".json,application/json" OnChange="OnStyleFileSelected" />
+    </div>
+
+    @if (styleError != null)
+    {
+        <div class="alert alert-danger py-1 mb-3">@styleError</div>
+    }
+    @if (styleDirty)
+    {
+        <div class="alert alert-warning py-1 mb-3">@Lang.Get("UnsavedStyleChanges")</div>
+    }
+    else if (styleSaved)
+    {
+        <div class="alert alert-success py-1 mb-3">@Lang.Get("StyleSaved")</div>
+    }
+
+    @* Live preview — reflects every choice immediately (colours via the global --club-* vars,
+       brand/logo/banner/link from the in-memory style). Nothing here is persisted. *@
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@Lang.Get("StylePreview")</h5>
+            <p class="text-muted small">@Lang.Get("StylePreviewDesc")</p>
+
+            <div class="border rounded mb-3" style="overflow:hidden;">
+                @* mock top bar: brand/logo on the left, website link on the right *@
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2"
+                     style="background-color:#f5f5f5; border-bottom:1px solid #eaeaea;">
+                    <span class="d-flex align-items-center gap-2" style="color:var(--club-primary,#004b8d); font-weight:bold;">
+                        @if (!string.IsNullOrWhiteSpace(style.LogoImage))
+                        {
+                            <img src="@style.LogoImage" alt="logo" style="max-height:2.2rem; width:auto;" />
+                        }
+                        else
+                        {
+                            <span>@(string.IsNullOrWhiteSpace(style.BrandText) ? "—" : style.BrandText)</span>
+                        }
+                        <span class="text-muted" style="font-size:0.6em;">v@(Tsump.AppVersion.Version)</span>
+                    </span>
+                    @if (!string.IsNullOrWhiteSpace(style.WebsiteUrl))
+                    {
+                        <a href="@style.WebsiteUrl" target="_blank" rel="noopener">
+                            @(string.IsNullOrWhiteSpace(style.WebsiteLabel) ? style.WebsiteUrl : style.WebsiteLabel)
+                        </a>
+                    }
+                </div>
+                @* mock banner *@
+                @if (!string.IsNullOrWhiteSpace(style.BannerImage))
+                {
+                    <img src="@style.BannerImage" alt="banner" class="img-fluid d-block w-100"
+                         style="max-height:140px; object-fit:cover;" />
+                }
+            </div>
+
+            @* sample controls so the colours are visible even before a banner/logo is set *@
+            <div class="d-flex align-items-center flex-wrap gap-3">
+                <button type="button" class="btn btn-primary btn-sm">@Lang.Get("SampleButton")</button>
+                <a href="javascript:void(0)">@Lang.Get("SampleLink")</a>
+                <span class="badge" style="background-color:var(--club-primary,#004b8d);">@Lang.Get("PrimaryColor")</span>
+            </div>
+        </div>
+    </div>
+
+    @* Club identity *@
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@Lang.Get("StyleIdentity")</h5>
+            <div class="mb-3">
+                <label class="form-label">@Lang.Get("BrandText")</label>
+                <input type="text" class="form-control" style="max-width:300px;" maxlength="40"
+                       value="@style.BrandText"
+                       @onchange="e => { style.BrandText = e.Value?.ToString() ?? string.Empty; MarkDirty(); }" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">@Lang.Get("WebsiteUrl")</label>
+                <input type="url" class="form-control" style="max-width:400px;" placeholder="https://…"
+                       value="@style.WebsiteUrl"
+                       @onchange="e => { style.WebsiteUrl = e.Value?.ToString() ?? string.Empty; MarkDirty(); }" />
+            </div>
+            <div class="mb-1">
+                <label class="form-label">@Lang.Get("WebsiteLinkLabel")</label>
+                <input type="text" class="form-control" style="max-width:300px;" maxlength="40"
+                       value="@style.WebsiteLabel"
+                       @onchange="e => { style.WebsiteLabel = e.Value?.ToString() ?? string.Empty; MarkDirty(); }" />
+            </div>
+        </div>
+    </div>
+
+    @* Colours *@
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@Lang.Get("StyleColors")</h5>
+            <div class="row">
+                <div class="col-md-6 mb-2">
+                    <label class="form-label">@Lang.Get("PrimaryColor")</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="color" class="form-control form-control-color" style="width:48px;"
+                               value="@style.PrimaryColor"
+                               @oninput="async e => { style.PrimaryColor = e.Value?.ToString() ?? style.PrimaryColor; MarkDirty(); await ApplyStyle(); }" />
+                        <input type="text" class="form-control" style="max-width:120px;" maxlength="7"
+                               value="@style.PrimaryColor"
+                               @onchange="async e => { style.PrimaryColor = NormalizeHex(e.Value?.ToString(), style.PrimaryColor); MarkDirty(); await ApplyStyle(); }" />
+                    </div>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <label class="form-label">@Lang.Get("LinkColor")</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="color" class="form-control form-control-color" style="width:48px;"
+                               value="@style.LinkColor"
+                               @oninput="async e => { style.LinkColor = e.Value?.ToString() ?? style.LinkColor; MarkDirty(); await ApplyStyle(); }" />
+                        <input type="text" class="form-control" style="max-width:120px;" maxlength="7"
+                               value="@style.LinkColor"
+                               @onchange="async e => { style.LinkColor = NormalizeHex(e.Value?.ToString(), style.LinkColor); MarkDirty(); await ApplyStyle(); }" />
+                    </div>
+                </div>
+            </div>
+
+            @* Pick a colour from a reference image (e.g. a Snipping Tool capture of the club site) *@
+            <hr class="my-3" />
+            <label class="form-label mb-1">@Lang.Get("PickFromImage")</label>
+            <p class="text-muted small mb-2">@Lang.Get("PickFromImageHint")</p>
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick='() => triggerFileInput("pickerFile")'>
+                    <i class="bi bi-image me-1"></i>@Lang.Get("UploadImage")
+                </button>
+                <input type="file" id="pickerFile" accept="image/*" class="d-none" @onchange="OnPickerFileSelected" />
+                <span class="text-muted small">@Lang.Get("OrPasteSnip")</span>
+                @if (pickerHasImage)
+                {
+                    <div class="btn-group btn-group-sm ms-2" role="group">
+                        <button type="button" class="btn @(pickTarget == "primary" ? "btn-primary" : "btn-outline-primary")"
+                                @onclick='() => pickTarget = "primary"'>@Lang.Get("PrimaryColor")</button>
+                        <button type="button" class="btn @(pickTarget == "link" ? "btn-primary" : "btn-outline-primary")"
+                                @onclick='() => pickTarget = "link"'>@Lang.Get("LinkColor")</button>
+                    </div>
+                    @if (pickedColor != null)
+                    {
+                        <span class="d-inline-flex align-items-center gap-1 ms-1">
+                            <span style="display:inline-block;width:1.1rem;height:1.1rem;border:1px solid #ccc;border-radius:3px;background-color:@pickedColor;"></span>
+                            <code>@pickedColor</code>
+                        </span>
+                    }
+                }
+            </div>
+            @if (pickerError != null)
+            {
+                <div class="alert alert-danger py-1">@pickerError</div>
+            }
+            <canvas id="pickerCanvas" class="@(pickerHasImage ? "" : "d-none")"
+                    style="max-width:100%; cursor:crosshair; border:1px solid #ddd; border-radius:3px;"></canvas>
+        </div>
+    </div>
+
+    @* Images *@
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@Lang.Get("StyleImages")</h5>
+
+            @* Logo *@
+            <div class="mb-4">
+                <label class="form-label fw-bold">@Lang.Get("Logo")</label>
+                <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                    @if (!string.IsNullOrWhiteSpace(style.LogoImage))
+                    {
+                        <img src="@style.LogoImage" alt="logo" style="max-height:48px; max-width:160px; border:1px solid #ddd; border-radius:3px;" />
+                        <button class="btn btn-sm btn-outline-danger" title="@Lang.Get("ClearImage")"
+                                @onclick="() => { style.LogoImage = null; MarkDirty(); }">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick='() => triggerFileInput("logoFile")'>
+                        <i class="bi bi-upload me-1"></i>@Lang.Get("UploadImage")
+                    </button>
+                    <input type="file" id="logoFile" accept="image/*" class="d-none" @onchange="OnLogoSelected" />
+                </div>
+                <input type="url" class="form-control" style="max-width:400px;" placeholder="@Lang.Get("ImageUrl")"
+                       value="@(IsDataUrl(style.LogoImage) ? "" : style.LogoImage)"
+                       @onchange="e => { var v = e.Value?.ToString(); style.LogoImage = string.IsNullOrWhiteSpace(v) ? null : v; MarkDirty(); }" />
+            </div>
+
+            @* Banner *@
+            <div>
+                <label class="form-label fw-bold">@Lang.Get("Banner")</label>
+                <div class="mb-2">
+                    @if (!string.IsNullOrWhiteSpace(style.BannerImage))
+                    {
+                        <div class="mb-2">
+                            <img src="@style.BannerImage" alt="banner" class="img-fluid" style="max-height:120px; border:1px solid #ddd; border-radius:3px;" />
+                        </div>
+                    }
+                    <div class="d-flex align-items-center flex-wrap gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick='() => triggerFileInput("bannerFile")'>
+                            <i class="bi bi-upload me-1"></i>@Lang.Get("UploadImage")
+                        </button>
+                        <input type="file" id="bannerFile" accept="image/*" class="d-none" @onchange="OnBannerSelected" />
+                        @if (!string.IsNullOrWhiteSpace(style.BannerImage))
+                        {
+                            <button class="btn btn-sm btn-outline-danger" title="@Lang.Get("ClearImage")"
+                                    @onclick="() => { style.BannerImage = null; MarkDirty(); }">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
+                <input type="url" class="form-control" style="max-width:400px;" placeholder="@Lang.Get("ImageUrl")"
+                       value="@(IsDataUrl(style.BannerImage) ? "" : style.BannerImage)"
+                       @onchange="e => { var v = e.Value?.ToString(); style.BannerImage = string.IsNullOrWhiteSpace(v) ? null : v; MarkDirty(); }" />
+            </div>
+        </div>
+    </div>
+
+    @* Reset — stages the neutral palette; nothing is persisted until Save. *@
+    <div class="mb-4">
+        @if (confirmReset)
+        {
+            <span class="alert alert-warning d-inline-block mb-0 py-1">
+                @Lang.Get("ResetStyleConfirm")
+                <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmReset">@Lang.Get("YesReset")</button>
+                <button class="btn btn-sm btn-secondary" @onclick="() => confirmReset = false">@Lang.Get("Cancel")</button>
+            </span>
+        }
+        else
+        {
+            <button class="btn btn-outline-secondary" @onclick="() => confirmReset = true">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>@Lang.Get("ResetStyle")
+            </button>
+        }
+    </div>
+
+</div>
+
 
 @code {
+    private string activeTab = "clubevent";
     private string competitionPeriod = "";
     private bool enableScoreEntry;
     private Dictionary<DayOfWeek, List<TimeSpan>> schedule = new();
@@ -288,6 +563,20 @@
     private List<int> tournamentUma3Players = new() { 12500, 0, -12500 };
     private bool enableExternalScoring;
     private bool enableScanLogging;
+    private ClubStyle style = new();
+    private ClubStyle savedStyle = new();   // last-persisted snapshot (for Discard + preview revert)
+    private bool styleDirty;
+    private bool styleSaved;
+    private string? styleError;
+    private bool confirmReset;
+
+    // Colour-from-image eyedropper (reference image is transient — never persisted).
+    private const int PickerMaxDim = 900;
+    private DotNetObjectReference<Settings>? selfRef;
+    private bool pickerHasImage;
+    private string pickTarget = "primary";   // which colour the next image-click sets
+    private string? pickedColor;
+    private string? pickerError;
     private static readonly DayOfWeek[] allDays = new[]
     {
         DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
@@ -295,7 +584,22 @@
     };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
-    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+        // If the user leaves with an unsaved colour preview applied, revert the global CSS
+        // variables to the persisted values so the rest of the app isn't left previewing
+        // colours that were never consented to. Fire-and-forget: JS is still alive across SPA nav.
+        if (styleDirty)
+            _ = JS.InvokeVoidAsync("applyClubStyle", savedStyle.PrimaryColor, savedStyle.LinkColor);
+        // Tear down the picker's global paste listener and release the .NET ref.
+        if (selfRef != null)
+        {
+            _ = JS.InvokeVoidAsync("clubPicker.dispose");
+            selfRef.Dispose();
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -319,7 +623,13 @@
             tournamentUma3Players = new List<int>(settings.TournamentUma3Players);
             enableExternalScoring = settings.EnableExternalScoring;
             enableScanLogging = settings.EnableScanLogging;
+            style = settings.Style.Clone();
+            savedStyle = settings.Style.Clone();
             StateHasChanged();
+
+            // Wire up the colour-from-image picker (canvas + global paste listener).
+            selfRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("clubPicker.init", "pickerCanvas", selfRef, PickerMaxDim);
         }
     }
 
@@ -429,8 +739,169 @@
             TournamentUma4Players = new List<int>(tournamentUma4Players),
             TournamentUma3Players = new List<int>(tournamentUma3Players),
             EnableExternalScoring = enableExternalScoring,
-            EnableScanLogging = enableScanLogging
+            EnableScanLogging = enableScanLogging,
+            Style = style
         };
         await SettingsService.SaveAsync(settings);
+    }
+
+    // --- Style tab ---
+    //
+    // Deliberately NO autosave: edits only mutate the in-memory `style` (plus a live colour
+    // preview) and flip `styleDirty`. Nothing is written to localStorage until the user clicks
+    // Save. `savedStyle` is the last-persisted snapshot, used to Discard and to revert the live
+    // colour preview if the user leaves with unsaved changes.
+
+    private void MarkDirty()
+    {
+        styleDirty = true;
+        styleSaved = false;
+        styleError = null;
+    }
+
+    // The only path that persists style to localStorage. SettingsService.OnChanged then fires, so
+    // MainLayout and NavMenu re-read and re-apply (colours/brand/link/banner update app-wide).
+    private async Task SaveStyle()
+    {
+        await Save();
+        savedStyle = style.Clone();
+        styleDirty = false;
+        confirmReset = false;
+        styleError = null;
+        styleSaved = true;
+    }
+
+    // Throw away unsaved edits: restore the persisted snapshot and revert the live preview.
+    private async Task DiscardStyle()
+    {
+        style = savedStyle.Clone();
+        styleDirty = false;
+        styleSaved = false;
+        confirmReset = false;
+        styleError = null;
+        await ApplyStyle();
+    }
+
+    // Live-preview the colours without persisting (used while editing the colour pickers, on
+    // import, and to revert on discard/leave). Not persistence — just CSS variables on <html>.
+    private async Task ApplyStyle()
+    {
+        await JS.InvokeVoidAsync("applyClubStyle", style.PrimaryColor, style.LinkColor);
+    }
+
+    private async Task OnLogoSelected()
+    {
+        // Logo: keep transparency (PNG), modest size.
+        var dataUrl = await JS.InvokeAsync<string?>("readImageAsDataUrl", "logoFile", 256, false);
+        if (!string.IsNullOrEmpty(dataUrl))
+        {
+            style.LogoImage = dataUrl;
+            MarkDirty();
+        }
+    }
+
+    private async Task OnBannerSelected()
+    {
+        // Banner: wider, JPEG to keep the localStorage blob small.
+        var dataUrl = await JS.InvokeAsync<string?>("readImageAsDataUrl", "bannerFile", 1200, true);
+        if (!string.IsNullOrEmpty(dataUrl))
+        {
+            style.BannerImage = dataUrl;
+            MarkDirty();
+        }
+    }
+
+    // --- Colour-from-image eyedropper ---
+
+    private async Task OnPickerFileSelected()
+    {
+        var ok = await JS.InvokeAsync<bool>("clubPicker.loadFromInput", "pickerFile", PickerMaxDim);
+        OnPickerImageLoaded(ok);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnPickerImageLoaded(bool ok)
+    {
+        pickerHasImage = ok;
+        pickerError = ok ? null : Lang.Get("PickImageFailed");
+        StateHasChanged();
+    }
+
+    // Called from JS when the user clicks a pixel in the reference image. Applies the sampled
+    // colour to the selected target (primary/link) — staged like any other edit (no autosave).
+    [JSInvokable]
+    public async Task OnColorPicked(string hex)
+    {
+        pickedColor = hex;
+        if (pickTarget == "link")
+            style.LinkColor = hex;
+        else
+            style.PrimaryColor = hex;
+        MarkDirty();
+        await ApplyStyle();
+        StateHasChanged();
+    }
+
+    // Stage the neutral palette + preview; persisted only when the user then clicks Save.
+    private async Task ConfirmReset()
+    {
+        style = ClubStyle.Neutral();
+        confirmReset = false;
+        MarkDirty();
+        await ApplyStyle();
+    }
+
+    private async Task ExportStyle()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(style,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+        var name = string.IsNullOrWhiteSpace(style.BrandText) ? "club" : style.BrandText.Trim();
+        await JS.InvokeVoidAsync("downloadFile", $"{name}-style.json", base64);
+    }
+
+    private async Task OnStyleFileSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file.Size > 8 * 1024 * 1024) { styleError = Lang.Get("FileTooLarge"); return; }
+            using var reader = new System.IO.StreamReader(file.OpenReadStream(8 * 1024 * 1024));
+            var json = await reader.ReadToEndAsync();
+            var imported = System.Text.Json.JsonSerializer.Deserialize<ClubStyle>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (imported == null || string.IsNullOrWhiteSpace(imported.PrimaryColor))
+            {
+                styleError = Lang.Get("InvalidStyleFile");
+                return;
+            }
+            // Load into the editor and preview, but DON'T persist — the user must click Save.
+            // MarkDirty() clears any previous error and shows the amber "unsaved" banner.
+            style = imported;
+            MarkDirty();
+            await ApplyStyle();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            styleError = Lang.Get("InvalidStyleFile");
+        }
+        catch (Exception ex)
+        {
+            styleError = ex.Message;
+        }
+    }
+
+    private async Task triggerFileInput(string id) => await JS.InvokeVoidAsync("triggerFileInput", id);
+
+    private static bool IsDataUrl(string? url) => url?.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ?? false;
+
+    // Accepts "#rrggbb" or "rrggbb"; returns a normalized "#rrggbb" or the fallback if invalid.
+    private static string NormalizeHex(string? input, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return fallback;
+        var s = input.Trim();
+        if (!s.StartsWith('#')) s = "#" + s;
+        return System.Text.RegularExpressions.Regex.IsMatch(s, "^#[0-9a-fA-F]{6}$") ? s.ToLowerInvariant() : fallback;
     }
 }

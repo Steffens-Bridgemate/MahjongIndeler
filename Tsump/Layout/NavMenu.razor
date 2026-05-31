@@ -1,3 +1,4 @@
+@using Tsump.Models
 @using Tsump.Services
 @inject LanguageService Lang
 @inject AppModeService Mode
@@ -6,7 +7,17 @@
 
 <div class="top-row ps-3 navbar navbar-light">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Tsumo! <span class="text-muted" style="font-size: 0.6em;">v@(Tsump.AppVersion.Version)</span></a>
+        <a class="navbar-brand" href="">
+            @if (!string.IsNullOrWhiteSpace(style.LogoImage))
+            {
+                <img src="@style.LogoImage" alt="@style.BrandText" />
+            }
+            else
+            {
+                <span>@style.BrandText</span>
+            }
+            <span class="text-muted" style="font-size: 0.6em;">v@(Tsump.AppVersion.Version)</span>
+        </a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -87,6 +98,7 @@
 @code {
     private bool collapseNavMenu = true;
     private bool scanLoggingEnabled;
+    private ClubStyle style = new();
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
@@ -119,6 +131,7 @@
     {
         var settings = await SettingsService.GetAsync();
         scanLoggingEnabled = settings.EnableScanLogging;
+        style = settings.Style;
     }
 
     private void ToggleNavMenu()

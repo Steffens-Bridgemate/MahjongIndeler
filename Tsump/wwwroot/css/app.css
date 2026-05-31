@@ -15,22 +15,22 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0088cc;
+    color: var(--club-link, #0088cc);
 }
 
 a:hover, .btn-link:hover {
-    color: #005e8d;
+    color: var(--club-link-hover, #005e8d);
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #004b8d;
-    border-color: #003d73;
+    background-color: var(--club-primary, #004b8d);
+    border-color: var(--club-primary-hover, #003d73);
 }
 
 .btn-primary:hover {
-    background-color: #003d73;
-    border-color: #002b41;
+    background-color: var(--club-primary-hover, #003d73);
+    border-color: var(--club-primary-hover, #002b41);
 }
 
 .btn-success {
@@ -59,6 +59,34 @@ a:hover, .btn-link:hover {
 
 .form-check-input:not(:checked) {
     border: 2px solid #666;
+}
+
+/* Tab headers track the club link colour (inactive); the active tab keeps Bootstrap's
+   higher-specificity .active emphasis, and status-coloured tabs keep their inline override. */
+.nav-tabs .nav-link {
+    color: var(--club-link, #0088cc);
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--club-link-hover, #005e8d);
+}
+
+/* Checked checkboxes/radios use the club primary as their fill. Bootstrap 5.3 hardcodes
+   #0d6efd here (it does NOT read --bs-primary), so this override is required. The tick/dot
+   glyph (--bs-form-check-bg-image) is swapped by applyClubStyle to a black-stroke SVG when the
+   primary colour is light enough that a white glyph would wash out; the fallbacks below are the
+   stock white glyphs, used before the JS runs. */
+.form-check-input:checked {
+    background-color: var(--club-primary, #004b8d);
+    border-color: var(--club-primary, #004b8d);
+}
+
+.form-check-input:checked[type=checkbox] {
+    --bs-form-check-bg-image: var(--club-check-image, url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e"));
+}
+
+.form-check-input:checked[type=radio] {
+    --bs-form-check-bg-image: var(--club-radio-image, url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23fff'/%3e%3c/svg%3e"));
 }
 
 .content {
@@ -186,7 +214,7 @@ a:hover, .btn-link:hover {
     }
 
         .loading-progress circle:last-child {
-            stroke: #004b8d;
+            stroke: var(--club-primary, #004b8d);
             stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
             transition: stroke-dasharray 0.05s ease-in-out;
         }

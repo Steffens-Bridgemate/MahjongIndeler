@@ -1,6 +1,11 @@
 @inherits LayoutComponentBase
+@using Tsump.Models
 @using Tsump.Services
+@using Microsoft.JSInterop
 @inject LanguageService Lang
+@inject SettingsService SettingsService
+@inject IJSRuntime JS
+@implements IDisposable
 
 <div class="page">
     <div class="sidebar">
@@ -11,7 +16,10 @@
         <div class="top-row px-4">
             <button class="btn btn-sm @(Lang.IsDutch ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("nl")'>NL</button>
             <button class="btn btn-sm @(Lang.IsEnglish ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("en")'>EN</button>
-            <a href="https://www.mahjongclubtsumo.nl/" target="_blank">@Lang.Get("MahjongclubTsumo")</a>
+            @if (!string.IsNullOrWhiteSpace(style.WebsiteUrl))
+            {
+                <a href="@style.WebsiteUrl" target="_blank">@(string.IsNullOrWhiteSpace(style.WebsiteLabel) ? style.WebsiteUrl : style.WebsiteLabel)</a>
+            }
         </div>
 
         <article class="content px-4">
@@ -23,9 +31,34 @@
 <AppUpdateBanner />
 
 @code {
+    private ClubStyle style = new();
+
     protected override void OnInitialized()
     {
         Lang.OnLanguageChanged += StateHasChanged;
+        SettingsService.OnChanged += OnSettingsChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadAndApplyStyle();
+        }
+    }
+
+    private async Task LoadAndApplyStyle()
+    {
+        var settings = await SettingsService.GetAsync();
+        style = settings.Style;
+        await JS.InvokeVoidAsync("applyClubStyle", style.PrimaryColor, style.LinkColor);
+        StateHasChanged();
+    }
+
+    // Settings saved elsewhere (the Style tab) — re-read the link and re-apply colours.
+    private async void OnSettingsChanged()
+    {
+        await LoadAndApplyStyle();
     }
 
     private void SetLanguage(string lang)
@@ -36,5 +69,6 @@
     public void Dispose()
     {
         Lang.OnLanguageChanged -= StateHasChanged;
+        SettingsService.OnChanged -= OnSettingsChanged;
     }
 }

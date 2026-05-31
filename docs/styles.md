@@ -111,6 +111,25 @@ Per-table cards encode player count by colour: 4-player = `border-success` + `bg
 header; 3-player = `border-warning` + `bg-warning text-dark`. Headers omit the "(N players)" suffix on
 the assignment view; the Scores view keeps it (rendered by `ScoreTable`).
 
+## 9b. Club theming — never hardcode brand colours
+
+Brand colours are **user-configurable** (Settings → Style). Don't write the Tsumo hex
+(`#004b8d`, `#0088cc`) into new CSS — reference the custom property with the hex as fallback:
+`color: var(--club-primary, #004b8d);` (variants: `--club-primary-hover`,
+`--club-primary-soft`/`-softer` for the translucent nav backgrounds, `--club-link`,
+`--club-link-hover`). They're set on `<html>` by `applyClubStyle` from two stored hex values;
+Bootstrap `text-primary`/`border-primary` also follow (via `--bs-primary`). The upper-left brand,
+upper-right link and landing banner come from `ClubSettings.Style` — see [pages.md](pages.md#style-theming-club-branding).
+
+What the two colours reach:
+- **Primary** — solid buttons, nav brand/active, loading spinner, **and checked checkboxes/radios**
+  (Bootstrap 5.3 hardcodes `#0d6efd` on `.form-check-input:checked`, so [app.css](../Tsump/wwwroot/css/app.css)
+  overrides it explicitly). The tick/dot glyph **auto-flips white↔black** for contrast: `applyClubStyle`
+  computes YIQ brightness of the primary and sets `--club-check-image`/`--club-radio-image` accordingly.
+- **Link** — hyperlinks (`a`) **and inactive `nav-tabs` tab headers**. Status-coloured tabs
+  (`ScoreStatusHelper.TabClass`, `text-white`/`text-dark` `!important`) and the active tab
+  (higher-specificity `.active`) deliberately keep their own colour.
+
 ## 10. i18n
 
 All user-facing text via `Lang.Get(...)` with keys in both `nl` and `en` blocks of

@@ -37,6 +37,45 @@ public class ClubSettings
     // nav item is exposed for inspecting and decoding them. Diagnostic aid for HID-scanner
     // round-trip issues; off by default.
     public bool EnableScanLogging { get; set; } = false;
+
+    // Club branding (colours, brand text, website link, logo, banner). Defaults are the Tsumo!
+    // club's, so the live deployment is unchanged out of the box; the Style tab edits these and
+    // "Reset to neutral" swaps in ClubStyle.Neutral().
+    public ClubStyle Style { get; set; } = new();
+}
+
+public class ClubStyle
+{
+    public string PrimaryColor { get; set; } = "#004b8d";
+    public string LinkColor { get; set; } = "#0088cc";
+
+    // Upper-left brand. Shown as text when LogoImage is null.
+    public string BrandText { get; set; } = "Tsumo!";
+
+    // Upper-right link. Hidden entirely when WebsiteUrl is blank.
+    public string WebsiteUrl { get; set; } = "https://www.mahjongclubtsumo.nl/";
+    public string WebsiteLabel { get; set; } = "Mahjongclub Tsumo";
+
+    // Either a remote URL or a downscaled data: URL produced by readImageAsDataUrl.
+    public string? LogoImage { get; set; }
+    public string? BannerImage { get; set; } = "https://www.mahjongclubtsumo.nl/images/headers/header-logo.jpg";
+
+    // All properties are immutable strings, so a memberwise clone is a deep copy. Used by the
+    // Style editor to keep an independent working copy vs. the last-saved snapshot.
+    public ClubStyle Clone() => (ClubStyle)MemberwiseClone();
+
+    // The "blank slate" palette for a club that isn't Tsumo. Deliberately desaturated so it
+    // reads as "unbranded" rather than impersonating another club.
+    public static ClubStyle Neutral() => new()
+    {
+        PrimaryColor = "#5a6b7b",
+        LinkColor = "#3b6ea5",
+        BrandText = "Mahjong",
+        WebsiteUrl = "",
+        WebsiteLabel = "",
+        LogoImage = null,
+        BannerImage = null,
+    };
 }
 
 public class ScheduleEntry
