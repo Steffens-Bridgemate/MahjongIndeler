@@ -4,6 +4,10 @@ self.importScripts('./service-worker-assets.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
+// Backward-compat shim: older page versions shipped an "Update now" button that posts this to
+// activate the waiting worker. New pages use restart-to-update and never post it, but keep this
+// handler so the old button still works for users mid-transition (a user-clicked reload is fine).
+self.addEventListener('message', event => { if (event.data === 'SKIP_WAITING') self.skipWaiting(); });
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
