@@ -106,7 +106,7 @@
             var isActive = currentHanchan?.Id == s.Id && activeTab != "rankings" && activeTab != "allscores";
             var sessionLabel = GetSessionLabel(s);
             var hanchanStatus = ScoreStatusHelper.Classify(s.Tables, orderedHanchans.Skip(i + 1).Select(h => h.Tables));
-            var hanchanStatusClass = ScoreStatusHelper.TabClass(hanchanStatus);
+            var hanchanStatusClass = ScoreStatusHelper.TabClass(hanchanStatus, isActive);
             <li class="nav-item">
                 <a class="nav-link @(isActive ? "active" : "") @hanchanStatusClass"
                    style="@ScoreStatusHelper.TabStyle(isActive)"
@@ -120,7 +120,7 @@
             <li class="nav-item">
                 @{
                     var allStatus = AllHanchansScoreStatus();
-                    var allClass = ScoreStatusHelper.TabClass(allStatus);
+                    var allClass = ScoreStatusHelper.TabClass(allStatus, activeTab == "allscores");
                     var allExplain = allStatus == ScoreStatusHelper.Status.Partial || allStatus == ScoreStatusHelper.Status.Stale;
                 }
                 <a class="nav-link @(activeTab == "allscores" ? "active" : "") @allClass"
@@ -387,7 +387,7 @@ else
             <li class="nav-item">
                 @{
                     var scoresStatus = CurrentHanchanScoreStatus();
-                    var scoresClass = ScoreStatusHelper.TabClass(scoresStatus);
+                    var scoresClass = ScoreStatusHelper.TabClass(scoresStatus, activeTab == "scores");
                     var scoresExplain = scoresStatus == ScoreStatusHelper.Status.Partial || scoresStatus == ScoreStatusHelper.Status.Stale;
                 }
                 <a class="nav-link @(activeTab == "scores" ? "active" : "") @scoresClass"

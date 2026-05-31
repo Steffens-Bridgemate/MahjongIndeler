@@ -63,12 +63,16 @@ public static class ScoreStatusHelper
         return Status.Normal;
     }
 
-    /// <summary>Bootstrap utility classes for a nav-link tab in the given status.</summary>
-    public static string TabClass(Status s) => s switch
+    /// <summary>Bootstrap utility classes for a nav-link tab in the given status.
+    /// <paramref name="isActive"/> distinguishes the selected (full-opacity) tab from unselected
+    /// ones, which are dimmed via <c>--bs-bg-opacity</c> (see <see cref="TabStyle(bool)"/>):
+    /// on the dimmed (faded) red, white text washes out, so an unselected danger tab uses dark
+    /// text. The selected red keeps white text.</summary>
+    public static string TabClass(Status s, bool isActive) => s switch
     {
         Status.Partial => "bg-warning text-dark",
         Status.Complete => "bg-success text-white",
-        Status.Stale => "bg-danger text-white",
+        Status.Stale => isActive ? "bg-danger text-white" : "bg-danger text-dark",
         _ => "",
     };
 
