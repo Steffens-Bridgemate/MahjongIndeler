@@ -14,8 +14,11 @@
 
     <main>
         <div class="top-row px-4">
-            <button class="btn btn-sm @(Lang.IsDutch ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("nl")'>NL</button>
-            <button class="btn btn-sm @(Lang.IsEnglish ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("en")'>EN</button>
+            @* Keep NL/EN as one flex unit so the narrow-screen space-between can't split them. *@
+            <div class="d-flex">
+                <button class="btn btn-sm @(Lang.IsDutch ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("nl")'>NL</button>
+                <button class="btn btn-sm @(Lang.IsEnglish ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SetLanguage("en")'>EN</button>
+            </div>
             @if (!string.IsNullOrWhiteSpace(style.WebsiteUrl))
             {
                 <a href="@style.WebsiteUrl" target="_blank">@(string.IsNullOrWhiteSpace(style.WebsiteLabel) ? style.WebsiteUrl : style.WebsiteLabel)</a>

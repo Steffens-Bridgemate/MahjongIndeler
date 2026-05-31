@@ -4,6 +4,11 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- PWA OS title/status-bar colour. Deliberately a fixed neutral (darkslategray): an
+         installed standalone PWA's title bar is locked to the manifest theme_color (the OS caches
+         it), so a club-specific colour can't apply there anyway — keeping it neutral and static
+         everywhere is consistent. Must match manifest.webmanifest's theme_color. -->
+    <meta name="theme-color" content="#2f4f4f" />
     <title>Tsumo!</title>
     <meta property="og:title" content="Tsumo!" />
     <meta property="og:description" content="Mahjongclub: aanwezigheid, tafelindeling en scores." />
@@ -111,6 +116,11 @@
             root.style.setProperty('--club-link-hover', toHex(darken(l, 0.7)));
             root.style.setProperty('--bs-primary', toHex(p));
             root.style.setProperty('--bs-primary-rgb', p.r + ',' + p.g + ',' + p.b);
+
+            // Note: the PWA/browser top-bar colour (<meta name="theme-color">) is intentionally
+            // NOT changed here — it's a fixed neutral, because an installed PWA's title bar can't
+            // track a per-club colour anyway (see index.html head). Keeping it static avoids the
+            // browser-tab top bar drifting away from the installed-app title bar.
 
             // Contrast decision: on a light primary fill a white tick/dot washes out, so flip the
             // form-check glyph to black. YIQ perceived brightness, threshold ~150 (biased toward
