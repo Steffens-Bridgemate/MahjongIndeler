@@ -406,14 +406,6 @@
                 if (updatePending) notifyBanner();
             };
 
-            // Best-effort close so the waiting worker can activate on next launch. Resolves false
-            // only if the window is still here shortly after (close blocked — common on mobile);
-            // if it actually closed, the promise never resolves because the page is gone.
-            window.closeAppForUpdate = function () {
-                try { window.close(); } catch (e) { /* ignore */ }
-                return new Promise(function (resolve) { setTimeout(function () { resolve(false); }, 700); });
-            };
-
             function notifyBanner() {
                 updatePending = true;
                 if (dotNetRef) {

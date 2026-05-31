@@ -48,9 +48,7 @@ public class LanguageService
 
         // App update prompt (AppUpdateBanner)
         ["UpdateAvailable"] = "Er is een nieuwe versie. Sluit de app af en open opnieuw om bij te werken.",
-        ["UpdateRestartManual"] = "Sluit de app handmatig af en open opnieuw om bij te werken.",
-        ["CloseAppNow"] = "Nu afsluiten",
-        ["UpdateLater"] = "Later",
+        ["UpdateDismiss"] = "OK",
 
         // Tournament sub-nav
         ["TournamentParticipants"] = "Deelnemers",
@@ -465,9 +463,7 @@ public class LanguageService
 
         // App update prompt (AppUpdateBanner)
         ["UpdateAvailable"] = "A new version is available. Close the app and reopen it to update.",
-        ["UpdateRestartManual"] = "Please close the app manually and reopen it to update.",
-        ["CloseAppNow"] = "Close app now",
-        ["UpdateLater"] = "Later",
+        ["UpdateDismiss"] = "Dismiss",
 
         // Tournament sub-nav
         ["TournamentParticipants"] = "Participants",

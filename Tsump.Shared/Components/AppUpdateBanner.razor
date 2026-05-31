@@ -5,30 +5,22 @@
 
 @* Shown when a newer service-worker version has installed and is waiting. We do NOT activate it
    in place (no skipWaiting / no mid-action reload) — the update applies the next time the app is
-   launched fresh. The banner just informs the user and offers a best-effort "close now" to help
-   on phones/tablets that otherwise stay open indefinitely. The JS side (registerAppUpdateCallback
-   / closeAppForUpdate) lives in each app's index.html. *@
+   launched fresh, so the banner just tells the user to close and reopen. (There is no reliable way
+   to close an installed app from script — window.close() is blocked on every platform we tried —
+   so there's only a Dismiss button; the banner simply reappears on each launch until they restart.)
+   The JS side (registerAppUpdateCallback) lives in each app's index.html. *@
 @if (updateAvailable)
 {
     <div style="position:fixed;left:0;right:0;bottom:0;z-index:1080;background:#0d6efd;color:#fff;
                 padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:12px;
                 flex-wrap:wrap;box-shadow:0 -2px 8px rgba(0,0,0,.25);">
-        <span>
-            <i class="bi bi-arrow-clockwise me-2"></i>@Lang.Get(closeBlocked ? "UpdateRestartManual" : "UpdateAvailable")
-        </span>
-        <span class="d-flex gap-2">
-            @if (!closeBlocked)
-            {
-                <button class="btn btn-sm btn-light" @onclick="CloseApp">@Lang.Get("CloseAppNow")</button>
-            }
-            <button class="btn btn-sm btn-outline-light" @onclick="Dismiss">@Lang.Get("UpdateLater")</button>
-        </span>
+        <span><i class="bi bi-arrow-clockwise me-2"></i>@Lang.Get("UpdateAvailable")</span>
+        <button class="btn btn-sm btn-light" @onclick="Dismiss">@Lang.Get("UpdateDismiss")</button>
     </div>
 }
 
 @code {
     private bool updateAvailable;
-    private bool closeBlocked;
     private DotNetObjectReference<AppUpdateBanner>? selfRef;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
@@ -47,17 +39,6 @@
     {
         if (updateAvailable) return;
         updateAvailable = true;
-        StateHasChanged();
-    }
-
-    private async Task CloseApp()
-    {
-        // window.close() is best-effort: it works for an installed desktop PWA but is commonly
-        // blocked on mobile. closeAppForUpdate resolves only if the window is STILL open shortly
-        // after (i.e. the close was blocked) — if it actually closed, control never returns here.
-        try { await JS.InvokeAsync<bool>("closeAppForUpdate"); }
-        catch { /* ignore */ }
-        closeBlocked = true;
         StateHasChanged();
     }
 
