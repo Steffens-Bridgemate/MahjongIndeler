@@ -1,17 +1,18 @@
 /*
- * Layout switch for ScoreTable: narrow (stacked, one row per player) unless the
- * viewport is comfortably tablet-or-bigger. Wide requires ALL three:
- *   - min-width 500px and min-height 500px  → not a phone in either orientation
- *     (a phone/foldable-cover in landscape is wide but only ~376-390px tall).
- *   - min-aspect-ratio 1/2                   → not an extremely tall-narrow screen.
+ * Layout switch for ScoreTable: narrow (stacked, one row per player) below the
+ * standard 768px tablet breakpoint, wide (5-column table) at/above it. Plain
+ * width — no height/aspect/orientation gates, which is exactly what the Samsung
+ * Fold COVER screen reports unreliably (it gives an inconsistent viewport per
+ * orientation, which made earlier min-height / aspect-ratio rules misfire).
  *
- * The aspect-ratio gate is what handles a Samsung Fold cover screen in PORTRAIT:
- * it reports a CSS width >= 500px (so the width/height thresholds alone matched
- * "wide", rendering the 5-column table far wider than the ~6cm screen and letting
- * the browser shrink-fit it to a tiny size). Its width/height ratio is ~0.4,
- * versus >=0.6 for tablets/desktops — and unlike the reported pixel width (which
- * is unreliable across foldable DPRs), that ratio is invariant, so it's the
- * dependable discriminator.
+ * Why width alone is right here, per device:
+ *   - Fold cover, PORTRAIT  → ~540px CSS width  → narrow. (Confirmed by the
+ *     original bug: the wide table was shrink-fit "very small", which only
+ *     happens when the viewport is narrower than the table's ~600px — i.e. the
+ *     cover's portrait width is well under 768.)
+ *   - Fold cover, LANDSCAPE → ~900-1200px       → wide.
+ *   - Tablet, portrait      → >=768px           → wide.
+ *   - Phone, portrait       → <768px            → narrow.
  */
 
 .score-table-narrow {
@@ -22,7 +23,7 @@
     display: none;
 }
 
-@media (min-width: 500px) and (min-height: 500px) and (min-aspect-ratio: 1/2) {
+@media (min-width: 768px) {
     .score-table-narrow {
         display: none;
     }
