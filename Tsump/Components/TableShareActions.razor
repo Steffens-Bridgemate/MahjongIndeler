@@ -1,6 +1,7 @@
 @using Tsump.Models
 @using Tsump.Scoring
 @using Tsump.Services
+@using Microsoft.AspNetCore.Components.Web
 @inject ScoreInviteService Invites
 @inject LanguageService Lang
 @inject IJSRuntime JS
@@ -22,34 +23,78 @@
     </div>
 </div>
 
-<QrCodeModal IsOpen="showQr" Url="@qrUrl" Title="@ShortQrTitle"
+<QrCodeModal IsOpen="showQr" Url="@qrUrl" Title="@ShortTitleFor(currentTable)"
              Subtitle="@(qrCopied ? Lang.Get("QrCopiedToClipboard") : Lang.Get("QrCodeScoringSubtitle"))"
              Overlay="@QrCodeRenderer.Overlays.Organizer"
-             OnClose="CloseQr" />
+             OnClose="CloseQr" OnKeyDown="HandleKeyDown">
+    <AboveQr>
+        @* Table navigation: ‹ 1 2 3 … › so the user can flip between tables without
+           reopening the QR for each. *@
+        <div class="d-flex align-items-center justify-content-center flex-wrap gap-1 mb-2">
+            <button class="btn btn-sm btn-outline-secondary px-2" @onclick="ShowPrev"
+                    disabled="@(CurrentIndex <= 0)" aria-label="@Lang.Get("Previous")">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            @foreach (var t in OrderedTables)
+            {
+                var tt = t;
+                <button class="btn btn-sm @(tt.TableNumber == currentTable.TableNumber ? "btn-primary" : "btn-outline-secondary")"
+                        style="min-width:2.2rem;"
+                        @onclick="() => ShowTable(tt)">@tt.TableNumber</button>
+            }
+            <button class="btn btn-sm btn-outline-secondary px-2" @onclick="ShowNext"
+                    disabled="@(CurrentIndex >= OrderedTables.Count - 1)" aria-label="@Lang.Get("Next")">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+        <div class="text-center small text-muted mb-1">
+            <i class="bi bi-people me-1"></i>@PlayersFor(currentTable)
+        </div>
+    </AboveQr>
+</QrCodeModal>
 
 @code {
     [Parameter, EditorRequired] public Guid ContextId { get; set; }
     [Parameter, EditorRequired] public int SessionNumber { get; set; }
+    /// <summary>This card's table — the entry point the buttons act on; the QR view can then
+    /// page to any of <see cref="Tables"/>.</summary>
     [Parameter, EditorRequired] public TableAssignment Table { get; set; } = default!;
+    /// <summary>All tables in the session, for the QR navigation strip.</summary>
+    [Parameter, EditorRequired] public List<TableAssignment> Tables { get; set; } = new();
     [Parameter, EditorRequired] public Func<Guid, string> PlayerNameResolver { get; set; } = default!;
     [Parameter, EditorRequired] public int StartingPoints { get; set; }
-    [Parameter, EditorRequired] public List<int> Uma { get; set; } = new();
-    [Parameter, EditorRequired] public string Title { get; set; } = "";
-    [Parameter] public string? ShortQrTitle { get; set; }
+    [Parameter, EditorRequired] public List<int> Uma3 { get; set; } = new();
+    [Parameter, EditorRequired] public List<int> Uma4 { get; set; } = new();
+    /// <summary>Title prefix shared by every table in the session; the table suffix
+    /// ("— Table N") is appended per table. Used for the share message and the scoring-app title.</summary>
+    [Parameter, EditorRequired] public string TitlePrefix { get; set; } = "";
+    /// <summary>Shorter prefix for the on-QR-modal heading (no club/date prefix).</summary>
+    [Parameter, EditorRequired] public string ShortTitlePrefix { get; set; } = "";
 
     private bool copied;
     private bool showQr;
     private string? qrUrl;
     private bool qrCopied;
+    private TableAssignment currentTable = default!;
 
-    private string BuildUrl() => Invites.BuildInviteUrl(
-        ContextId, SessionNumber, Table, PlayerNameResolver,
-        StartingPoints, Uma, Title, Nav.BaseUri);
+    protected override void OnInitialized() => currentTable = Table;
+
+    private List<TableAssignment> OrderedTables => Tables.OrderBy(t => t.TableNumber).ToList();
+    private int CurrentIndex => OrderedTables.FindIndex(t => t.TableNumber == currentTable.TableNumber);
+
+    private List<int> UmaFor(TableAssignment t) => t.PlayerCount == 3 ? Uma3 : Uma4;
+    private string TitleFor(TableAssignment t) => $"{TitlePrefix} — {Lang.Get("Table")} {t.TableNumber}";
+    private string ShortTitleFor(TableAssignment t) => $"{ShortTitlePrefix} — {Lang.Get("Table")} {t.TableNumber}";
+    private string PlayersFor(TableAssignment t) => string.Join(", ", t.PlayerIds.Select(PlayerNameResolver));
+
+    private string BuildUrlFor(TableAssignment t) => Invites.BuildInviteUrl(
+        ContextId, SessionNumber, t, PlayerNameResolver,
+        StartingPoints, UmaFor(t), TitleFor(t), Nav.BaseUri);
 
     private async Task OnShareClick()
     {
-        var url = BuildUrl();
-        var message = Invites.BuildShareMessage(Title, url);
+        var url = BuildUrlFor(Table);
+        var message = Invites.BuildShareMessage(TitleFor(Table), url);
         await JS.InvokeVoidAsync("copyTextToClipboard", message);
         copied = true;
         StateHasChanged();
@@ -65,18 +110,60 @@
 
     private async Task OnQrClick()
     {
-        qrUrl = BuildUrl();
         showQr = true;
+        await ShowTable(Table);
+        _ = PrefetchQrCodes(); // warm the cache for the other tables so paging is instant
+    }
+
+    private void ShowPrev() { if (CurrentIndex > 0) _ = ShowTable(OrderedTables[CurrentIndex - 1]); }
+    private void ShowNext() { if (CurrentIndex < OrderedTables.Count - 1) _ = ShowTable(OrderedTables[CurrentIndex + 1]); }
+
+    // Keyboard: ←/→ page through tables; a digit key jumps straight to that table number.
+    // (Escape is handled by the modal itself.)
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Repeat) return; // holding a key shouldn't fire a clipboard copy per repeat
+        switch (e.Key)
+        {
+            case "ArrowLeft": ShowPrev(); break;
+            case "ArrowRight": ShowNext(); break;
+            default:
+                if (int.TryParse(e.Key, out var n))
+                {
+                    var t = OrderedTables.FirstOrDefault(x => x.TableNumber == n);
+                    if (t != null) _ = ShowTable(t);
+                }
+                break;
+        }
+    }
+
+    // Cooperative "background" render: Blazor WASM is single-threaded, so we can't truly offload,
+    // but yielding between tables keeps the UI responsive while QrCodeRenderer's cache fills. After
+    // this, paging to any table is a cache hit (instant) instead of a fresh ~few-ms render.
+    private async Task PrefetchQrCodes()
+    {
+        foreach (var t in OrderedTables)
+        {
+            if (!showQr) break; // user closed the modal — stop warming
+            await Task.Yield();
+            QrCodeRenderer.ToSvg(BuildUrlFor(t));
+        }
+    }
+
+    private async Task ShowTable(TableAssignment t)
+    {
+        currentTable = t;
+        qrUrl = BuildUrlFor(t);
         qrCopied = false;
         StateHasChanged();
 
-        // Auto-copy the QR as a PNG so the user can paste straight into WhatsApp.
-        // The button click is the user gesture clipboard.write needs.
+        // Auto-copy the shown table's QR as a PNG so the user can paste straight into WhatsApp.
+        // Every navigation click is a user gesture, so the clipboard write stays allowed.
         try
         {
             var svg = QrCodeRenderer.ToSvg(qrUrl);
             var organizerOverlay = QrCodeRenderer.Overlays.Organizer;
-            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, ShortQrTitle ?? Title, organizerOverlay.BackgroundColor, "white");
+            var ok = await JS.InvokeAsync<bool>("copyQrImageToClipboard", svg, 480, ShortTitleFor(t), organizerOverlay.BackgroundColor, "white");
             if (ok)
             {
                 qrCopied = true;

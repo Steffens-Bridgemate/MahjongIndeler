@@ -37,9 +37,11 @@
     </div>
     <div class="card-body p-2">
         @* Narrow layout (any viewport with width or height under 500px — covers phones
-           in either orientation and foldables in their compact state). One card per
-           player, with a per-player Advanced toggle that reveals Loan / Penalty rows
-           for that player only. *@
+           in either orientation and foldables in their compact state). The 5-column wide
+           table is transposed: one row per player (Eind / Versch / Totaal), with a
+           per-player Advanced toggle that reveals an inline Loan / Penalty / Uma sub-row.
+           Starting points are identical for every seat, so they're entered once above the
+           Eind column instead of per player. *@
         <div class="score-table-narrow">
             @if (hasError)
             {
@@ -47,155 +49,136 @@
                     @(sumDiff < 0 ? Lang.Get("Deficit") : Lang.Get("Surplus")): @Math.Abs(sumDiff) @Lang.Get("Points")
                 </div>
             }
-            @for (int idxLoop = 0; idxLoop < score.PlayerScores.Count; idxLoop++)
-            {
-                var idx = idxLoop;
-                var ps = score.PlayerScores[idx];
-                var psRef = ps;
-                var extras = IsExtrasShownFor(idx);
-                <div class="card mb-2 @(ps.IsVirtual ? "bg-light" : "")">
-                    <div class="card-header py-1 d-flex align-items-center">
-                        <strong class="flex-grow-1">
-                            @if (ps.IsVirtual)
-                            {
-                                <em>@ps.VirtualName</em>
-                            }
-                            else
-                            {
-                                @GetPlayerName(ps.PlayerId)
-                            }
-                        </strong>
-                        @if (!ps.IsVirtual)
+            <table class="table table-sm table-bordered mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>@Lang.Get("Player")</th>
+                        <th class="text-center" style="min-width:64px;">@Lang.Get("EndShort")</th>
+                        <th class="text-center">@Lang.Get("DifferenceMicro")</th>
+                        <th class="text-center">@Lang.Get("FinalScoreShort")</th>
+                        <th style="width:1%;"></th>
+                    </tr>
+                    @* One shared Start, sitting above the Eind column. Editing applies to
+                       every seat (and Mr. X). Read-only in the scoring app (ReadOnlyStart).
+                       tabindex=-1 so Tab on an End cell skips it. *@
+                    <tr>
+                        <td class="text-end small text-muted border-0">@Lang.Get("StartShort")</td>
+                        <td class="text-center border-0">
+                            <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                   tabindex="-1"
+                                   readonly="@(ReadOnlyStart || ReadOnly)"
+                                   value="@FormatDisplay(SharedStartingPoints)"
+                                   @onchange="async e => { if (!ReadOnlyStart && !ReadOnly) await OnSharedStartingPointsChanged(e); }" />
+                        </td>
+                        <td colspan="3" class="border-0"></td>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int idxLoop = 0; idxLoop < score.PlayerScores.Count; idxLoop++)
+                    {
+                        var idx = idxLoop;
+                        var ps = score.PlayerScores[idx];
+                        var psRef = ps;
+                        var extras = IsExtrasShownFor(idx);
+                        <tr>
+                            <td class="fw-bold">
+                                @if (ps.IsVirtual)
+                                {
+                                    <em>@ps.VirtualName</em>
+                                }
+                                else
+                                {
+                                    @GetPlayerName(ps.PlayerId)
+                                }
+                            </td>
+                            <td class="text-center">
+                                @* All End inputs share tabindex=1 → tabbed first, in source order.
+                                   data-end-input marks real-player End cells for the JS auto-advance
+                                   (index.html); Mr. X is derived so it's left unmarked. *@
+                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       data-end-input='@(psRef.IsVirtual ? null : "1")'
+                                       tabindex="1"
+                                       readonly="@ReadOnly"
+                                       value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
+                                       placeholder="−"
+                                       @onchange="e => OnEndPointsChanged(psRef, e)" />
+                            </td>
+                            <td class="text-center fw-bold @(hasError ? "text-danger" : "")">
+                                @if (!ps.IsVirtual && ps.EndPoints.HasValue)
+                                {
+                                    @FormatDisplaySigned(ps.Difference)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="text-center fw-bold table-active">
+                                @if (!ps.IsVirtual && allEndPointsFilled && sumDiff == 0)
+                                {
+                                    @FormatDisplaySigned(ps.Total)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td class="text-center px-1">
+                                @if (!ps.IsVirtual && !ReadOnly)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                            style="font-size:1.1rem;line-height:1;min-width:2rem;"
+                                            @onclick="() => ToggleExtrasFor(idx)"
+                                            title="@Lang.Get("Advanced")">
+                                        @(extras ? "−" : "+")
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                        @if (extras && !ps.IsVirtual)
                         {
-                            <button class="btn btn-sm btn-outline-secondary py-0 px-2"
-                                    style="font-size:1.1rem;line-height:1;min-width:2rem;"
-                                    @onclick="() => ToggleExtrasFor(idx)"
-                                    title="@Lang.Get("Advanced")">
-                                @(extras ? "−" : "+")
-                            </button>
-                        }
-                    </div>
-                    <div class="card-body p-2">
-                        <div class="d-flex gap-2 align-items-stretch">
-                            @* Left side — labels (col 1) + inputs (col 2) in a compact table. *@
-                            <table class="table table-sm table-bordered mb-0" style="flex:1; min-width:0;">
-                                <tbody>
-                                    <tr>
-                                        <td style="vertical-align:middle;">@Lang.Get("StartShort")</td>
-                                        <td class="text-center">
-                                            @* Start is pre-filled and rarely edited — skip in tab order so Tab
-                                               on End goes straight to the next card's End. *@
+                            <tr class="bg-light">
+                                <td colspan="5" class="px-2 py-2">
+                                    <div class="d-flex align-items-center flex-wrap gap-3 small">
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span>@Lang.Get("LoanShort")</span>
                                             <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
-                                                   tabindex="-1"
-                                                   readonly="@(ReadOnlyStart || ReadOnly)"
-                                                   value="@FormatDisplay(psRef.StartingPoints)"
-                                                   @onchange="async e => { if (!ReadOnlyStart && !ReadOnly) await OnStartingPointsChanged(psRef, e); }" />
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td style="vertical-align:middle;">@Lang.Get("EndShort")</td>
-                                        <td class="text-center">
-                                            @* All End inputs share tabindex=1 → tabbed first, in source order. *@
-                                            <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
-                                                   tabindex="1"
+                                                   style="width:72px;@(psRef.Loan != 0 ? "background-color:#ffe5e5;" : "")"
                                                    readonly="@ReadOnly"
-                                                   value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
+                                                   value="@FormatLoan(psRef.Loan)"
                                                    placeholder="−"
-                                                   @onchange="e => OnEndPointsChanged(psRef, e)" />
-                                        </td>
-                                    </tr>
-                                    @if (extras && !ps.IsVirtual)
-                                    {
-                                        <tr>
-                                            <td style="vertical-align:middle;">@Lang.Get("LoanShort")</td>
-                                            <td class="text-center">
-                                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
-                                                       readonly="@ReadOnly"
-                                                       value="@FormatLoan(psRef.Loan)"
-                                                       placeholder="−"
-                                                       @onfocus="e => OnLoanFocus(psRef)"
-                                                       @onchange="e => OnLoanChanged(psRef, e)"
-                                                       style="@(psRef.Loan != 0 ? "background-color:#ffe5e5;" : "")" />
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td style="vertical-align:middle;">@Lang.Get("PenaltyShort")</td>
-                                            <td class="text-center">
-                                                <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
-                                                       readonly="@ReadOnly"
-                                                       value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
-                                                       placeholder="−"
-                                                       @onchange="e => OnPenaltyChanged(psRef, e)"
-                                                       style="@(psRef.Penalty != 0 ? "background-color:#ffe5e5;" : "")" />
-                                            </td>
-                                        </tr>
-                                    }
-                                    <tr class="fw-bold">
-                                        @* "border-style: hidden" beats neighbouring borders under
-                                           border-collapse, so this empty cell renders invisibly. *@
-                                        <td style="border-style:hidden; background:transparent;"></td>
-                                        <td class="text-end table-active" style="vertical-align:middle;">@Lang.Get("FinalScoreShort")</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            @* Right side (col 3) — compact summary: Diff, Uma, Total. *@
-                            <div class="d-flex flex-column justify-content-around small ps-1" style="min-width:90px;">
-                                <div class="d-flex justify-content-between @(hasError ? "text-danger fw-bold" : "")">
-                                    <span>@Lang.Get("DifferenceMicro"):</span>
-                                    <span class="text-end fw-bold">
-                                        @if (ps.IsVirtual)
-                                        {
-                                            <span class="text-muted">—</span>
-                                        }
-                                        else if (ps.EndPoints.HasValue)
-                                        {
-                                            @FormatDisplaySigned(ps.Difference)
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">—</span>
-                                        }
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span>@Lang.Get("UmaShort"):</span>
-                                    <span class="text-end">
-                                        @if (ps.IsVirtual)
-                                        {
-                                            <span class="text-muted">—</span>
-                                        }
-                                        else if (allEndPointsFilled && sumDiff == 0)
-                                        {
-                                            @FormatDisplaySigned(ps.Uma)
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted">—</span>
-                                        }
-                                    </span>
-                                </div>
-                                @* Same background as the .table-active Total row in col 1+2,
-                                   so the bottom of the card reads as a single Total band. *@
-                                <div class="text-end fw-bold px-1" style="font-size:1.15em; background-color: rgba(0,0,0,0.075);">
-                                    @if (ps.IsVirtual)
-                                    {
-                                        <span class="text-muted">—</span>
-                                    }
-                                    else if (allEndPointsFilled && sumDiff == 0)
-                                    {
-                                        @FormatDisplaySigned(ps.Total)
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">—</span>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
+                                                   @onfocus="e => OnLoanFocus(psRef)"
+                                                   @onchange="e => OnLoanChanged(psRef, e)" />
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span>@Lang.Get("PenaltyShort")</span>
+                                            <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                                   style="width:72px;@(psRef.Penalty != 0 ? "background-color:#ffe5e5;" : "")"
+                                                   readonly="@ReadOnly"
+                                                   value="@(psRef.Penalty != 0 ? FormatDisplay(psRef.Penalty) : "")"
+                                                   placeholder="−"
+                                                   @onchange="e => OnPenaltyChanged(psRef, e)" />
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span>@Lang.Get("UmaShort"):</span>
+                                            <span class="fw-bold">
+                                                @if (allEndPointsFilled && sumDiff == 0)
+                                                {
+                                                    @FormatDisplaySigned(psRef.Uma)
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
+                                            </span>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
 
         @* Wide layout (viewport with both dimensions ≥ 500px): the original 5-column table. *@
@@ -249,6 +232,7 @@
                             <td class="text-center">
                                 @* All End inputs share tabindex=1 → tabbed first across the page in source order. *@
                                 <input type="text" inputmode="decimal" class="form-control form-control-sm text-center"
+                                       data-end-input='@(psRef.IsVirtual ? null : "1")'
                                        tabindex="1"
                                        readonly="@ReadOnly"
                                        value="@(psRef.EndPoints.HasValue ? FormatDisplay(psRef.EndPoints.Value) : "")"
@@ -501,6 +485,23 @@
     private async Task OnStartingPointsChanged(PlayerScore ps, ChangeEventArgs e)
     {
         ps.StartingPoints = ParseInput(e.Value?.ToString()) ?? DefaultStartingPoints;
+        DeriveVirtualEnd(Table);
+        CalculateUma();
+        await CheckAndNotifyComplete();
+    }
+
+    // The narrow layout enters starting points once for the whole table (they're the same
+    // for every seat). Representative value for display; falls back to the configured default.
+    private int SharedStartingPoints =>
+        Table.Score?.PlayerScores.FirstOrDefault()?.StartingPoints ?? DefaultStartingPoints;
+
+    private async Task OnSharedStartingPointsChanged(ChangeEventArgs e)
+    {
+        var score = Table.Score;
+        if (score == null) return;
+        var value = ParseInput(e.Value?.ToString()) ?? DefaultStartingPoints;
+        foreach (var ps in score.PlayerScores)
+            ps.StartingPoints = value;
         DeriveVirtualEnd(Table);
         CalculateUma();
         await CheckAndNotifyComplete();

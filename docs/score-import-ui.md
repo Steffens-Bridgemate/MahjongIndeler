@@ -145,6 +145,20 @@ static string ToSvg(string url, int pixelsPerModule = 4);   // pristine — no o
 
 QR SVG mechanics: ECC level H, `width`/`height` stripped and replaced with a `viewBox` so the canvas rasteriser knows the coordinate space.
 
+`ToSvg` **memoises** by `(url, pixelsPerModule)` — a level-H QR for our payloads costs a few ms, and each QR is rendered more than once (modal + PNG copy) and re-rendered when paging back. Cache is content-addressed: the URL encodes the table's roster/number, so a reassignment or swap yields a *new* URL → cache miss → fresh QR; stale entries are simply never looked up again (bounded at 64, cleared wholesale). No invalidation hook needed.
+
+## Invite-QR navigation (organizer)
+
+[TableShareActions.razor](../Tsump/Components/TableShareActions.razor) owns the per-table Share/QR buttons **and** the QR navigator. The QR modal pages across *all* tables in the session: it gets the full `Tables` list plus session-level `TitlePrefix`/`ShortTitlePrefix` and `Uma3`/`Uma4`, and builds any table's URL/title/players on demand (`TitleFor`/`BuildUrlFor`/`PlayersFor`).
+
+- **Strip + label.** `QrCodeModal` exposes an `AboveQr` render-slot; the navigator fills it with a `‹ 1 2 3 … ›` table strip (current highlighted, chevrons disabled at the ends) and a `bi-people` players line for the selected table.
+- **Keyboard.** `QrCodeModal` focuses its popup on open and forwards keydown via `OnKeyDown` (Escape it handles itself → close). `TableShareActions.HandleKeyDown`: ←/→ page prev/next, a digit jumps to that table number, auto-repeat ignored (so a held key doesn't spam clipboard copies).
+- **Prefetch.** On open, `PrefetchQrCodes` warms `ToSvg` for the other tables cooperatively (`await Task.Yield()` between each) — Blazor WASM is single-threaded, so this is the "background" render: current QR shows immediately, the rest fill the cache so paging is instant. Each navigation re-copies that table's PNG to the clipboard (every click/key is a user gesture).
+
+## Score entry layout (narrow / portrait)
+
+[ScoreTable.razor](../Tsump.Shared/Components/ScoreTable.razor)'s narrow layout (viewport <500px) is a **transposed** table — one row per player (`Speler | Eind | Versch. | Totaal | [+]`) instead of a card-per-player — with a single shared **Start** field above the Eind column (starting points are identical for every seat; editing applies to all). The per-player `[+]` reveals an inline Loan/Penalty/Uma sub-row. Real-player End inputs carry `data-end-input`; a small `input` listener in each app's `index.html` **auto-advances** focus to the next empty End cell once a cell holds a complete value (`«int»«,/.»«one digit»`, e.g. `28,5`), committing via the `change` event. The wide layout (≥500px) keeps the original 5-column table.
+
 ## Hardware (USB HID) scanner notes
 
 A USB 2D scanner behaves as a keyboard wedge: scanned text arrives as keystrokes into the focused element. No browser API, no permission prompt. The target is the offscreen capture `<textarea>`, which only exists in the **Hand scanner** state — so arm it first (the QR icon + progress bar is the "ready" cue). Capture/accumulation is JS-side (see above), which is what makes it robust regardless of event-loop speed.

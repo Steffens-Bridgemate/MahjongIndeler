@@ -459,16 +459,16 @@ else
                             @if (externalScoringEnabled && currentHanchan != null)
                             {
                                 var tableRef = table;
-                                <div class="card-footer p-2">
-                                    <TableShareActions ContextId="currentHanchan.Id"
-                                                       SessionNumber="CurrentHanchanNumber()"
-                                                       Table="tableRef"
-                                                       PlayerNameResolver="GetPlayerName"
-                                                       StartingPoints="weeklyStartingPoints"
-                                                       Uma="@(tableRef.PlayerCount == 3 ? uma3Players : uma4Players)"
-                                                       Title="@($"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()} — {Lang.Get("Table")} {tableRef.TableNumber}")"
-                                                       ShortQrTitle="@($"{BuildHanchanSubtitle()} — {Lang.Get("Table")} {tableRef.TableNumber}")" />
-                                </div>
+                                <TableShareActions ContextId="currentHanchan.Id"
+                                                   SessionNumber="CurrentHanchanNumber()"
+                                                   Table="tableRef"
+                                                   Tables="tables"
+                                                   PlayerNameResolver="GetPlayerName"
+                                                   StartingPoints="weeklyStartingPoints"
+                                                   Uma3="uma3Players"
+                                                   Uma4="uma4Players"
+                                                   TitlePrefix="@($"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()}")"
+                                                   ShortTitlePrefix="@BuildHanchanSubtitle()" />
                             }
                         </div>
                     </div>

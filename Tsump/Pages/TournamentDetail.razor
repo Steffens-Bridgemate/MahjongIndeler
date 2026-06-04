@@ -265,16 +265,18 @@ else
                             </ul>
                             @if (externalScoringEnabled)
                             {
-                                var shareTitle = $"{tournament.Name} — {Lang.Get("Hanchan")} {sessRef.SessionNumber} — {Lang.Get("Table")} {tableRef.TableNumber}";
-                                var shortQrTitle = $"{Lang.Get("Hanchan")} {sessRef.SessionNumber} — {Lang.Get("Table")} {tableRef.TableNumber}";
+                                var titlePrefix = $"{tournament.Name} — {Lang.Get("Hanchan")} {sessRef.SessionNumber}";
+                                var shortTitlePrefix = $"{Lang.Get("Hanchan")} {sessRef.SessionNumber}";
                                 <TableShareActions ContextId="sessRef.Id"
                                                    SessionNumber="sessRef.SessionNumber"
                                                    Table="tableRef"
+                                                   Tables="sessRef.Tables"
                                                    PlayerNameResolver="GetParticipantDisplay"
                                                    StartingPoints="tournamentStartingPoints"
-                                                   Uma="@(tableRef.PlayerCount == 3 ? uma3Players : uma4Players)"
-                                                   Title="@shareTitle"
-                                                   ShortQrTitle="@shortQrTitle" />
+                                                   Uma3="uma3Players"
+                                                   Uma4="uma4Players"
+                                                   TitlePrefix="@titlePrefix"
+                                                   ShortTitlePrefix="@shortTitlePrefix" />
                             }
                         </div>
                     </div>

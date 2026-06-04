@@ -571,6 +571,33 @@
                 el.focus();
             } catch (_) { }
         };
+
+        // Score entry auto-advance: once an "End" cell holds a complete value — an integer part,
+        // a decimal separator, then exactly one digit (e.g. "28,5") — commit it to Blazor and jump
+        // to the next still-empty End cell. The marked cells are tagged data-end-input by
+        // ScoreTable.razor (real players only; Mr. X is derived). Both the narrow and wide layouts
+        // render End inputs, but only the visible one has an offsetParent, so the "next empty"
+        // search lands in the active layout.
+        (function () {
+            if (window.__tsumpEndAutoAdvance) return;
+            window.__tsumpEndAutoAdvance = true;
+            var complete = /^\d+[.,]\d$/;
+            document.addEventListener('input', function (e) {
+                var el = e.target;
+                if (!el || !el.matches || !el.matches('input[data-end-input]')) return;
+                if (!complete.test(el.value)) return;
+                el.dispatchEvent(new Event('change', { bubbles: true })); // commit via Blazor @onchange
+                var all = Array.prototype.slice.call(document.querySelectorAll('input[data-end-input]'));
+                for (var j = all.indexOf(el) + 1; j < all.length; j++) {
+                    var n = all[j];
+                    if (n.offsetParent !== null && !n.readOnly && n.value.trim() === '') {
+                        n.focus(); if (n.select) { n.select(); }
+                        return;
+                    }
+                }
+                el.blur(); // nothing left to fill
+            }, true);
+        })();
     </script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script>

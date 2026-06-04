@@ -1,10 +1,14 @@
 @using Tsump.Scoring
+@using Microsoft.AspNetCore.Components.Web
 @inject LanguageService Lang
 
 @if (IsOpen && !string.IsNullOrEmpty(Url))
 {
     <div class="qr-backdrop" @onclick="OnCloseHandler">
-        <div class="qr-popup" @onclick:stopPropagation="true">
+        @* tabindex + programmatic focus on open so the popup receives key events (arrows to page
+           tables, Escape to close); keydown bubbles up from the inner buttons too. *@
+        <div class="qr-popup" @ref="popupRef" tabindex="-1" style="outline:none;"
+             @onclick:stopPropagation="true" @onkeydown="HandleKeyDown">
             <div class="qr-header">
                 @if (Overlay != null)
                 {
@@ -30,6 +34,12 @@
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
+            @if (AboveQr != null)
+            {
+                <div class="qr-abovebody px-2 pt-2">
+                    @AboveQr
+                </div>
+            }
             <div class="qr-body">
                 @if (svgMarkup != null)
                 {
@@ -52,14 +62,22 @@
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public QrCodeRenderer.CenterOverlay? Overlay { get; set; }
+    /// <summary>Optional content rendered between the header and the QR image — used by the
+    /// invite flow for a table-navigation strip and a players label.</summary>
+    [Parameter] public RenderFragment? AboveQr { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     /// <summary>Optional "save as" action. When wired, a floppy-icon button appears in the
     /// header; the callback is responsible for actually triggering the file save (the modal
     /// stays out of the JS interop business).</summary>
     [Parameter] public EventCallback OnSave { get; set; }
+    /// <summary>Forwarded keydown for consumers that navigate inside the modal (e.g. the invite
+    /// flow's table strip). Escape is handled here directly; everything else is passed through.</summary>
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
 
     private string? svgMarkup;
     private string? renderedFor;
+    private ElementReference popupRef;
+    private bool focused;
 
     protected override void OnParametersSet()
     {
@@ -76,6 +94,27 @@
         {
             renderedFor = null;
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Move focus into the popup once per open so it captures key events.
+        if (IsOpen && !focused)
+        {
+            // Only latch `focused` on success, so a render where the popup wasn't ready yet
+            // (e.g. Url not set) retries on the next one rather than silently never focusing.
+            try { await popupRef.FocusAsync(); focused = true; } catch { /* not focusable yet */ }
+        }
+        else if (!IsOpen && focused)
+        {
+            focused = false;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { await OnCloseHandler(); return; }
+        if (OnKeyDown.HasDelegate) await OnKeyDown.InvokeAsync(e);
     }
 
     private async Task OnCloseHandler()

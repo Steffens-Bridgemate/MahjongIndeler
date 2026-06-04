@@ -31,7 +31,26 @@ public static class QrCodeRenderer
             BackgroundColor: "#198754");
     }
 
+    // Memoise rendered SVGs. Building a level-H QR for our payloads costs a few ms (matrix
+    // generation + emitting one <rect> per module), and each table's QR is rendered more than
+    // once (modal display + the PNG clipboard copy) and re-rendered every time the user pages
+    // back to it. Blazor WASM is single-threaded, so this is the cheapest way to make navigation
+    // feel instant — the cache is warmed cooperatively (see TableShareActions.PrefetchQrCodes).
+    // Keyed by (url, pixelsPerModule); URLs are large, so the cache is bounded and cleared wholesale.
+    private static readonly Dictionary<(string Url, int Ppm), string> _svgCache = new();
+    private const int SvgCacheCap = 64;
+
     public static string ToSvg(string url, int pixelsPerModule = 4)
+    {
+        var key = (url, pixelsPerModule);
+        if (_svgCache.TryGetValue(key, out var hit)) return hit;
+        var svg = Render(url, pixelsPerModule);
+        if (_svgCache.Count >= SvgCacheCap) _svgCache.Clear();
+        _svgCache[key] = svg;
+        return svg;
+    }
+
+    private static string Render(string url, int pixelsPerModule)
     {
         using var gen = new QRCodeGenerator();
         // Level H kept (carried over from the centre-overlay era). Larger QR, but each
