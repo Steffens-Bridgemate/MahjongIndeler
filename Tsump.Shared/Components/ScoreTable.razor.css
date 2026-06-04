@@ -1,18 +1,11 @@
 /*
- * Layout switch for ScoreTable: narrow (stacked, one row per player) below the
- * standard 768px tablet breakpoint, wide (5-column table) at/above it. Plain
- * width — no height/aspect/orientation gates, which is exactly what the Samsung
- * Fold COVER screen reports unreliably (it gives an inconsistent viewport per
- * orientation, which made earlier min-height / aspect-ratio rules misfire).
+ * Layout switch for ScoreTable: narrow when the viewport is "phone-sized" in
+ * EITHER dimension, wide only when both width and height are at least 500px.
  *
- * Why width alone is right here, per device:
- *   - Fold cover, PORTRAIT  → ~540px CSS width  → narrow. (Confirmed by the
- *     original bug: the wide table was shrink-fit "very small", which only
- *     happens when the viewport is narrower than the table's ~600px — i.e. the
- *     cover's portrait width is well under 768.)
- *   - Fold cover, LANDSCAPE → ~900-1200px       → wide.
- *   - Tablet, portrait      → >=768px           → wide.
- *   - Phone, portrait       → <768px            → narrow.
+ * Width alone (Bootstrap's md=768px) is wrong for foldables: a Samsung Fold
+ * cover screen in landscape is wider than 768px but only ~376px tall, and a
+ * regular phone in landscape is wider than 768px but only ~390px tall — both
+ * benefit from the narrow stacked layout.
  */
 
 .score-table-narrow {
@@ -23,7 +16,7 @@
     display: none;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 500px) and (min-height: 500px) {
     .score-table-narrow {
         display: none;
     }
