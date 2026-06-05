@@ -18,6 +18,11 @@ public class TableAssignment
     public List<Guid> PlayerIds { get; set; } = new();
     public int PlayerCount => PlayerIds.Count;
     public TableScore? Score { get; set; }
+
+    /// <summary>Organizer-side bookkeeping: has this table's invite QR been handed out / scanned.
+    /// Set from the QR modal (Enter) and the table card checkbox; persisted with the container.
+    /// Not part of the scoring wire payload.</summary>
+    public bool Scanned { get; set; }
 }
 
 public class TableScore

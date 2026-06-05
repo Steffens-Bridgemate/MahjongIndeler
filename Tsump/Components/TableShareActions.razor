@@ -50,6 +50,14 @@
         <div class="text-center small text-muted mb-1">
             <i class="bi bi-people me-1"></i>@PlayersFor(currentTable)
         </div>
+        @* Scanned indicator: set (never reset) here by pressing Enter — the trailing key a scan /
+           "this one's done" gesture sends. The matching checkbox on the table card is the one that
+           toggles by mouse click. Both reflect the same TableAssignment.Scanned. *@
+        <div class="form-check d-flex justify-content-center align-items-center gap-2 mb-2">
+            <input class="form-check-input m-0" type="checkbox" id="qr-scanned"
+                   checked="@currentTable.Scanned" disabled />
+            <label class="form-check-label" for="qr-scanned">@Lang.Get("Scanned")</label>
+        </div>
     </AboveQr>
 </QrCodeModal>
 
@@ -70,6 +78,10 @@
     [Parameter, EditorRequired] public string TitlePrefix { get; set; } = "";
     /// <summary>Shorter prefix for the on-QR-modal heading (no club/date prefix).</summary>
     [Parameter, EditorRequired] public string ShortTitlePrefix { get; set; } = "";
+    /// <summary>Raised when the currently-shown table is marked scanned from the QR modal (Enter).
+    /// The flag is already set on the table object; the parent uses this to persist + re-render its
+    /// own (mouse-toggled) card checkbox.</summary>
+    [Parameter] public EventCallback<TableAssignment> OnScannedChanged { get; set; }
 
     private bool copied;
     private bool showQr;
@@ -118,8 +130,8 @@
     private void ShowPrev() { if (CurrentIndex > 0) _ = ShowTable(OrderedTables[CurrentIndex - 1]); }
     private void ShowNext() { if (CurrentIndex < OrderedTables.Count - 1) _ = ShowTable(OrderedTables[CurrentIndex + 1]); }
 
-    // Keyboard: ←/→ page through tables; a digit key jumps straight to that table number.
-    // (Escape is handled by the modal itself.)
+    // Keyboard: ←/→ page through tables; a digit key jumps straight to that table number;
+    // Enter marks the shown table scanned. (Escape is handled by the modal itself.)
     private void HandleKeyDown(KeyboardEventArgs e)
     {
         if (e.Repeat) return; // holding a key shouldn't fire a clipboard copy per repeat
@@ -127,6 +139,7 @@
         {
             case "ArrowLeft": ShowPrev(); break;
             case "ArrowRight": ShowNext(); break;
+            case "Enter": _ = MarkScanned(); break;
             default:
                 if (int.TryParse(e.Key, out var n))
                 {
@@ -135,6 +148,15 @@
                 }
                 break;
         }
+    }
+
+    // Enter only ever sets (never clears) — clearing is done by mouse on the table card.
+    private async Task MarkScanned()
+    {
+        if (currentTable.Scanned) return;
+        currentTable.Scanned = true;
+        StateHasChanged();
+        await OnScannedChanged.InvokeAsync(currentTable);
     }
 
     // Cooperative "background" render: Blazor WASM is single-threaded, so we can't truly offload,

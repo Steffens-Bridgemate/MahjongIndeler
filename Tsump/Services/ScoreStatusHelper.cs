@@ -17,19 +17,18 @@ public static class ScoreStatusHelper
         Stale,     // empty itself, but a later sibling has scores → should have been completed first
     }
 
+    /// <summary>One table has every real PlayerScore's EndPoints set and its differences sum to 0.</summary>
+    public static bool TableIsComplete(TableAssignment table)
+    {
+        if (table.Score == null) return false;
+        var realPlayers = table.Score.PlayerScores.Where(p => !p.IsVirtual).ToList();
+        if (realPlayers.Count == 0 || !realPlayers.All(p => p.EndPoints.HasValue)) return false;
+        return table.Score.PlayerScores.Sum(p => p.Difference) == 0;
+    }
+
     /// <summary>Every real PlayerScore has EndPoints and each table's differences sum to 0.</summary>
     public static bool TablesAreComplete(List<TableAssignment> tables)
-    {
-        if (tables.Count == 0) return false;
-        foreach (var table in tables)
-        {
-            if (table.Score == null) return false;
-            var realPlayers = table.Score.PlayerScores.Where(p => !p.IsVirtual).ToList();
-            if (realPlayers.Count == 0 || !realPlayers.All(p => p.EndPoints.HasValue)) return false;
-            if (table.Score.PlayerScores.Sum(p => p.Difference) != 0) return false;
-        }
-        return true;
-    }
+        => tables.Count > 0 && tables.All(TableIsComplete);
 
     /// <summary>Any real PlayerScore has an EndPoints value set.</summary>
     public static bool TablesHaveAnyScore(List<TableAssignment> tables)

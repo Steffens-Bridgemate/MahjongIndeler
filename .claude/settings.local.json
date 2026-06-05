@@ -36,7 +36,13 @@
       "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-String \"error|succeeded|FAILED|Warning|Error\"\\) -join \"`n\")",
       "PowerShell(\\(Get-Content \"$env:TEMP\\\\tb7.txt\"\\) -join \"`n\")",
       "PowerShell(if \\(Test-Path \"$env:TEMP\\\\tb7.txt\"\\) { \\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-Object -Last 8\\) -join \"`n\" } else { \"no file\" })",
-      "PowerShell(if \\(Test-Path \"$env:TEMP\\\\tb7.txt\"\\) { \\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-Object -Last 6\\) -join \"`n\" } else { \"no file\" })"
+      "PowerShell(if \\(Test-Path \"$env:TEMP\\\\tb7.txt\"\\) { \\(Get-Content \"$env:TEMP\\\\tb7.txt\" | Select-Object -Last 6\\) -join \"`n\" } else { \"no file\" })",
+      "Bash(curl -s \"https://api.github.com/repos/Steffens-Bridgemate/MahjongIndeler/actions/runs?branch=master&per_page=3\")",
+      "Bash(curl -s \"https://api.github.com/repos/Steffens-Bridgemate/MahjongIndeler/actions/runs?branch=master&per_page=2\")",
+      "Bash(awk ' *)",
+      "Bash(curl -s \"https://api.github.com/repos/Steffens-Bridgemate/MahjongScoring/actions/runs?branch=master&per_page=2\")",
+      "Bash(curl -s \"https://api.github.com/repos/Steffens-Bridgemate/MahjongIndeler/actions/runs?branch=master&per_page=1\")",
+      "PowerShell(dotnet build \"c:\\\\Users\\\\aners\\\\source\\\\repos\\\\MahjongScoring\\\\Tsump.Scoring\\\\Tsump.Scoring.csproj\" -c Release -v q --nologo 2>&1)"
     ]
   }
 }

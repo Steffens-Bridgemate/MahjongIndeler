@@ -244,8 +244,17 @@ else
                     var sessRef = session;
                     <div class="col-md-4 mb-3">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
-                            <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
-                                @Lang.Get("Table") @table.TableNumber
+                            <div class="card-header d-flex justify-content-between align-items-center @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
+                                <span>@Lang.Get("Table") @table.TableNumber</span>
+                                @if (externalScoringEnabled)
+                                {
+                                    @* Mouse-toggled twin of the QR modal's Enter-set checkbox; same TableAssignment.Scanned. *@
+                                    <label class="form-check-label d-flex align-items-center gap-1 m-0" title="@Lang.Get("ScannedTitle")" @onclick:stopPropagation="true">
+                                        <input class="form-check-input m-0" type="checkbox"
+                                               checked="@table.Scanned" @onchange="() => ToggleScanned(tableRef)" />
+                                        <span class="small">@Lang.Get("Scanned")</span>
+                                    </label>
+                                }
                             </div>
                             <ul class="list-group list-group-flush">
                                 @foreach (var playerId in table.PlayerIds)
@@ -276,7 +285,8 @@ else
                                                    Uma3="uma3Players"
                                                    Uma4="uma4Players"
                                                    TitlePrefix="@titlePrefix"
-                                                   ShortTitlePrefix="@shortTitlePrefix" />
+                                                   ShortTitlePrefix="@shortTitlePrefix"
+                                                   OnScannedChanged="@(_ => PersistScanned())" />
                             }
                         </div>
                     </div>
@@ -669,6 +679,22 @@ else
         selectedPlayerIds.Clear();
 
         await TournamentService.SaveAsync(tournament);
+    }
+
+    // Mouse-toggle of a table card's scanned checkbox (twin of the QR modal's Enter-set one).
+    private async Task ToggleScanned(TableAssignment table)
+    {
+        table.Scanned = !table.Scanned;
+        await PersistScanned();
+    }
+
+    // Persist the scanned flags (set from either checkbox) — Scanned lives on TableAssignment,
+    // which is part of the tournament's session tables.
+    private async Task PersistScanned()
+    {
+        if (tournament == null) return;
+        await TournamentService.SaveAsync(tournament);
+        StateHasChanged();
     }
 
     private void OnDragStart(Guid playerId, int sessionNumber)

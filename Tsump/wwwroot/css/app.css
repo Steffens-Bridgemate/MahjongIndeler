@@ -271,3 +271,21 @@ code {
     font-size: 1.1rem;
     border-radius: 50%;
 }
+
+/* Floating table-navigation strip on the weekly Assignments view. Sticks below the tab header
+   while the table cards scroll; buttons go green once a table's invite QR has been scanned. */
+.table-nav-strip {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bs-body-bg, #fff);
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.table-nav-btn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.5rem;
+    font-weight: 600;
+    font-size: 1.05rem;
+}

@@ -413,6 +413,13 @@ else
 
         @if (activeTab == "tables")
         {
+            @* Assignments tab: the strip is always available for navigation; only its green
+               (scanned) state is gated on the scanning setting (see TableNavGreen). *@
+            @if (HasNavTables)
+            {
+                @RenderTableNavStrip
+            }
+
             @if (!IsLockedPastSession && selectedPlayerIds.Count > 0)
             {
                 <div class="mb-3">
@@ -434,10 +441,20 @@ else
             <div class="row">
                 @foreach (var table in tables)
                 {
-                    <div class="col-md-4 mb-3">
+                    var tableRef = table;
+                    <div class="col-md-4 mb-3" id="@TableAnchorId(table.TableNumber)">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
-                            <div class="card-header @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
-                                @Lang.Get("Table") @table.TableNumber
+                            <div class="card-header d-flex justify-content-between align-items-center @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
+                                <span>@Lang.Get("Table") @table.TableNumber</span>
+                                @if (externalScoringEnabled && currentHanchan != null)
+                                {
+                                    @* Mouse-toggled twin of the QR modal's Enter-set checkbox; same TableAssignment.Scanned. *@
+                                    <label class="form-check-label d-flex align-items-center gap-1 m-0" title="@Lang.Get("ScannedTitle")" @onclick:stopPropagation="true">
+                                        <input class="form-check-input m-0" type="checkbox"
+                                               checked="@table.Scanned" @onchange="() => ToggleScanned(tableRef)" />
+                                        <span class="small">@Lang.Get("Scanned")</span>
+                                    </label>
+                                }
                             </div>
                             <ul class="list-group list-group-flush">
                                 @foreach (var playerId in table.PlayerIds)
@@ -458,7 +475,6 @@ else
                             </ul>
                             @if (externalScoringEnabled && currentHanchan != null)
                             {
-                                var tableRef = table;
                                 <TableShareActions ContextId="currentHanchan.Id"
                                                    SessionNumber="CurrentHanchanNumber()"
                                                    Table="tableRef"
@@ -468,7 +484,8 @@ else
                                                    Uma3="uma3Players"
                                                    Uma4="uma4Players"
                                                    TitlePrefix="@($"{Lang.FormatDate(sessionDate)} — {BuildHanchanSubtitle()}")"
-                                                   ShortTitlePrefix="@BuildHanchanSubtitle()" />
+                                                   ShortTitlePrefix="@BuildHanchanSubtitle()"
+                                                   OnScannedChanged="@(_ => PersistScanned())" />
                             }
                         </div>
                     </div>
@@ -487,12 +504,19 @@ else
             <ScoreImportPanel IsEnabled="externalScoringEnabled"
                               OnApplied="OnHanchanScoreApplied"
                               PlayerNameResolver="GetPlayerName" />
+            @* Scores tab: green = result entry complete, so the strip is useful regardless of scanning. *@
+            @if (HasNavTables)
+            {
+                @RenderTableNavStrip
+            }
             @foreach (var table in tables)
             {
-                <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
-                            Table="table" PlayerNameResolver="GetPlayerName"
-                            OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
-                            DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                <div id="@TableAnchorId(table.TableNumber)">
+                    <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
+                                Table="table" PlayerNameResolver="GetPlayerName"
+                                OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                </div>
             }
         }
     }
@@ -1497,6 +1521,71 @@ else
 
         saved = true;
         attendanceExpanded = false;
+    }
+
+    private static string TableAnchorId(int tableNumber) => $"table-card-{tableNumber}";
+
+    // Whether there are tables to navigate. The Assignments tab additionally gates on scanning
+    // being enabled; the Scores tab doesn't (its green = result complete). Both tabs reuse the same
+    // table-card-N anchor ids since only one is ever in the DOM.
+    private bool HasNavTables => currentHanchan != null && tables.Count > 0;
+
+    // Floating jump-to-table strip. Buttons scroll a table into view and turn green when "done":
+    // on the Assignments tab that means the invite QR was scanned; on the Scores tab it means the
+    // table's result entry is complete. The leading mark/unmark-all checkbox only appears on the
+    // Assignments tab when scanning is enabled (scanned is the only thing it can bulk-toggle).
+    private RenderFragment RenderTableNavStrip => @<div class="table-nav-strip d-flex align-items-center flex-wrap gap-2 py-2 mb-3">
+        @if (activeTab == "tables" && externalScoringEnabled)
+        {
+            <div class="form-check m-0 d-flex align-items-center" title="@Lang.Get("ScanAllTitle")">
+                <input class="form-check-input mt-0" type="checkbox" id="scan-all-tables"
+                       checked="@AllTablesScanned" @onchange="ToggleScanAll" />
+                <label class="form-check-label visually-hidden" for="scan-all-tables">@Lang.Get("ScanAll")</label>
+            </div>
+        }
+        @foreach (var navTable in tables.OrderBy(t => t.TableNumber))
+        {
+            var nt = navTable;
+            <button class="btn table-nav-btn @(TableNavGreen(nt) ? "btn-success" : "btn-outline-secondary")"
+                    @onclick="() => ScrollToTable(nt.TableNumber)">@nt.TableNumber</button>
+        }
+    </div>;
+
+    private async Task ScrollToTable(int tableNumber)
+        => await JS.InvokeVoidAsync("scrollToElement", TableAnchorId(tableNumber));
+
+    // Assignments tab → scanned (only when scanning is enabled); Scores tab → result entry complete.
+    private bool TableNavGreen(TableAssignment t)
+        => activeTab == "scores"
+            ? ScoreStatusHelper.TableIsComplete(t)
+            : externalScoringEnabled && t.Scanned;
+
+    // True only when every table is scanned — drives the strip's mark-all checkbox state.
+    private bool AllTablesScanned => tables.Count > 0 && tables.All(t => t.Scanned);
+
+    // Mark-all checkbox: set every table to the new checked state (all-on if not already all-on).
+    private async Task ToggleScanAll()
+    {
+        var target = !AllTablesScanned;
+        foreach (var t in tables) t.Scanned = target;
+        await PersistScanned();
+    }
+
+    // Mouse-toggle of a table card's scanned checkbox (twin of the QR modal's Enter-set one).
+    private async Task ToggleScanned(TableAssignment table)
+    {
+        table.Scanned = !table.Scanned;
+        await PersistScanned();
+    }
+
+    // Persist the scanned flags (set from either checkbox) onto the current hanchan. A lightweight
+    // save of the whole container — Scanned lives on TableAssignment, which is part of Tables.
+    private async Task PersistScanned()
+    {
+        if (currentHanchan == null) return;
+        currentHanchan.Tables = tables;
+        await SessionService.SaveAsync(currentHanchan);
+        StateHasChanged();
     }
 
     private async Task SaveScores()
