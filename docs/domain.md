@@ -36,6 +36,8 @@ Both `Hanchan` and `TournamentSession` carry a `Guid Id`. The shared codec ([Sco
 
 `TableAssignment` ([Tsump.Shared/Models/Hanchan.cs](../Tsump.Shared/Models/Hanchan.cs)) holds `TableNumber`, `PlayerIds`, and optional `TableScore`. `PlayerCount` is `PlayerIds.Count`. Tables are 3 or 4 players.
 
+`TableAssignment.Scanned` is organizer-side bookkeeping: "this table's invite QR has been handed out / scanned". Set from the QR modal (Enter sets, never clears — a scanner's trailing key) and the per-table card checkbox (mouse toggles), persisted with the container. It's **not** on the scoring wire payload, and the whole scanned UI is gated on `ClubSettings.EnableExternalScoring`.
+
 `TableScore.PlayerScores` order matters: real players in `PlayerIds` order, then any virtual players at the end. `ScoreTable.InitializeScores` enforces this ordering and adds the virtual Mr. X for 3-player tables.
 
 ### Mr. X (the 3-player virtual fourth)
@@ -56,6 +58,8 @@ so the sum of differences across all four `PlayerScore` rows is zero. `ScoreTabl
 Weekly Uma is from `ClubSettings.WeeklyUma{3,4}Players`. Tournament Uma is from `Tournament.Uma{3,4}Players` if set, otherwise **falls back to weekly settings** — see [TournamentScoreContextResolver.cs](../Tsump/Services/TournamentScoreContextResolver.cs). Same fallback rule applies to `StartingPoints`.
 
 ### Score-status classification
+
+`ScoreStatusHelper.TableIsComplete(table)` is the single-table predicate (all real `EndPoints` set + differences sum to 0); `TablesAreComplete` delegates to it. Used by the table-nav strip to colour a Scores-view button green per table (see [styles.md](styles.md#table-nav-strip)).
 
 [ScoreStatusHelper.cs](../Tsump/Services/ScoreStatusHelper.cs) classifies a hanchan/session against its later siblings:
 

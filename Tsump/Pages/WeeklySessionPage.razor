@@ -9,6 +9,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject LocalStorageService Storage
+@inject ContextNavService Ctx
 @implements IDisposable
 
 <PageTitle>@Lang.Get("WeeklySession") - Tsumo!</PageTitle>
@@ -61,16 +62,11 @@
     </div>
 </div>
 
+@* The hanchan selector, Add Hanchan, All Scores, Rankings and Back to Workflow live in the sidebar
+   (contextual nav, published from BuildSessionNav). Only the all-hanchans export row stays here. *@
 @if (hanchansOnDate.Count > 0 || currentHanchan == null)
 {
     <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
-        @if (hanchansOnDate.Count > 0)
-        {
-            <button class="btn btn-sm btn-outline-success" @onclick="StartNewHanchan"
-                    disabled="@(currentHanchan != null && !currentHanchan.IsFinalized)">
-                <i class="bi bi-plus-lg me-1"></i>@Lang.Get("AddHanchan")
-            </button>
-        }
         @if (hanchansOnDate.Count > 1 && activeTab == "tables")
         {
             @* Each export-all group takes its own row when expanded. *@
@@ -96,55 +92,6 @@
             }
         }
     </div>
-    <ul class="nav nav-tabs mb-0">
-        @{
-            var orderedHanchans = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
-        }
-        @for (int i = 0; i < orderedHanchans.Count; i++)
-        {
-            var s = orderedHanchans[i];
-            var isActive = currentHanchan?.Id == s.Id && activeTab != "rankings" && activeTab != "allscores";
-            var sessionLabel = GetSessionLabel(s);
-            var hanchanStatus = ScoreStatusHelper.Classify(s.Tables, orderedHanchans.Skip(i + 1).Select(h => h.Tables));
-            var hanchanStatusClass = ScoreStatusHelper.TabClass(hanchanStatus, isActive);
-            <li class="nav-item">
-                <a class="nav-link @(isActive ? "active" : "") @hanchanStatusClass"
-                   style="@ScoreStatusHelper.TabStyle(isActive)"
-                   href="javascript:void(0)" @onclick="() => SelectHanchan(s)">
-                    @sessionLabel
-                </a>
-            </li>
-        }
-        @if (hanchansOnDate.Count > 1)
-        {
-            <li class="nav-item">
-                @{
-                    var allStatus = AllHanchansScoreStatus();
-                    var allClass = ScoreStatusHelper.TabClass(allStatus, activeTab == "allscores");
-                    var allExplain = allStatus == ScoreStatusHelper.Status.Partial || allStatus == ScoreStatusHelper.Status.Stale;
-                }
-                <a class="nav-link @(activeTab == "allscores" ? "active" : "") @allClass"
-                   style="@ScoreStatusHelper.TabStyle(activeTab == "allscores")"
-                   href="javascript:void(0)" @onclick="ActivateAllScoresTab">
-                    @Lang.Get("AllScores")
-                    @if (allExplain)
-                    {
-                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
-                           @onclick:stopPropagation="true"
-                           @onclick="() => ShowStatusExplanation(allStatus, isAggregated: true)"></i>
-                    }
-                </a>
-            </li>
-        }
-        @if (hanchansOnDate.Any(h => h.Tables.Any(t => t.Score != null)))
-        {
-            <li class="nav-item">
-                <a class="nav-link @(activeTab == "rankings" ? "active" : "")" href="javascript:void(0)" @onclick="ActivateRankingsTab">
-                    @Lang.Get("Rankings")
-                </a>
-            </li>
-        }
-    </ul>
 }
 
 @if (IsLockedPastSession)
@@ -165,6 +112,15 @@ else if (members.Count == 0)
 else
 {
     <div class="tab-content-panel">
+    @* Status explainer (triggered from the Scores sub-tab and the sidebar's All Scores "?"); kept at
+       the top of the panel so it shows on whichever view is active. *@
+    @if (statusExplanation != null)
+    {
+        <div class="alert alert-info alert-dismissible py-2 small">
+            @statusExplanation
+            <button type="button" class="btn-close" @onclick="() => statusExplanation = null"></button>
+        </div>
+    }
     @if (activeTab != "rankings" && activeTab != "allscores")
     {
     <CollapsibleCard CssClass="mb-4" @bind-Expanded="attendanceExpanded"
@@ -221,13 +177,6 @@ else
                 }
                 <button class="btn btn-outline-secondary" @onclick="ShowCopyFromHistory">
                     <i class="bi bi-clipboard-plus me-1"></i>@Lang.Get("CopyFromHistory")
-                </button>
-            }
-            @if (workflowStepKey != null)
-            {
-                <button class="btn @(saved ? "btn-primary" : "btn-outline-secondary")"
-                        disabled="@(!saved)" @onclick="BackToWorkflow">
-                    &larr; @Lang.Get("BackToWorkflow")
                 </button>
             }
             @if (tables.Count > 0 && activeTab == "tables")
@@ -403,13 +352,6 @@ else
                 </a>
             </li>
         </ul>
-        @if (statusExplanation != null)
-        {
-            <div class="alert alert-info alert-dismissible py-2 small">
-                @statusExplanation
-                <button type="button" class="btn-close" @onclick="() => statusExplanation = null"></button>
-            </div>
-        }
 
         @if (activeTab == "tables")
         {
@@ -542,8 +484,7 @@ else
     .tab-content-panel {
         background-color: #fff;
         border: 1px solid #dee2e6;
-        border-top: none;
-        border-radius: 0 0 .375rem .375rem;
+        border-radius: .375rem;
         padding: 1rem;
         margin-bottom: 1rem;
     }
@@ -647,7 +588,11 @@ else
         sessionDate.Date < DateTime.Today && currentHanchan is { IsFinalized: true };
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
-    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+        Ctx.Clear();
+    }
 
     private IEnumerable<Member> FilteredMembers()
     {
@@ -719,6 +664,8 @@ else
 
             StateHasChanged();
         }
+        // Refresh the sidebar's contextual nav after every render (dedup'd by signature).
+        PublishNav();
     }
 
     private async Task LoadSessionsForDate()
@@ -772,6 +719,109 @@ else
         LoadFromHanchan(hanchan);
     }
 
+    private static string? StatusDotClass(ScoreStatusHelper.Status s) => s switch
+    {
+        ScoreStatusHelper.Status.Complete => "bg-success",
+        ScoreStatusHelper.Status.Partial => "bg-warning",
+        ScoreStatusHelper.Status.Stale => "bg-danger",
+        _ => null,
+    };
+
+    // Builds the sidebar's contextual nav: Back to workflow (if applicable), History, the hanchan
+    // designators (with status colour), + Add hanchan, All scores, Rankings — mirroring what used to
+    // be the in-page tab strip. Click handlers reuse the page's existing methods.
+    private List<ContextNavEntry> BuildSessionNav()
+    {
+        var entries = new List<ContextNavEntry>();
+
+        if (workflowStepKey != null)
+            entries.Add(new ContextNavEntry
+            {
+                Label = Lang.Get("BackToWorkflow"),
+                IconClass = "bi-card-checklist-nav-menu",
+                Disabled = !saved,
+                OnSelect = () => BackToWorkflow(),
+            });
+
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("History"),
+            IconClass = "bi-clock-history-nav-menu",
+            Href = "history",
+        });
+
+        var ordered = hanchansOnDate.OrderBy(s => s.StartTime ?? TimeSpan.Zero).ToList();
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            var s = ordered[i];
+            var sid = s.Id;
+            var status = ScoreStatusHelper.Classify(s.Tables, ordered.Skip(i + 1).Select(h => h.Tables));
+            entries.Add(new ContextNavEntry
+            {
+                Label = GetSessionLabel(s),
+                StatusClass = StatusDotClass(status),
+                IsActive = currentHanchan?.Id == sid && activeTab != "rankings" && activeTab != "allscores",
+                // Resolve by id at click time: a dedup'd (unrefreshed) entry must not capture a stale
+                // Hanchan instance after hanchansOnDate is re-deserialised on save/reload.
+                OnSelect = () =>
+                {
+                    var live = hanchansOnDate.FirstOrDefault(h => h.Id == sid);
+                    if (live != null) SelectHanchan(live);
+                    return Task.CompletedTask;
+                },
+            });
+        }
+
+        if (hanchansOnDate.Count > 0)
+            entries.Add(new ContextNavEntry
+            {
+                Label = Lang.Get("AddHanchan"),
+                IconClass = "bi-plus-lg-nav-menu",
+                Disabled = currentHanchan != null && !currentHanchan.IsFinalized,
+                OnSelect = async () => { await StartNewHanchan(); },
+            });
+
+        if (hanchansOnDate.Count > 1)
+        {
+            var allStatus = AllHanchansScoreStatus();
+            var explain = allStatus is ScoreStatusHelper.Status.Partial or ScoreStatusHelper.Status.Stale;
+            entries.Add(new ContextNavEntry
+            {
+                Label = Lang.Get("AllScores"),
+                StatusClass = StatusDotClass(allStatus),
+                IsActive = activeTab == "allscores",
+                OnSelect = () => { ActivateAllScoresTab(); return Task.CompletedTask; },
+                OnExplain = explain
+                    ? () => { ShowStatusExplanation(allStatus, isAggregated: true); StateHasChanged(); return Task.CompletedTask; }
+                    : null,
+            });
+        }
+
+        if (hanchansOnDate.Any(h => h.Tables.Any(t => t.Score != null)))
+            entries.Add(new ContextNavEntry
+            {
+                Label = Lang.Get("Rankings"),
+                IconClass = "bi-bar-chart-fill-nav-menu",
+                IsActive = activeTab == "rankings",
+                OnSelect = () => { ActivateRankingsTab(); return Task.CompletedTask; },
+            });
+
+        return entries;
+    }
+
+    // Publish to the sidebar only when the visible signature changes, so frequent page renders
+    // (e.g. typing in the member search) don't churn the nav.
+    private string navSignature = "";
+    private void PublishNav()
+    {
+        var entries = BuildSessionNav();
+        var sig = string.Join("|", entries.Select(e =>
+            $"{e.Label}/{e.IsActive}/{e.StatusClass}/{e.Disabled}/{e.Href}/{e.OnExplain != null}"));
+        if (sig == navSignature) return;
+        navSignature = sig;
+        Ctx.Set(entries);
+    }
+
     private async Task StartNewHanchan()
     {
         // Copy attendance from the last hanchan on this date
@@ -809,6 +859,7 @@ else
         {
             hanchanStartTime = defaultStartTime;
         }
+        StateHasChanged();
     }
 
     private string GetSessionLabel(Hanchan session)
@@ -1462,6 +1513,7 @@ else
     private void ActivateRankingsTab()
     {
         activeTab = "rankings";
+        StateHasChanged();
     }
 
     private void RequestDeleteHanchan()

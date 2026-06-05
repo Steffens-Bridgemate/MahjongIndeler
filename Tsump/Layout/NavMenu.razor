@@ -6,6 +6,7 @@
 @inject SettingsService SettingsService
 @inject NavigationManager Nav
 @inject TournamentNavContext TournamentNav
+@inject ContextNavService Ctx
 @implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-light">
@@ -29,7 +30,48 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="nav flex-column">
-        @if (CurrentTournamentId is Guid tid)
+        @if (Ctx.Entries.Count > 0)
+        {
+            @* Page-supplied contextual nav (e.g. the weekly session): the owning page builds these
+               entries from its own state and handlers, and clears them on leaving. *@
+            @foreach (var entry in Ctx.Entries)
+            {
+                var e = entry;
+                <div class="nav-item px-3">
+                    @if (e.Href is { } href)
+                    {
+                        <NavLink class="nav-link" href="@href">
+                            @if (e.IconClass is { } ic) { <span class="bi @ic" aria-hidden="true"></span> }
+                            else if (e.StatusClass is { } sc) { <span class="nav-status-dot @sc"></span> }
+                            @e.Label
+                        </NavLink>
+                    }
+                    else if (e.Disabled)
+                    {
+                        <a class="nav-link disabled" aria-disabled="true">
+                            @if (e.IconClass is { } ic) { <span class="bi @ic" aria-hidden="true"></span> }
+                            else if (e.StatusClass is { } sc) { <span class="nav-status-dot @sc"></span> }
+                            @e.Label
+                        </a>
+                    }
+                    else
+                    {
+                        <a class="nav-link @(e.IsActive ? "active" : "")" href="javascript:void(0)"
+                           @onclick="@(() => InvokeSelect(e))">
+                            @if (e.IconClass is { } ic) { <span class="bi @ic" aria-hidden="true"></span> }
+                            else if (e.StatusClass is { } sc) { <span class="nav-status-dot @sc"></span> }
+                            @e.Label
+                            @if (e.OnExplain is not null)
+                            {
+                                <span class="nav-explain" @onclick:stopPropagation="true"
+                                      @onclick="@(() => InvokeExplain(e))">?</span>
+                            }
+                        </a>
+                    }
+                </div>
+            }
+        }
+        else if (CurrentTournamentId is Guid tid)
         {
             @* Inside a tournament the sidebar becomes the tournament's own sub-nav; "Back to
                tournaments" returns to the general menu. Guidesheets/Rankings stay disabled until the
@@ -192,10 +234,14 @@
         SettingsService.OnChanged += OnSettingsChanged;
         Nav.LocationChanged += OnLocationChanged;
         TournamentNav.OnChanged += OnContextChanged;
+        Ctx.OnChanged += OnContextChanged;
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
     private void OnContextChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task InvokeSelect(ContextNavEntry e) { if (e.OnSelect != null) await e.OnSelect(); }
+    private async Task InvokeExplain(ContextNavEntry e) { if (e.OnExplain != null) await e.OnExplain(); }
 
     // Re-read the logging flag when settings are saved so the Log item appears/disappears
     // without a page reload.
@@ -224,5 +270,6 @@
         SettingsService.OnChanged -= OnSettingsChanged;
         Nav.LocationChanged -= OnLocationChanged;
         TournamentNav.OnChanged -= OnContextChanged;
+        Ctx.OnChanged -= OnContextChanged;
     }
 }

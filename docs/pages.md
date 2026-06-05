@@ -70,10 +70,13 @@ Sections appear only for pages with cross-file behaviour worth recording. Pages 
 
 Cross-cutting concerns covered in [domain.md](domain.md) (status classification, Mr. X, Uma) and [score-import-ui.md](score-import-ui.md) (import panel, share actions, QR overlays). The pages themselves are mostly straightforward wiring around those.
 
+Both pages now host the **table-nav strip** and a **contextual sidebar nav** — both documented in [styles.md](styles.md#11-table-nav-strip-jump-to-table). In short: the top-level tab strips (tournament's Participants/Tables/Guidesheets/Rankings; weekly's hanchans/All-scores/Rankings + Add hanchan + Back-to-workflow) moved into the sidebar, so on a tournament/session route the sidebar *is* that page's nav. Weekly publishes its entries via `ContextNavService` and clears them on `Dispose`; tournament is URL-driven. The tournament score tabs are now **Scores per hanchan** / **Scores per table** (`ScoresPerHanchan`/`ScoresPerTable` keys) matching how each groups its `ScoreTable`s.
+
 Two non-obvious things specific to WeeklySessionPage worth flagging:
 
 - `scoreTableVersion` is bumped on `SaveScores`, `SaveHanchan`, and `OnHanchanScoreApplied` (the `<ScoreImportPanel>` callback). It's part of every `ScoreTable`'s `@key` tuple so Blazor disposes/recreates each `ScoreTable` after a save — needed because the underlying `TableAssignment` references are replaced when `hanchansOnDate` is reloaded.
 - `CurrentHanchanNumber` derives the 1-based "Hanchan N of the day" by ordering `hanchansOnDate` by `StartTime`. There's no stored hanchan number (see [domain.md](domain.md)).
+- The sidebar's weekly nav rebuilds only on a visible-signature change (`PublishNav`), and hanchan-click handlers resolve the live `Hanchan` by id at click time to dodge the stale-reference gotcha after a save/reload.
 
 ## Workflow.razor
 

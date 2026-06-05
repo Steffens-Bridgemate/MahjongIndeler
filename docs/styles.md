@@ -137,6 +137,42 @@ All user-facing text via `Lang.Get(...)` with keys in both `nl` and `en` blocks 
 Prefer reusing an existing short key (`Copy`, `Print`, `Download`, `Assignments`) over adding a
 near-duplicate. Don't bulk-rename strings the user deliberately set.
 
+## 11. Table-nav strip (jump-to-table)
+
+[TableNavStrip.razor](../Tsump/Components/TableNavStrip.razor) is the floating, sticky strip of
+finger-sized table-number buttons shown above the table cards on the weekly + tournament
+assignment/score views. It's page-agnostic: the caller passes `Tables`, an `IsGreen` predicate, an
+`AnchorId` mapper (the DOM id to smooth-scroll to), and optional `Leading` content.
+
+- A button turns **green** (`btn-success`) when "done": *scanned* on the assignment view (gated on
+  external scoring), *result-complete* (`ScoreStatusHelper.TableIsComplete`) on the score views.
+- Clicking scrolls the matching `id` into view via `window.scrollToElement`, which measures the
+  sticky strip's real height (it wraps to several rows) and offsets by it; scroll targets carry the
+  `.table-scroll-anchor` class.
+- The weekly assignment view adds a leading **mark/unmark-all-scanned** checkbox (external-scoring
+  only). The tournament adds one strip per hanchan (Scores/Assignments) and one per table-number
+  group on the per-table view.
+
+## 12. Contextual sidebar nav
+
+Some pages replace the normal [NavMenu](../Tsump/Layout/NavMenu.razor) menu with their own sub-nav
+("Back to …" at the top), to declutter wide in-page tab strips. Two mechanisms, kept separate on
+purpose (routes vs in-page state) — they could later unify on `ContextNavService`:
+
+- **Tournament** (URL-based): while the URL is a `/tournament/{id}…` route, NavMenu renders the four
+  tournament destinations as links + a Tournaments (trophy) "back" item.
+  [TournamentNavContext](../Tsump/Services/TournamentNavContext.cs) only carries `IsGenerated`, so
+  Guidesheets/Rankings stay disabled until the tournament is generated — updated live (no nav).
+- **Weekly session** (entry-based): [ContextNavService](../Tsump/Services/ContextNavService.cs) lets
+  the page publish a flat list of `ContextNavEntry` (label, icon or status-dot, active, disabled,
+  click or href, optional "?" explainer). NavMenu renders them (so they get sidebar styling); the
+  page rebuilds on a signature change and **clears on `Dispose`**. The hanchan designators (with a
+  `.nav-status-dot` mirroring the tab status colour), Add hanchan, All scores, Rankings and
+  Back-to-workflow live here; History is the escape back to the general menu.
+
+On narrow screens the menu button is pinned top-right (fixed) and the menu drops in as a floating
+panel — see the `max-width` block in [NavMenu.razor.css](../Tsump/Layout/NavMenu.razor.css).
+
 ## Exceptions
 
 Deliberate departures from the rules above — don't "fix" these:
