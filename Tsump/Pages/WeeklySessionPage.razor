@@ -414,10 +414,22 @@ else
         @if (activeTab == "tables")
         {
             @* Assignments tab: the strip is always available for navigation; only its green
-               (scanned) state is gated on the scanning setting (see TableNavGreen). *@
+               (scanned) state — and the mark-all checkbox — are gated on the scanning setting. *@
             @if (HasNavTables)
             {
-                @RenderTableNavStrip
+                <TableNavStrip Tables="tables" IsGreen="TableNavGreen"
+                               AnchorId="@(t => TableAnchorId(t.TableNumber))">
+                    <Leading>
+                        @if (externalScoringEnabled)
+                        {
+                            <div class="form-check m-0 d-flex align-items-center" title="@Lang.Get("ScanAllTitle")">
+                                <input class="form-check-input mt-0" type="checkbox" id="scan-all-tables"
+                                       checked="@AllTablesScanned" @onchange="ToggleScanAll" />
+                                <label class="form-check-label visually-hidden" for="scan-all-tables">@Lang.Get("ScanAll")</label>
+                            </div>
+                        }
+                    </Leading>
+                </TableNavStrip>
             }
 
             @if (!IsLockedPastSession && selectedPlayerIds.Count > 0)
@@ -442,7 +454,7 @@ else
                 @foreach (var table in tables)
                 {
                     var tableRef = table;
-                    <div class="col-md-4 mb-3" id="@TableAnchorId(table.TableNumber)">
+                    <div class="col-md-4 mb-3 table-scroll-anchor" id="@TableAnchorId(table.TableNumber)">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
                             <div class="card-header d-flex justify-content-between align-items-center @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
                                 <span>@Lang.Get("Table") @table.TableNumber</span>
@@ -507,11 +519,12 @@ else
             @* Scores tab: green = result entry complete, so the strip is useful regardless of scanning. *@
             @if (HasNavTables)
             {
-                @RenderTableNavStrip
+                <TableNavStrip Tables="tables" IsGreen="TableNavGreen"
+                               AnchorId="@(t => TableAnchorId(t.TableNumber))" />
             }
             @foreach (var table in tables)
             {
-                <div id="@TableAnchorId(table.TableNumber)">
+                <div class="table-scroll-anchor" id="@TableAnchorId(table.TableNumber)">
                     <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
                                 Table="table" PlayerNameResolver="GetPlayerName"
                                 OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
@@ -1529,30 +1542,6 @@ else
     // being enabled; the Scores tab doesn't (its green = result complete). Both tabs reuse the same
     // table-card-N anchor ids since only one is ever in the DOM.
     private bool HasNavTables => currentHanchan != null && tables.Count > 0;
-
-    // Floating jump-to-table strip. Buttons scroll a table into view and turn green when "done":
-    // on the Assignments tab that means the invite QR was scanned; on the Scores tab it means the
-    // table's result entry is complete. The leading mark/unmark-all checkbox only appears on the
-    // Assignments tab when scanning is enabled (scanned is the only thing it can bulk-toggle).
-    private RenderFragment RenderTableNavStrip => @<div class="table-nav-strip d-flex align-items-center flex-wrap gap-2 py-2 mb-3">
-        @if (activeTab == "tables" && externalScoringEnabled)
-        {
-            <div class="form-check m-0 d-flex align-items-center" title="@Lang.Get("ScanAllTitle")">
-                <input class="form-check-input mt-0" type="checkbox" id="scan-all-tables"
-                       checked="@AllTablesScanned" @onchange="ToggleScanAll" />
-                <label class="form-check-label visually-hidden" for="scan-all-tables">@Lang.Get("ScanAll")</label>
-            </div>
-        }
-        @foreach (var navTable in tables.OrderBy(t => t.TableNumber))
-        {
-            var nt = navTable;
-            <button class="btn table-nav-btn @(TableNavGreen(nt) ? "btn-success" : "btn-outline-secondary")"
-                    @onclick="() => ScrollToTable(nt.TableNumber)">@nt.TableNumber</button>
-        }
-    </div>;
-
-    private async Task ScrollToTable(int tableNumber)
-        => await JS.InvokeVoidAsync("scrollToElement", TableAnchorId(tableNumber));
 
     // Assignments tab → scanned (only when scanning is enabled); Scores tab → result entry complete.
     private bool TableNavGreen(TableAssignment t)

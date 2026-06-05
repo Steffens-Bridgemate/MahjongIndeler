@@ -1,0 +1,31 @@
+@using Tsump.Models
+@inject IJSRuntime JS
+
+@* Floating jump-to-table strip. Each button scrolls a table into view and turns green when the
+   caller's IsGreen predicate says it's "done" (scanned on the assignment view, result-complete on
+   the score views). Optional Leading content (e.g. a mark-all checkbox) renders before the first
+   button. The caller owns the green/anchor semantics so this stays page-agnostic. *@
+<div class="table-nav-strip d-flex align-items-center flex-wrap gap-2 py-2 mb-3">
+    @Leading
+    @foreach (var table in Tables.OrderBy(t => t.TableNumber))
+    {
+        var t = table;
+        <button class="btn table-nav-btn @(IsGreen(t) ? "btn-success" : "btn-outline-secondary")"
+                @onclick="() => Scroll(t)">@LabelFor(t)</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TableAssignment> Tables { get; set; } = Array.Empty<TableAssignment>();
+    /// <summary>Whether a table's button shows as "done" (green).</summary>
+    [Parameter, EditorRequired] public Func<TableAssignment, bool> IsGreen { get; set; } = _ => false;
+    /// <summary>DOM id to smooth-scroll into view when a table's button is tapped.</summary>
+    [Parameter, EditorRequired] public Func<TableAssignment, string> AnchorId { get; set; } = default!;
+    /// <summary>Button label; defaults to the table number.</summary>
+    [Parameter] public Func<TableAssignment, string>? Label { get; set; }
+    /// <summary>Optional content rendered before the first table button (e.g. a mark-all checkbox).</summary>
+    [Parameter] public RenderFragment? Leading { get; set; }
+
+    private string LabelFor(TableAssignment t) => Label?.Invoke(t) ?? t.TableNumber.ToString();
+    private async Task Scroll(TableAssignment t) => await JS.InvokeVoidAsync("scrollToElement", AnchorId(t));
+}
