@@ -5,15 +5,10 @@
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject TournamentNavContext TournamentNav
 @implements IDisposable
 
 <PageTitle>@Lang.Get("TournamentGuidesheets") - Tsumo!</PageTitle>
-
-<div class="mb-3">
-    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
-        &larr; @Lang.Get("BackToTournaments")
-    </button>
-</div>
 
 @if (tournament == null)
 {
@@ -23,22 +18,6 @@ else
 {
     <h1><i class="bi bi-file-earmark-text me-2"></i>@tournament.Name</h1>
     <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
-
-    @* --- Sub-navigation --- *@
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link" href="tournament/@Id/participants">@Lang.Get("TournamentParticipants")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="tournament/@Id">@Lang.Get("TournamentAssignments")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link active" href="tournament/@Id/guidesheets">@Lang.Get("TournamentGuidesheets")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/rankings" : "#")">@Lang.Get("Rankings")</a>
-        </li>
-    </ul>
 
     <p class="text-muted">@Lang.Get("GuidesheetsDesc")</p>
     <div class="form-check mb-3">
@@ -64,8 +43,6 @@ else
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
-    private void GoToList() => Nav.NavigateTo("tournaments");
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -76,6 +53,7 @@ else
             else
                 StateHasChanged();
         }
+        if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
     }
 
     private string BuildGuidesheetHtml(bool includePrintButton)

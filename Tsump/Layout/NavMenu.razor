@@ -1,8 +1,11 @@
 @using Tsump.Models
 @using Tsump.Services
+@using Microsoft.AspNetCore.Components.Routing
 @inject LanguageService Lang
 @inject AppModeService Mode
 @inject SettingsService SettingsService
+@inject NavigationManager Nav
+@inject TournamentNavContext TournamentNav
 @implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-light">
@@ -26,6 +29,57 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="nav flex-column">
+        @if (CurrentTournamentId is Guid tid)
+        {
+            @* Inside a tournament the sidebar becomes the tournament's own sub-nav; "Back to
+               tournaments" returns to the general menu. Guidesheets/Rankings stay disabled until the
+               tournament is generated (TournamentNavContext, kept fresh by the pages). *@
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="tournaments">
+                    <span class="bi bi-trophy-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Tournaments")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@($"tournament/{tid}/participants")">
+                    <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("TournamentParticipants")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@($"tournament/{tid}")" Match="NavLinkMatch.All">
+                    <span class="bi bi-table-nav-menu" aria-hidden="true"></span> @Lang.Get("TournamentAssignments")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                @if (TournamentGenerated(tid))
+                {
+                    <NavLink class="nav-link" href="@($"tournament/{tid}/guidesheets")">
+                        <span class="bi bi-card-checklist-nav-menu" aria-hidden="true"></span> @Lang.Get("TournamentGuidesheets")
+                    </NavLink>
+                }
+                else
+                {
+                    <a class="nav-link disabled" aria-disabled="true">
+                        <span class="bi bi-card-checklist-nav-menu" aria-hidden="true"></span> @Lang.Get("TournamentGuidesheets")
+                    </a>
+                }
+            </div>
+            <div class="nav-item px-3">
+                @if (TournamentGenerated(tid))
+                {
+                    <NavLink class="nav-link" href="@($"tournament/{tid}/rankings")">
+                        <span class="bi bi-bar-chart-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Rankings")
+                    </NavLink>
+                }
+                else
+                {
+                    <a class="nav-link disabled" aria-disabled="true">
+                        <span class="bi bi-bar-chart-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Rankings")
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Home")
@@ -92,6 +146,7 @@
                 </NavLink>
             </div>
         }
+        }
     </nav>
 </div>
 
@@ -101,6 +156,24 @@
     private ClubStyle style = new();
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    // Tournament id from the current URL (the /tournament/{id}[/...] sub-pages). Drives whether the
+    // sidebar shows the tournament sub-nav; null on every other route.
+    private Guid? CurrentTournamentId
+    {
+        get
+        {
+            var path = Nav.ToBaseRelativePath(Nav.Uri);
+            var cut = path.IndexOfAny(new[] { '?', '#' });
+            if (cut >= 0) path = path[..cut];
+            var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            return segs.Length >= 2 && segs[0] == "tournament" && Guid.TryParse(segs[1], out var id)
+                ? id : null;
+        }
+    }
+
+    // Only trust the generated flag when it's for the tournament we're actually showing.
+    private bool TournamentGenerated(Guid id) => TournamentNav.Id == id && TournamentNav.IsGenerated;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -117,7 +190,12 @@
         Lang.OnLanguageChanged += StateHasChanged;
         Mode.OnModeChanged += StateHasChanged;
         SettingsService.OnChanged += OnSettingsChanged;
+        Nav.LocationChanged += OnLocationChanged;
+        TournamentNav.OnChanged += OnContextChanged;
     }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+    private void OnContextChanged() => InvokeAsync(StateHasChanged);
 
     // Re-read the logging flag when settings are saved so the Log item appears/disappears
     // without a page reload.
@@ -144,5 +222,7 @@
         Lang.OnLanguageChanged -= StateHasChanged;
         Mode.OnModeChanged -= StateHasChanged;
         SettingsService.OnChanged -= OnSettingsChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+        TournamentNav.OnChanged -= OnContextChanged;
     }
 }

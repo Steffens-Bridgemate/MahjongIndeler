@@ -7,15 +7,10 @@
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject TournamentNavContext TournamentNav
 @implements IDisposable
 
 <PageTitle>@Lang.Get("TournamentAssignments") - Tsumo!</PageTitle>
-
-<div class="mb-3">
-    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
-        &larr; @Lang.Get("BackToTournaments")
-    </button>
-</div>
 
 @if (tournament == null)
 {
@@ -25,22 +20,6 @@ else
 {
     <h1><i class="bi bi-table me-2"></i>@tournament.Name</h1>
     <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
-
-    @* --- Sub-navigation --- *@
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link" href="tournament/@Id/participants">@Lang.Get("TournamentParticipants")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link active" href="tournament/@Id">@Lang.Get("TournamentAssignments")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/guidesheets" : "#")">@Lang.Get("TournamentGuidesheets")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/rankings" : "#")">@Lang.Get("Rankings")</a>
-        </li>
-    </ul>
 
     @* --- Initial generate button (pre-generation only; once generated the Regenerate
          button moves into the assignments card, on the Import-result row). --- *@
@@ -108,7 +87,7 @@ else
                 <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "") @scoresClass"
                    style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "scores", 0.2)"
                    href="javascript:void(0)" @onclick="ActivateScoresTab">
-                    @Lang.Get("Scores")
+                    @Lang.Get("ScoresPerHanchan")
                     @if (scoresExplain)
                     {
                         <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
@@ -125,7 +104,7 @@ else
                 <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "") @allClass"
                    style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "allscores", 0.2)"
                    href="javascript:void(0)" @onclick="ActivateAllScoresTab">
-                    @Lang.Get("AllScores")
+                    @Lang.Get("ScoresPerTable")
                     @if (allExplain)
                     {
                         <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
@@ -542,8 +521,6 @@ else
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
-    private void GoToList() => Nav.NavigateTo("tournaments");
-
     private void ToggleHanchan(int sessionNumber)
     {
         if (!expandedHanchans.Remove(sessionNumber))
@@ -567,6 +544,9 @@ else
             }
             StateHasChanged();
         }
+        // Keep the sidebar's tournament sub-nav in sync (also reflects IsGenerated flipping after
+        // Generate, since this runs on every render). Set() no-ops when nothing changed.
+        if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
     }
 
     private void GenerateSessions()

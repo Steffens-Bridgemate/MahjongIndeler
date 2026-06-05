@@ -267,7 +267,17 @@
         };
         window.scrollToElement = function (id) {
             var el = document.getElementById(id);
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (!el) return;
+            // The jump target sits under a sticky table-nav strip whose height varies (it wraps to
+            // several rows when there are many tables). Measure the nearest strip *preceding* this
+            // target and reserve exactly that much room, so the strip never covers the top of it.
+            var strips = document.querySelectorAll('.table-nav-strip');
+            var strip = null;
+            strips.forEach(function (s) {
+                if (s.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) strip = s;
+            });
+            el.style.scrollMarginTop = (strip ? strip.offsetHeight + 8 : 0) + 'px';
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
         window.openHtmlInNewTab = function (html) {
             var blob = new Blob([html], { type: 'text/html;charset=utf-8' });

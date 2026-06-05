@@ -6,15 +6,10 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject SettingsService SettingsService
+@inject TournamentNavContext TournamentNav
 @implements IDisposable
 
 <PageTitle>@Lang.Get("TournamentParticipants") - Tsumo!</PageTitle>
-
-<div class="mb-3">
-    <button class="btn btn-outline-secondary btn-sm" @onclick="GoToList">
-        &larr; @Lang.Get("BackToTournaments")
-    </button>
-</div>
 
 @if (tournament == null)
 {
@@ -24,22 +19,6 @@ else
 {
     <h1><i class="bi bi-people-fill me-2"></i>@tournament.Name</h1>
     <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
-
-    @* --- Sub-navigation --- *@
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link active" href="tournament/@Id/participants">@Lang.Get("TournamentParticipants")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="tournament/@Id">@Lang.Get("TournamentAssignments")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/guidesheets" : "#")">@Lang.Get("TournamentGuidesheets")</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link @(tournament.IsGenerated ? "" : "disabled")" href="@(tournament.IsGenerated ? $"tournament/{Id}/rankings" : "#")">@Lang.Get("Rankings")</a>
-        </li>
-    </ul>
 
     @* --- CSV import/export --- *@
     <div class="d-flex align-items-center gap-2 mb-2 flex-wrap justify-content-end">
@@ -245,8 +224,6 @@ else
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
 
-    private void GoToList() => Nav.NavigateTo("tournaments");
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -260,6 +237,7 @@ else
             clubUma3Players = new List<int>(settings.TournamentUma3Players);
             StateHasChanged();
         }
+        if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
     }
 
     private void OnParticipantNameInput(ChangeEventArgs e)
