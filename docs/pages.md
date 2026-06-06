@@ -113,13 +113,15 @@ A reference calculator: pick win type + value, see the point payments. Logic and
   while dragging, a full-viewport transparent `.riichi-drag-capture` layer catches pointer move/up so
   the drag stays smooth off the header (no JS / pointer-capture). The nav item is shared across the
   three branches via a `RenderFragment` (`calcItem`).
-- **Scoring app = a global tab bar.** The Scores/Calculator tabs live in
-  [MainLayout.razor](../../MahjongScoring/Tsump.Scoring/Layout/MainLayout.razor) so they show on **every**
-  page — including the QR deep-link `/score` page (the demo launch profile opens straight there, so
-  Landing-only tabs were invisible in practice). **Scores** routes to `/` (Landing) and is active
-  everywhere except the calculator; **Calculator** is its own route
-  [`/calculator`](../../MahjongScoring/Tsump.Scoring/Pages/RiichiCalculator.razor) hosting
-  `<RiichiScoreCalculator/>` + a button to the standalone PWA (`RiichiInstallStandalone`).
+- **Scoring app = a global tab strip that does NOT navigate.** The Scores/Calculator tabs live in
+  [MainLayout.razor](../../MahjongScoring/Tsump.Scoring/Layout/MainLayout.razor) (so they show on every
+  page, including the QR deep-link `/score` — the demo launch profile opens straight there). Switching
+  tabs only toggles **visibility** (`d-none`): the routed page `@Body` (e.g. the score-entry table)
+  stays **mounted but hidden**, so **in-progress, not-yet-saved score entry is never lost** — the
+  calculator is a convenience that must never disturb the core scoring flow. The calculator
+  (`<RiichiScoreCalculator/>` + the standalone-install button, `RiichiInstallStandalone`) is rendered
+  inline in the layout, **not** a route. A genuine navigation (new score link) resets to the Scores
+  view via `LocationChanged`.
 - **Standalone app = its own repo.** `MahjongRiichiCalc` (sibling repo) is a thin, prettied Blazor WASM
   host (green "felt" theme, centered card, language toggle) that consumes `Tsump.Shared` via submodule
   (with a sibling-path fallback for local dev) and is an installable PWA (manifest + SVG icon + a
