@@ -28,6 +28,10 @@ public static class RiichiScore
 
     private static int FuIndex(int fu) => Array.IndexOf(FuValues, fu);
 
+    // The two fan/fu combinations the kiriage house rule rounds up to mangan (see table comment).
+    // They carry a "Kiriage Mangan" label, shown like the Mangan/Baiman limit badges.
+    private static bool IsKiriageMangan(int fan, int fu) => (fan == 4 && fu == 30) || (fan == 3 && fu == 60);
+
     // --- Fan 1-4 lookups. Outer index = fu (FuValues order), inner index = fan-1. null = invalid. ---
 
     private static readonly int?[][] RonDealer =
@@ -140,19 +144,20 @@ public static class RiichiScore
 
         int fi = FuIndex(fu.Value);
         int fanIdx = fan - 1;
+        string kiriage = IsKiriageMangan(fan, fu.Value) ? "Kiriage Mangan" : "";
 
         if (win == RiichiWin.Ron)
         {
             var cell = (isDealer ? RonDealer : RonNonDealer)[fi][fanIdx];
             if (cell is null) return Invalid(isTsumo, isDealer);
-            return new RiichiResult(true, false, isDealer, cell.Value, cell.Value, null, null, null, "");
+            return new RiichiResult(true, false, isDealer, cell.Value, cell.Value, null, null, null, kiriage);
         }
 
         if (isDealer)
         {
             var each = TsumoDealerEach[fi][fanIdx];
             if (each is null) return Invalid(isTsumo, isDealer);
-            return new RiichiResult(true, true, true, each.Value * 3, null, each.Value, null, null, "");
+            return new RiichiResult(true, true, true, each.Value * 3, null, each.Value, null, null, kiriage);
         }
         else
         {
@@ -160,7 +165,7 @@ public static class RiichiScore
             var dealerPay = TsumoNonDealerDealerPay[fi][fanIdx];
             if (each is null || dealerPay is null) return Invalid(isTsumo, isDealer);
             int total = each.Value * 2 + dealerPay.Value;
-            return new RiichiResult(true, true, false, total, null, null, each.Value, dealerPay.Value, "");
+            return new RiichiResult(true, true, false, total, null, null, each.Value, dealerPay.Value, kiriage);
         }
     }
 
