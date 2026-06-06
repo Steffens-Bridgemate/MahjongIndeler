@@ -92,7 +92,9 @@ A reference calculator: pick win type + value, see the point payments. Logic and
 - **Logic — [RiichiScore.cs](../Tsump.Shared/Scoring/RiichiScore.cs)** (namespace `Tsump.Scoring`). Pure
   static lookup of the standard Riichi tables (transcribed from the score images). Fan 1–4 are keyed
   by fu with **`null` cells for impossible combinations** (e.g. 1-fan/20-fu, any 20-fu ron, 25-fu
-  tsumo below 3 fan); fan 5+ are limit hands (Mangan/Haneman/Baiman/Sanbaiman) and ignore fu; Yakuman
+  tsumo below 3 fan); **kiriage mangan** is baked in — 30fu/4han and 60fu/3han round **up** to mangan
+  (8000/12000 ron, 4000-each / 2000+4000 tsumo) for both ron and tsumo (club house rule); fan 5+ are
+  limit hands (Mangan/Haneman/Baiman/Sanbaiman) and ignore fu; Yakuman
   is a separate flag (fan slider is 1–11). `Calculate(...)` returns a `RiichiResult` populating exactly
   one payment shape (ron = discarder pays; dealer tsumo = each pays; non-dealer tsumo = each-nondealer
   + dealer) plus `Total`, `LimitName`, and `Valid`. `ValidFu(win, isDealer, fan)` feeds the wizard so

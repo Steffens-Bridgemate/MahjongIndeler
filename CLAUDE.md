@@ -35,6 +35,8 @@ These phrases map to **exact** procedures. Do all the steps, in order, in one go
 | **"deploy scoring"** / "push scoring" | Bump the MahjongScoring submodule + push (step 3 below). Stop there. |
 | **"deploy both"** / **"full push"** / "full deploy" | **Both, in order: steps 1 → 2 → 3 below.** This is the default for any shared-code (`Tsump.Shared`) change, because a `Tsump.Shared` edit is not live until *both* repos redeploy. |
 
+**"deploy both" / "deploy all" means the organizer + scoring app ONLY.** The standalone Riichi calculator app ([MahjongRiichiCalc](https://github.com/Steffens-Bridgemate/MahjongRiichiCalc), live at `https://steffens-bridgemate.github.io/MahjongRiichiCalc/`) is a *third* consumer of `Tsump.Shared`, but it rarely needs updating — so it is **never** included in "deploy both"/"deploy all". Redeploy it only when the user **explicitly and separately** asks (e.g. "deploy the calculator app"). To update it: `git submodule update --remote external/MahjongIndeler` in that repo, commit, push (auto-deploys).
+
 **Step 1 — refresh docs (organizer).** Update the `docs/` files touched by the change (`docs/domain.md`, `docs/score-apply.md`, `docs/score-import-ui.md`, `docs/pages.md`, etc.) so they match what's deploying. Stage them in the same commit.
 
 **Step 2 — commit + push organizer.**

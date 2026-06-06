@@ -17,6 +17,8 @@ public record RiichiResult(
 // Standard Riichi scoring tables. Source: Downloads/Riichi scores/*.png.
 // Fan 1-4 are keyed by fu (null cell = combination does not exist).
 // Fan 5+ are limit hands and ignore fu.
+// Kiriage mangan: 30fu/4han and 60fu/3han are rounded UP to mangan (8000/12000 ron,
+// 2000/4000 & 4000 tsumo) for both ron and tsumo — the club's house rule, baked into the cells below.
 public static class RiichiScore
 {
     public static readonly int[] FuValues = { 20, 25, 30, 40, 50, 60, 70 };
@@ -32,10 +34,10 @@ public static class RiichiScore
     {
         new int?[] { null, null,  null,  null  },  // 20
         new int?[] { null, 2400,  4800,  9600  },  // 25
-        new int?[] { 1500, 2900,  5800,  11600 },  // 30
+        new int?[] { 1500, 2900,  5800,  12000 },  // 30  (4 han: kiriage mangan)
         new int?[] { 2000, 3900,  7700,  12000 },  // 40
         new int?[] { 2400, 4800,  9600,  12000 },  // 50
-        new int?[] { 2900, 5800,  11600, 12000 },  // 60
+        new int?[] { 2900, 5800,  12000, 12000 },  // 60  (3 han: kiriage mangan)
         new int?[] { 3400, 6800,  12000, 12000 },  // 70
     };
 
@@ -43,10 +45,10 @@ public static class RiichiScore
     {
         new int?[] { null, null, null, null },  // 20
         new int?[] { null, 1600, 3200, 6400 },  // 25
-        new int?[] { 1000, 2000, 3900, 7700 },  // 30
+        new int?[] { 1000, 2000, 3900, 8000 },  // 30  (4 han: kiriage mangan)
         new int?[] { 1300, 2600, 5200, 8000 },  // 40
         new int?[] { 1600, 3200, 6400, 8000 },  // 50
-        new int?[] { 2000, 3900, 7700, 8000 },  // 60
+        new int?[] { 2000, 3900, 8000, 8000 },  // 60  (3 han: kiriage mangan)
         new int?[] { 2300, 4500, 8000, 8000 },  // 70
     };
 
@@ -55,10 +57,10 @@ public static class RiichiScore
     {
         new int?[] { null, 700,  1300, 2600 },  // 20
         new int?[] { null, null, 1600, 3200 },  // 25
-        new int?[] { 500,  1000, 2000, 3900 },  // 30
+        new int?[] { 500,  1000, 2000, 4000 },  // 30  (4 han: kiriage mangan)
         new int?[] { 700,  1300, 2600, 4000 },  // 40
         new int?[] { 800,  1600, 3200, 4000 },  // 50
-        new int?[] { 1000, 2000, 3900, 4000 },  // 60
+        new int?[] { 1000, 2000, 4000, 4000 },  // 60  (3 han: kiriage mangan)
         new int?[] { 1200, 2300, 4000, 4000 },  // 70
     };
 
@@ -79,10 +81,10 @@ public static class RiichiScore
     {
         new int?[] { null, 700,  1300, 2600 },  // 20
         new int?[] { null, null, 1600, 3200 },  // 25
-        new int?[] { 500,  1000, 2000, 3900 },  // 30
+        new int?[] { 500,  1000, 2000, 4000 },  // 30  (4 han: kiriage mangan)
         new int?[] { 700,  1300, 2600, 4000 },  // 40
         new int?[] { 800,  1600, 3200, 4000 },  // 50
-        new int?[] { 1000, 2000, 3900, 4000 },  // 60
+        new int?[] { 1000, 2000, 4000, 4000 },  // 60  (3 han: kiriage mangan)
         new int?[] { 1200, 2300, 4000, 4000 },  // 70
     };
 
