@@ -188,16 +188,18 @@ else the default menu.
   `ContextNavService` — back-to-Tournaments + Participants, the three **view selectors**
   (Assignments / Scores per Hanchan / Scores per Table) that drive the in-page `tournamentActiveTab`
   (there is **no** in-page tab strip), then jumps to the two bottom info cards (3-player
-  distribution, Meetings — they expand the card and scroll to it), then Guidesheets + Rankings. The
+  distribution, Meetings — they expand the card and scroll to it), then Guidesheets, Rankings and
+  finally **Settings** (the tournament's scoring-settings page, gear icon — always last). The
   active selector is followed by an **indented (`Indent = 1`) jump list** — its hanchans (Assignments
   / Scores per Hanchan) or its table numbers (Scores per Table); each entry switches the view,
   expands the target, and smooth-scrolls to it (`pendingScrollId` / `pendingScrollFn` consumed in
   `OnAfterRenderAsync`: `scrollToElement` reserves a sticky strip's height, `scrollToAnchor` is a
   plain scroll for targets with no strip above them). Before generation, and
   on the other `/tournament/{id}/…` sub-pages (which don't publish entries), NavMenu falls back to
-  its URL-based branch: the four tournament destinations as links + a top **"Back"** item, with
-  [TournamentNavContext](../Tsump/Services/TournamentNavContext.cs) carrying `IsGenerated` so
-  Guidesheets/Rankings stay disabled until generated. Both the entry-based and URL-based back items
+  its URL-based branch: the tournament destinations as links (Participants, Assignments,
+  Guidesheets, Rankings, then **Settings** last — the scoring-settings page) + a top **"Back"**
+  item, with [TournamentNavContext](../Tsump/Services/TournamentNavContext.cs) carrying `IsGenerated`
+  so Guidesheets/Rankings stay disabled until generated (Settings/Participants stay enabled). Both the entry-based and URL-based back items
   use the **home icon** and the generic `Back` label, and navigate to the Tournaments list.
 
 Indented sub-items use `.nav-subitem` (tighter, smaller) in

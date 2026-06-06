@@ -1047,6 +1047,12 @@ else
             IconClass = "bi-bar-chart-fill-nav-menu",
             Href = $"tournament/{Id}/rankings",
         });
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("Settings"),
+            IconClass = "bi-gear-fill-nav-menu",
+            Href = $"tournament/{Id}/scoring",
+        });
 
         return entries;
     }

@@ -18,7 +18,7 @@
 {
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title">@Lang.Get("CreateTournament")</h5>
+            <h5 class="card-title">@(editId == null ? Lang.Get("CreateTournament") : Lang.Get("EditTournament"))</h5>
             <div class="mb-3">
                 <label class="form-label">@Lang.Get("TournamentName")</label>
                 <input class="form-control" @bind="newName" />
@@ -41,8 +41,16 @@
                     }
                 </select>
             </div>
-            <button class="btn btn-success me-2" @onclick="CreateTournament">@Lang.Get("Save")</button>
-            <button class="btn btn-secondary" @onclick="() => showForm = false">@Lang.Get("Cancel")</button>
+            @if (showEditResetWarning)
+            {
+                <div class="alert alert-warning py-2">
+                    @Lang.Get("ChangeHanchansWarning")
+                    <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmEditReset">@Lang.Get("YesContinue")</button>
+                    <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showEditResetWarning = false">@Lang.Get("Cancel")</button>
+                </div>
+            }
+            <button class="btn btn-success me-2" @onclick="SaveForm">@Lang.Get("Save")</button>
+            <button class="btn btn-secondary" @onclick="CloseForm">@Lang.Get("Cancel")</button>
         </div>
     </div>
 }
@@ -73,19 +81,24 @@ else
                                 <span class="badge bg-success ms-2">&#10003;</span>
                             }
                         </p>
-                        <button class="btn btn-primary btn-sm me-2" @onclick="() => OpenTournament(t)">
-                            @Lang.Get("OpenTournament")
-                        </button>
-                        @if (deleteConfirmId == t.Id)
-                        {
-                            <span class="text-danger me-2">@Lang.Get("DeleteTournamentConfirm")</span>
-                            <button class="btn btn-danger btn-sm me-1" @onclick="() => ConfirmDelete(t.Id)">@Lang.Get("YesDelete")</button>
-                            <button class="btn btn-secondary btn-sm" @onclick="() => deleteConfirmId = null">@Lang.Get("Cancel")</button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-outline-danger btn-sm" @onclick="() => deleteConfirmId = t.Id">@Lang.Get("Remove")</button>
-                        }
+                        <div class="d-flex align-items-center flex-wrap gap-1">
+                            <button class="btn btn-primary btn-sm" @onclick="() => OpenTournament(t)">
+                                @Lang.Get("OpenTournament")
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" title="@Lang.Get("Edit")" @onclick="() => EditTournament(t)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            @if (deleteConfirmId == t.Id)
+                            {
+                                <span class="text-danger ms-1">@Lang.Get("DeleteTournamentConfirm")</span>
+                                <button class="btn btn-danger btn-sm" @onclick="() => ConfirmDelete(t.Id)">@Lang.Get("YesDelete")</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => deleteConfirmId = null">@Lang.Get("Cancel")</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => deleteConfirmId = t.Id">@Lang.Get("Remove")</button>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -96,11 +109,16 @@ else
 @code {
     private List<Tournament>? tournaments;
     private bool showForm;
+    // null = the form is creating a new tournament; otherwise it's editing this existing one.
+    private Guid? editId;
     private string newName = string.Empty;
     private string newShortName = string.Empty;
     private DateTime newDate = DateTime.Today;
     private int newSessionCount = 4;
     private Guid? deleteConfirmId;
+    // Editing a generated tournament's hanchan count wipes its assignments — gate that behind a confirm.
+    private bool showEditResetWarning;
+    private bool editResetConfirmed;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -116,12 +134,36 @@ else
 
     private void ShowCreateForm()
     {
+        editId = null;
         newName = string.Empty;
         newShortName = string.Empty;
         newDate = DateTime.Today;
         newSessionCount = 4;
+        showEditResetWarning = false;
+        editResetConfirmed = false;
         showForm = true;
     }
+
+    private void EditTournament(Tournament t)
+    {
+        editId = t.Id;
+        newName = t.Name;
+        newShortName = t.ShortName ?? string.Empty;
+        newDate = t.Date;
+        newSessionCount = t.SessionCount;
+        showEditResetWarning = false;
+        editResetConfirmed = false;
+        deleteConfirmId = null;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        showEditResetWarning = false;
+    }
+
+    private Task SaveForm() => editId == null ? CreateTournament() : SaveEdit();
 
     private async Task CreateTournament()
     {
@@ -130,7 +172,7 @@ else
 
         var tournament = new Tournament
         {
-            Name = newName,
+            Name = newName.Trim(),
             ShortName = string.IsNullOrWhiteSpace(newShortName) ? null : newShortName.Trim(),
             Date = newDate,
             SessionCount = newSessionCount
@@ -141,6 +183,47 @@ else
         showForm = false;
 
         Nav.NavigateTo($"tournament/{tournament.Id}/participants");
+    }
+
+    private async Task SaveEdit()
+    {
+        if (string.IsNullOrWhiteSpace(newName)) return;
+        var t = tournaments?.FirstOrDefault(x => x.Id == editId);
+        if (t == null) return;
+
+        var hanchansChanged = newSessionCount != t.SessionCount;
+
+        // Only a hanchan-count change on a generated tournament invalidates the assignments — warn
+        // and clear them on confirm. Name / short-name / date edits always save silently.
+        if (t.IsGenerated && hanchansChanged && !editResetConfirmed)
+        {
+            showEditResetWarning = true;
+            return;
+        }
+
+        t.Name = newName.Trim();
+        t.ShortName = string.IsNullOrWhiteSpace(newShortName) ? null : newShortName.Trim();
+        t.Date = newDate;
+        if (hanchansChanged)
+        {
+            t.SessionCount = newSessionCount;
+            if (t.IsGenerated)
+            {
+                t.Sessions.Clear();
+                t.IsGenerated = false;
+            }
+        }
+
+        await TournamentService.SaveAsync(t);
+        tournaments = await TournamentService.GetAllAsync();
+        CloseForm();
+    }
+
+    private async Task ConfirmEditReset()
+    {
+        editResetConfirmed = true;
+        showEditResetWarning = false;
+        await SaveEdit();
     }
 
     private void OpenTournament(Tournament tournament)

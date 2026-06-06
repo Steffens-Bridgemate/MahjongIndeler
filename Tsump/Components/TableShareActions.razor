@@ -38,7 +38,7 @@
             @foreach (var t in OrderedTables)
             {
                 var tt = t;
-                <button class="btn btn-sm @(tt.TableNumber == currentTable.TableNumber ? "btn-primary" : "btn-outline-secondary")"
+                <button class="btn btn-sm @TableNavClass(tt)"
                         style="min-width:2.2rem;"
                         @onclick="() => ShowTable(tt)">@tt.TableNumber</button>
             }
@@ -98,6 +98,14 @@
 
     private List<TableAssignment> OrderedTables => Tables.OrderBy(t => t.TableNumber).ToList();
     private int CurrentIndex => OrderedTables.FindIndex(t => t.TableNumber == currentTable.TableNumber);
+
+    // Strip-button colour: scanned tables go green (matching the assignment-overview TableNavStrip),
+    // otherwise the currently-shown table reads as primary and the rest as plain outlines. Scanned
+    // wins over "current" so marking the shown table scanned gives immediate green feedback.
+    private string TableNavClass(TableAssignment t)
+        => t.Scanned ? "btn-success"
+            : t.TableNumber == currentTable.TableNumber ? "btn-primary"
+            : "btn-outline-secondary";
 
     private List<int> UmaFor(TableAssignment t) => t.PlayerCount == 3 ? Uma3 : Uma4;
     private string TitleFor(TableAssignment t) => $"{TitlePrefix} — {Lang.Get("Table")} {t.TableNumber}";
