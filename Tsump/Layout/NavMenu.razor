@@ -1,17 +1,19 @@
 @using Tsump.Models
 @using Tsump.Services
 @using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.JSInterop
 @inject LanguageService Lang
 @inject AppModeService Mode
 @inject SettingsService SettingsService
 @inject NavigationManager Nav
 @inject TournamentNavContext TournamentNav
 @inject ContextNavService Ctx
-@inject CalculatorOverlayService Calc
+@inject IJSRuntime JS
 @implements IDisposable
 
-@* The Calculator is the LAST item in every nav variant (contextual, tournament, default) and opens
-   the floating draggable overlay instead of navigating. Shared as a fragment to avoid repetition. *@
+@* The Calculator is the LAST item in every nav variant (contextual, tournament, default). It launches
+   the standalone calculator app in its own browser window (CalculatorAppConfig.DeployedUrl) rather than
+   navigating or embedding an overlay. Shared as a fragment to avoid repetition. *@
 @{
     RenderFragment calcItem =
         @<div class="nav-item px-3">
@@ -284,10 +286,11 @@
         collapseNavMenu = !collapseNavMenu;
     }
 
-    // Opens the floating calculator overlay and collapses the (narrow-screen) menu.
-    private void OpenCalculator()
+    // Launches the standalone calculator app in its own window (a named popup so repeat clicks
+    // reuse/refocus the same window) and collapses the (narrow-screen) menu.
+    private async Task OpenCalculator()
     {
-        Calc.Open();
+        await JS.InvokeVoidAsync("open", CalculatorAppConfig.DeployedUrl, "riichi-calc", "width=480,height=660");
         collapseNavMenu = true;
     }
 

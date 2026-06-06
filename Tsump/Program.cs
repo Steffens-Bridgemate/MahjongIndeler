@@ -23,7 +23,6 @@ builder.Services.AddScoped<TournamentAssignmentService>();
 builder.Services.AddScoped<AppModeService>();
 builder.Services.AddScoped<TournamentNavContext>();
 builder.Services.AddScoped<ContextNavService>();
-builder.Services.AddScoped<CalculatorOverlayService>();
 builder.Services.AddSingleton<LanguageService>();
 
 await builder.Build().RunAsync();

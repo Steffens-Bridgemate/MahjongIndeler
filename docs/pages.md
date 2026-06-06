@@ -105,14 +105,17 @@ A reference calculator: pick win type + value, see the point payments. Logic and
   shows every selector at once. Switching modes preserves values. `RevalidateFu` drops a now-illegal
   fu when win/seat/fan change. Localized via `Lang` (keys `Riichi*` in all four dictionaries; limit
   names stay Japanese).
-- **Organizer = floating draggable overlay, not a page.** The nav item is the **last** entry in
-  **every** NavMenu variant (contextual/weekly, tournament, default) and is an **action**, not a
-  `NavLink`: it calls [CalculatorOverlayService](../Tsump/Services/CalculatorOverlayService.cs)`.Open()`.
-  [RiichiCalculatorOverlay.razor](../Tsump/Components/RiichiCalculatorOverlay.razor) lives in
-  `MainLayout` so it floats over any page; it has a Close button and is **dragged in pure Blazor** —
-  while dragging, a full-viewport transparent `.riichi-drag-capture` layer catches pointer move/up so
-  the drag stays smooth off the header (no JS / pointer-capture). The nav item is shared across the
-  three branches via a `RenderFragment` (`calcItem`).
+- **Organizer = launches the standalone calculator app in its own window, not embedded.** The nav
+  item is the **last** entry in **every** NavMenu variant (contextual/weekly, tournament, default) and
+  is an **action**, not a `NavLink`: `OpenCalculator` calls `window.open` (via JS interop) on
+  [CalculatorAppConfig](../Tsump/CalculatorAppConfig.cs)`.DeployedUrl` — the deployed
+  [MahjongRiichiCalc](https://github.com/Steffens-Bridgemate/MahjongRiichiCalc) app — as a named
+  (`riichi-calc`) sized popup, so repeat clicks reuse/refocus the same OS-managed window. The nav item
+  is shared across the three branches via a `RenderFragment` (`calcItem`). (The earlier in-app
+  *floating draggable overlay* — `CalculatorOverlayService` + `RiichiCalculatorOverlay.razor` — was
+  removed: the hand-rolled pointer-drag was awkward, and a real browser window is OS-draggable for
+  free. The calculator UI itself, `RiichiScoreCalculator`, still lives in `Tsump.Shared` and is what
+  the standalone app renders.)
 - **Scoring app = a global tab strip that does NOT navigate.** The Scores/Calculator tabs live in
   [MainLayout.razor](../../MahjongScoring/Tsump.Scoring/Layout/MainLayout.razor) (so they show on every
   page, including the QR deep-link `/score` — the demo launch profile opens straight there). Switching
