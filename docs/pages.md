@@ -113,10 +113,13 @@ A reference calculator: pick win type + value, see the point payments. Logic and
   while dragging, a full-viewport transparent `.riichi-drag-capture` layer catches pointer move/up so
   the drag stays smooth off the header (no JS / pointer-capture). The nav item is shared across the
   three branches via a `RenderFragment` (`calcItem`).
-- **Scoring app = a tab.** [Landing.razor](../../MahjongScoring/Tsump.Scoring/Pages/Landing.razor) is now
-  two Bootstrap tabs — **Scores** (the existing landing text) and **Calculator** (`<RiichiScoreCalculator/>`
-  + a button linking to the standalone PWA, `RiichiInstallStandalone`). The `/score` deep-link page is
-  unchanged.
+- **Scoring app = a global tab bar.** The Scores/Calculator tabs live in
+  [MainLayout.razor](../../MahjongScoring/Tsump.Scoring/Layout/MainLayout.razor) so they show on **every**
+  page — including the QR deep-link `/score` page (the demo launch profile opens straight there, so
+  Landing-only tabs were invisible in practice). **Scores** routes to `/` (Landing) and is active
+  everywhere except the calculator; **Calculator** is its own route
+  [`/calculator`](../../MahjongScoring/Tsump.Scoring/Pages/RiichiCalculator.razor) hosting
+  `<RiichiScoreCalculator/>` + a button to the standalone PWA (`RiichiInstallStandalone`).
 - **Standalone app = its own repo.** `MahjongRiichiCalc` (sibling repo) is a thin, prettied Blazor WASM
   host (green "felt" theme, centered card, language toggle) that consumes `Tsump.Shared` via submodule
   (with a sibling-path fallback for local dev) and is an installable PWA (manifest + SVG icon + a
