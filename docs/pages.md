@@ -84,6 +84,43 @@ Two non-obvious things specific to WeeklySessionPage worth flagging:
 - **Per-tournament scoring overrides moved to their own page** ([TournamentScoringSettings.razor](../Tsump/Pages/TournamentScoringSettings.razor), `/tournament/{id}/scoring`) — they used to be a `CollapsibleCard` at the bottom of `TournamentParticipants`. It's reachable via the **"Settings"** sidebar entry (gear, always last; see [styles.md §12](styles.md#12-contextual-sidebar-nav)) and, like the other sub-pages, calls `TournamentNav.Set` so the URL-based branch's disabled state stays correct.
 - **Participant delete is a two-click inline confirm** mirroring the Members page: first click arms the row's trash button (turns solid `btn-danger` + "confirm deletion" tooltip), the second removes — and removal still flows through `RemoveParticipant`'s existing reset-warning path when the tournament is generated.
 
+## Riichi score calculator (shared — all three apps)
+
+A reference calculator: pick win type + value, see the point payments. Logic and UI live once in
+`Tsump.Shared`; the three apps embed it differently.
+
+- **Logic — [RiichiScore.cs](../Tsump.Shared/Scoring/RiichiScore.cs)** (namespace `Tsump.Scoring`). Pure
+  static lookup of the standard Riichi tables (transcribed from the score images). Fan 1–4 are keyed
+  by fu with **`null` cells for impossible combinations** (e.g. 1-fan/20-fu, any 20-fu ron, 25-fu
+  tsumo below 3 fan); fan 5+ are limit hands (Mangan/Haneman/Baiman/Sanbaiman) and ignore fu; Yakuman
+  is a separate flag (fan slider is 1–11). `Calculate(...)` returns a `RiichiResult` populating exactly
+  one payment shape (ron = discarder pays; dealer tsumo = each pays; non-dealer tsumo = each-nondealer
+  + dealer) plus `Total`, `LimitName`, and `Valid`. `ValidFu(win, isDealer, fan)` feeds the wizard so
+  only legal fu are offered.
+- **Component — [RiichiScoreCalculator.razor](../Tsump.Shared/Components/RiichiScoreCalculator.razor)**.
+  Two modes share **one** set of selector blocks; only disclosure differs. **New** reveals
+  Ron/Tsumo → East/non-East → Fan → Fu (fu only when fan < 5) as each prior step is chosen; **Edit**
+  shows every selector at once. Switching modes preserves values. `RevalidateFu` drops a now-illegal
+  fu when win/seat/fan change. Localized via `Lang` (keys `Riichi*` in all four dictionaries; limit
+  names stay Japanese).
+- **Organizer = floating draggable overlay, not a page.** The nav item is the **last** entry in
+  **every** NavMenu variant (contextual/weekly, tournament, default) and is an **action**, not a
+  `NavLink`: it calls [CalculatorOverlayService](../Tsump/Services/CalculatorOverlayService.cs)`.Open()`.
+  [RiichiCalculatorOverlay.razor](../Tsump/Components/RiichiCalculatorOverlay.razor) lives in
+  `MainLayout` so it floats over any page; it has a Close button and is **dragged in pure Blazor** —
+  while dragging, a full-viewport transparent `.riichi-drag-capture` layer catches pointer move/up so
+  the drag stays smooth off the header (no JS / pointer-capture). The nav item is shared across the
+  three branches via a `RenderFragment` (`calcItem`).
+- **Scoring app = a tab.** [Landing.razor](../../MahjongScoring/Tsump.Scoring/Pages/Landing.razor) is now
+  two Bootstrap tabs — **Scores** (the existing landing text) and **Calculator** (`<RiichiScoreCalculator/>`
+  + a button linking to the standalone PWA, `RiichiInstallStandalone`). The `/score` deep-link page is
+  unchanged.
+- **Standalone app = its own repo.** `MahjongRiichiCalc` (sibling repo) is a thin, prettied Blazor WASM
+  host (green "felt" theme, centered card, language toggle) that consumes `Tsump.Shared` via submodule
+  (with a sibling-path fallback for local dev) and is an installable PWA (manifest + SVG icon + a
+  minimal runtime-caching service worker). Its `.csproj` `ProjectReference` is conditional on the
+  submodule's presence.
+
 ## Workflow.razor
 
 [Tsump/Pages/Workflow.razor](../Tsump/Pages/Workflow.razor)

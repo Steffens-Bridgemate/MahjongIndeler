@@ -72,6 +72,7 @@ For wire-format **breaking** changes, deploy MahjongScoring **first** *only if* 
 - **Use Segoe Fluent Icons / Bootstrap Icons** for button glyphs — not raw text or emoji.
 - **Never bulk-rename strings** the user deliberately left at their current values. Ask if unsure.
 - **Never commit or push without explicit approval.** Build locally first; then ask.
+- **Don't launch the app yourself — no `run`/`verify` skills, no `dotnet run` to "check it works", unless explicitly asked.** The user does the manual/visual checks. Your job: build locally to confirm it compiles, then stop and report. (Building, and throwaway logic harnesses, are fine.)
 - **Comments are for *why*, not *what*.** Skip docstrings that restate the signature. Note non-obvious invariants, workarounds, surprising decisions.
 - **`Tsump.Shared` cannot reference `Tsump`.** Components that need `TournamentService` etc. must live in `Tsump/Components/`. Pure Razor (no Tsump-side deps) can live in `Tsump.Shared/Components/`.
 - **Dutch term for "session" is "Zitting"** (not "Sessie"). Use it in `nl` strings in [LanguageService.cs](Tsump.Shared/Services/LanguageService.cs).

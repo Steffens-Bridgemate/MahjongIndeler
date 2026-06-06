@@ -1,0 +1,217 @@
+@using Tsump.Scoring
+@using Tsump.Services
+@inject LanguageService Lang
+@implements IDisposable
+
+@* Pure reference Riichi score calculator. Two modes share one set of selector blocks; they differ
+   only in disclosure: New reveals each step once the previous is chosen (wizard on one page), Edit
+   shows every selector at once. All scoring math lives in RiichiScore (Tsump.Shared/Scoring). *@
+<div class="riichi-calc">
+    <div class="d-flex align-items-center flex-wrap gap-1 mb-3">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm @(mode == Mode.New ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => SetMode(Mode.New)">
+                <i class="bi bi-magic me-1"></i>@Lang.Get("RiichiModeNew")
+            </button>
+            <button type="button" class="btn btn-sm @(mode == Mode.Edit ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => SetMode(Mode.Edit)">
+                <i class="bi bi-pencil me-1"></i>@Lang.Get("RiichiModeEdit")
+            </button>
+        </div>
+        @if (mode == Mode.New && AnythingSelected)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" @onclick="ResetAll"
+                    title="@Lang.Get("RiichiNewCalc")">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>@Lang.Get("RiichiNewCalc")
+            </button>
+        }
+    </div>
+
+    @* 1. Ron / Tsumo *@
+    <div class="riichi-step mb-3">
+        <div class="riichi-label">@Lang.Get("RiichiWinType")</div>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn @(win == RiichiWin.Ron ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => SetWin(RiichiWin.Ron)">@Lang.Get("RiichiRon")</button>
+            <button type="button" class="btn @(win == RiichiWin.Tsumo ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => SetWin(RiichiWin.Tsumo)">@Lang.Get("RiichiTsumo")</button>
+        </div>
+    </div>
+
+    @* 2. East (dealer) / non-East *@
+    @if (ShowSeat)
+    {
+        <div class="riichi-step mb-3">
+            <div class="riichi-label">@Lang.Get("RiichiSeat")</div>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn @(isDealer == true ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => SetSeat(true)">@Lang.Get("RiichiEast")</button>
+                <button type="button" class="btn @(isDealer == false ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => SetSeat(false)">@Lang.Get("RiichiNonEast")</button>
+            </div>
+        </div>
+    }
+
+    @* 3. Fan (1–11) or Yakuman *@
+    @if (ShowFan)
+    {
+        <div class="riichi-step mb-3">
+            <div class="riichi-label">@Lang.Get("RiichiFan")</div>
+            <div class="d-flex flex-wrap gap-1">
+                @for (int f = RiichiScore.MinFan; f <= RiichiScore.MaxFan; f++)
+                {
+                    var fv = f;
+                    <button type="button"
+                            class="btn riichi-num @(!yakuman && fan == fv ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SetFan(fv)">@fv</button>
+                }
+                <button type="button"
+                        class="btn @(yakuman ? "btn-warning" : "btn-outline-warning")"
+                        @onclick="SetYakuman">
+                    <i class="bi bi-star-fill me-1"></i>@Lang.Get("RiichiYakuman")
+                </button>
+            </div>
+        </div>
+    }
+
+    @* 4. Fu (only for fan < 5) *@
+    @if (ShowFu)
+    {
+        <div class="riichi-step mb-3">
+            <div class="riichi-label">@Lang.Get("RiichiFu")</div>
+            <div class="d-flex flex-wrap gap-1">
+                @foreach (var fuValue in RiichiScore.ValidFu(win!.Value, isDealer!.Value, fan!.Value))
+                {
+                    var fuv = fuValue;
+                    <button type="button"
+                            class="btn riichi-num @(fu == fuv ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SetFu(fuv)">@fuv</button>
+                }
+            </div>
+        </div>
+    }
+
+    @* Result *@
+    @if (IsComplete)
+    {
+        var r = RiichiScore.Calculate(win!.Value, isDealer!.Value, fan ?? RiichiScore.LimitFan, yakuman, fu);
+        @if (!r.Valid)
+        {
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-exclamation-triangle me-1"></i>@Lang.Get("RiichiInvalid")
+            </div>
+        }
+        else
+        {
+            <div class="card riichi-result">
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(r.LimitName))
+                    {
+                        <span class="badge bg-warning text-dark mb-2">@r.LimitName</span>
+                    }
+                    @if (!r.IsTsumo)
+                    {
+                        <div class="riichi-payment">
+                            <span class="riichi-amount">@r.RonPayment</span>
+                            <span class="riichi-payment-label">@Lang.Get("RiichiDiscarderPays")</span>
+                        </div>
+                    }
+                    else if (r.IsDealer)
+                    {
+                        <div class="riichi-payment">
+                            <span class="riichi-amount">@r.TsumoEach</span>
+                            <span class="riichi-payment-label">@Lang.Get("RiichiEachPays")</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="riichi-payment">
+                            <span class="riichi-amount">@r.TsumoNonDealer</span>
+                            <span class="riichi-payment-label">@Lang.Get("RiichiEachNonDealerPays")</span>
+                        </div>
+                        <div class="riichi-payment">
+                            <span class="riichi-amount">@r.TsumoDealer</span>
+                            <span class="riichi-payment-label">@Lang.Get("RiichiDealerPays")</span>
+                        </div>
+                    }
+                    <div class="riichi-total mt-2">
+                        @Lang.Get("RiichiTotal"): <strong>@r.Total</strong>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private enum Mode { New, Edit }
+
+    private Mode mode = Mode.New;
+    private RiichiWin? win;
+    private bool? isDealer;
+    private int? fan;       // 1..11; null when Yakuman or not yet chosen
+    private bool yakuman;
+    private int? fu;        // only meaningful for fan 1..4
+
+    protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
+    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+
+    // In Edit mode every selector is visible at once; in New mode each appears once its predecessor is set.
+    private bool ShowSeat => mode == Mode.Edit || win is not null;
+    private bool ShowFan => mode == Mode.Edit || (win is not null && isDealer is not null);
+    private bool ShowFu => !yakuman && fan is >= 1 and <= 4 && win is not null && isDealer is not null;
+
+    private bool AnythingSelected => win is not null || isDealer is not null || fan is not null || yakuman;
+
+    private bool IsComplete =>
+        win is not null && isDealer is not null &&
+        (yakuman || (fan is not null && (fan >= RiichiScore.LimitFan || fu is not null)));
+
+    private void SetMode(Mode m) => mode = m;
+
+    private void SetWin(RiichiWin w)
+    {
+        win = w;
+        RevalidateFu();
+    }
+
+    private void SetSeat(bool dealer)
+    {
+        isDealer = dealer;
+        RevalidateFu();
+    }
+
+    private void SetFan(int f)
+    {
+        yakuman = false;
+        fan = f;
+        RevalidateFu();
+    }
+
+    private void SetYakuman()
+    {
+        yakuman = true;
+        fan = null;
+        fu = null;
+    }
+
+    private void SetFu(int f) => fu = f;
+
+    // Drop a now-illegal fu when the win type / seat / fan change alters which fu are valid
+    // (e.g. switching to Ron removes 20 fu; 25 fu tsumo needs >= 3 fan).
+    private void RevalidateFu()
+    {
+        if (!ShowFu) { fu = null; return; }
+        if (fu is not null && !RiichiScore.ValidFu(win!.Value, isDealer!.Value, fan!.Value).Contains(fu.Value))
+            fu = null;
+    }
+
+    private void ResetAll()
+    {
+        win = null;
+        isDealer = null;
+        fan = null;
+        yakuman = false;
+        fu = null;
+    }
+}

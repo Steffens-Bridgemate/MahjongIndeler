@@ -1,0 +1,37 @@
+.riichi-calc {
+    max-width: 40rem;
+}
+
+.riichi-label {
+    font-weight: 600;
+    margin-bottom: .35rem;
+}
+
+.riichi-num {
+    min-width: 3rem;
+}
+
+.riichi-result {
+    border-color: var(--club-primary, #004b8d);
+}
+
+.riichi-payment {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+}
+
+.riichi-amount {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--club-primary, #004b8d);
+    min-width: 4.5rem;
+}
+
+.riichi-payment-label {
+    color: #555;
+}
+
+.riichi-total {
+    font-size: 1.1rem;
+}

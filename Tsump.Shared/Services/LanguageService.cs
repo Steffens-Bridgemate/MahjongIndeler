@@ -76,6 +76,28 @@ public class LanguageService
     // ── Dutch ──────────────────────────────────────────────
     private static readonly Dictionary<string, string> Dutch = new()
     {
+        // Riichi score calculator
+        ["RiichiCalculator"] = "Riichi rekenmachine",
+        ["RiichiModeNew"] = "Nieuw",
+        ["RiichiModeEdit"] = "Wijzigen",
+        ["RiichiNewCalc"] = "Nieuwe berekening",
+        ["RiichiWinType"] = "Winst",
+        ["RiichiRon"] = "Ron",
+        ["RiichiTsumo"] = "Tsumo",
+        ["RiichiSeat"] = "Wind",
+        ["RiichiEast"] = "Oost (gever)",
+        ["RiichiNonEast"] = "Niet-oost",
+        ["RiichiFan"] = "Fan",
+        ["RiichiYakuman"] = "Yakuman",
+        ["RiichiFu"] = "Fu",
+        ["RiichiInvalid"] = "Geen geldige combinatie",
+        ["RiichiDiscarderPays"] = "afgooier betaalt",
+        ["RiichiEachPays"] = "elke speler betaalt",
+        ["RiichiEachNonDealerPays"] = "elke niet-oost betaalt",
+        ["RiichiDealerPays"] = "oost betaalt",
+        ["RiichiTotal"] = "Totaal",
+        ["RiichiInstallStandalone"] = "Installeer rekenmachine-app",
+
         // Mode selection
         ["SelectMode"] = "Kies modus",
         ["WeeklyMode"] = "Clubavond",
@@ -544,6 +566,28 @@ public class LanguageService
     // ── English ────────────────────────────────────────────
     private static readonly Dictionary<string, string> English = new()
     {
+        // Riichi score calculator
+        ["RiichiCalculator"] = "Riichi calculator",
+        ["RiichiModeNew"] = "New",
+        ["RiichiModeEdit"] = "Edit",
+        ["RiichiNewCalc"] = "New calculation",
+        ["RiichiWinType"] = "Win",
+        ["RiichiRon"] = "Ron",
+        ["RiichiTsumo"] = "Tsumo",
+        ["RiichiSeat"] = "Seat",
+        ["RiichiEast"] = "East (dealer)",
+        ["RiichiNonEast"] = "Non-East",
+        ["RiichiFan"] = "Fan",
+        ["RiichiYakuman"] = "Yakuman",
+        ["RiichiFu"] = "Fu",
+        ["RiichiInvalid"] = "Not a valid combination",
+        ["RiichiDiscarderPays"] = "discarder pays",
+        ["RiichiEachPays"] = "each player pays",
+        ["RiichiEachNonDealerPays"] = "each non-dealer pays",
+        ["RiichiDealerPays"] = "dealer pays",
+        ["RiichiTotal"] = "Total",
+        ["RiichiInstallStandalone"] = "Install calculator app",
+
         // Mode selection
         ["SelectMode"] = "Select mode",
         ["WeeklyMode"] = "Club night",
@@ -1012,6 +1056,28 @@ public class LanguageService
     // ── French ─────────────────────────────────────────────
     private static readonly Dictionary<string, string> French = new()
     {
+        // Riichi score calculator
+        ["RiichiCalculator"] = "Calculateur Riichi",
+        ["RiichiModeNew"] = "Nouveau",
+        ["RiichiModeEdit"] = "Modifier",
+        ["RiichiNewCalc"] = "Nouveau calcul",
+        ["RiichiWinType"] = "Victoire",
+        ["RiichiRon"] = "Ron",
+        ["RiichiTsumo"] = "Tsumo",
+        ["RiichiSeat"] = "Vent",
+        ["RiichiEast"] = "Est (donneur)",
+        ["RiichiNonEast"] = "Non-Est",
+        ["RiichiFan"] = "Fan",
+        ["RiichiYakuman"] = "Yakuman",
+        ["RiichiFu"] = "Fu",
+        ["RiichiInvalid"] = "Combinaison non valide",
+        ["RiichiDiscarderPays"] = "le défausseur paie",
+        ["RiichiEachPays"] = "chaque joueur paie",
+        ["RiichiEachNonDealerPays"] = "chaque non-Est paie",
+        ["RiichiDealerPays"] = "l'Est paie",
+        ["RiichiTotal"] = "Total",
+        ["RiichiInstallStandalone"] = "Installer l'app calculateur",
+
         // Mode selection
         ["SelectMode"] = "Sélectionner le mode",
         ["WeeklyMode"] = "Soirée club",
@@ -1480,6 +1546,28 @@ public class LanguageService
     // ── German ─────────────────────────────────────────────
     private static readonly Dictionary<string, string> German = new()
     {
+        // Riichi score calculator
+        ["RiichiCalculator"] = "Riichi-Rechner",
+        ["RiichiModeNew"] = "Neu",
+        ["RiichiModeEdit"] = "Bearbeiten",
+        ["RiichiNewCalc"] = "Neue Berechnung",
+        ["RiichiWinType"] = "Gewinn",
+        ["RiichiRon"] = "Ron",
+        ["RiichiTsumo"] = "Tsumo",
+        ["RiichiSeat"] = "Wind",
+        ["RiichiEast"] = "Ost (Geber)",
+        ["RiichiNonEast"] = "Nicht-Ost",
+        ["RiichiFan"] = "Fan",
+        ["RiichiYakuman"] = "Yakuman",
+        ["RiichiFu"] = "Fu",
+        ["RiichiInvalid"] = "Keine gültige Kombination",
+        ["RiichiDiscarderPays"] = "Abwerfer zahlt",
+        ["RiichiEachPays"] = "jeder Spieler zahlt",
+        ["RiichiEachNonDealerPays"] = "jeder Nicht-Ost zahlt",
+        ["RiichiDealerPays"] = "Ost zahlt",
+        ["RiichiTotal"] = "Gesamt",
+        ["RiichiInstallStandalone"] = "Rechner-App installieren",
+
         // Mode selection
         ["SelectMode"] = "Modus wählen",
         ["WeeklyMode"] = "Clubabend",

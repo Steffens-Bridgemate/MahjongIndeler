@@ -7,7 +7,19 @@
 @inject NavigationManager Nav
 @inject TournamentNavContext TournamentNav
 @inject ContextNavService Ctx
+@inject CalculatorOverlayService Calc
 @implements IDisposable
+
+@* The Calculator is the LAST item in every nav variant (contextual, tournament, default) and opens
+   the floating draggable overlay instead of navigating. Shared as a fragment to avoid repetition. *@
+@{
+    RenderFragment calcItem =
+        @<div class="nav-item px-3">
+            <a class="nav-link" href="javascript:void(0)" @onclick="OpenCalculator">
+                <span class="bi bi-calculator-nav-menu" aria-hidden="true"></span> @Lang.Get("RiichiCalculator")
+            </a>
+        </div>;
+}
 
 <div class="top-row ps-3 navbar navbar-light">
     <div class="container-fluid">
@@ -70,6 +82,7 @@
                     }
                 </div>
             }
+            @calcItem
         }
         else if (CurrentTournamentId is Guid tid)
         {
@@ -125,6 +138,7 @@
                     <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Settings")
                 </NavLink>
             </div>
+            @calcItem
         }
         else
         {
@@ -194,6 +208,7 @@
                 </NavLink>
             </div>
         }
+        @calcItem
         }
     </nav>
 </div>
@@ -267,6 +282,13 @@
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    // Opens the floating calculator overlay and collapses the (narrow-screen) menu.
+    private void OpenCalculator()
+    {
+        Calc.Open();
+        collapseNavMenu = true;
     }
 
     public void Dispose()
