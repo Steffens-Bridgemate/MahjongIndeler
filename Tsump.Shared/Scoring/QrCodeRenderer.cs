@@ -31,7 +31,7 @@ public static class QrCodeRenderer
             BackgroundColor: "#198754");
     }
 
-    // Memoise rendered SVGs. Building a level-H QR for our payloads costs a few ms (matrix
+    // Memoise rendered SVGs. Building a QR for our payloads costs a few ms (matrix
     // generation + emitting one <rect> per module), and each table's QR is rendered more than
     // once (modal display + the PNG clipboard copy) and re-rendered every time the user pages
     // back to it. Blazor WASM is single-threaded, so this is the cheapest way to make navigation
@@ -53,9 +53,12 @@ public static class QrCodeRenderer
     private static string Render(string url, int pixelsPerModule)
     {
         using var gen = new QRCodeGenerator();
-        // Level H kept (carried over from the centre-overlay era). Larger QR, but each
-        // module is bigger relative to the badge — friendlier for hardware decoders.
-        var data = gen.CreateQrCode(url, QRCodeGenerator.ECCLevel.H);
+        // ECC level M (~15% recovery). Lower ECC ⇒ fewer codewords ⇒ smaller matrix ⇒ larger modules
+        // at a given print/screen size ⇒ easier to scan. The old level H was only there to survive the
+        // (since-removed) centre badge; with pristine QRs its extra redundancy just inflated the matrix.
+        // M is the smallest level that still tolerates normal paper wear (smudge/light crease); L (7%)
+        // is too fragile for print. Bump to Q (~25%) if scoresheets start getting badly damaged.
+        var data = gen.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
         var renderer = new SvgQRCode(data);
         var rawSvg = renderer.GetGraphic(pixelsPerModule);
 

@@ -10,6 +10,7 @@
 @inject NavigationManager Nav
 @inject LocalStorageService Storage
 @inject ContextNavService Ctx
+@inject ScoreInviteService Invites
 @implements IDisposable
 
 <PageTitle>@Lang.Get("WeeklySession") - Tsumo!</PageTitle>
@@ -1299,14 +1300,23 @@ else
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, WrapAsHtmlDocument(title, html));
     }
 
-    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(List<TableAssignment> tablesToRender, string? hanchanLabel = null)
+    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(List<TableAssignment> tablesToRender, Guid contextId, int hanchanNumber, string? hanchanLabel = null)
     {
         return tablesToRender.Select(t =>
         {
             var names = t.PlayerIds.Select(id => GetPlayerName(id)).ToList();
             if (t.PlayerCount == 3)
                 names.Add(Lang.Get("MrX"));
-            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, weeklyStartingPoints, hanchanLabel);
+            // When scanning is on, stamp the table's invite QR onto the scoresheet's side panel.
+            // Reuses the cached QrCodeRenderer (same URL as the QR modal → shared cache).
+            string? qr = null;
+            if (externalScoringEnabled && contextId != Guid.Empty)
+            {
+                // Weekly has no event short name; the scoring app rebuilds "Hanchan N — Table M".
+                qr = Invites.BuildInviteQrSvg(contextId, hanchanNumber, t, GetPlayerName,
+                    weeklyStartingPoints, t.PlayerCount == 3 ? uma3Players : uma4Players, null, Nav.BaseUri);
+            }
+            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, weeklyStartingPoints, hanchanLabel, qr);
         }).ToList();
     }
 
@@ -1315,7 +1325,7 @@ else
         if (tables.Count == 0 || members == null) return;
         var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
         var subtitle = BuildHanchanSubtitle();
-        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, subtitle), Lang.Get, includePrintButton: true);
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, currentHanchan?.Id ?? Guid.Empty, CurrentHanchanNumber(), subtitle), Lang.Get, includePrintButton: true);
         await JS.InvokeVoidAsync("openHtmlInNewTab", doc);
     }
 
@@ -1324,7 +1334,7 @@ else
         if (tables.Count == 0 || members == null) return;
         var title = $"{Lang.Get("Scoresheets")} — {Lang.FormatDate(sessionDate)}";
         var subtitle = BuildHanchanSubtitle();
-        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, subtitle), Lang.Get);
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(tables, currentHanchan?.Id ?? Guid.Empty, CurrentHanchanNumber(), subtitle), Lang.Get);
         var filename = $"scoresheets_{sessionDate:yyyy-MM-dd}.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
     }
@@ -1341,7 +1351,7 @@ else
             var h = ordered[i];
             var timeStr = h.StartTime is { } st ? st.ToString(@"hh\:mm") : "";
             var label = $"{Lang.Get("Hanchan")} {i + 1} {timeStr}".Trim();
-            result.AddRange(BuildScoresheetTables(h.Tables, label));
+            result.AddRange(BuildScoresheetTables(h.Tables, h.Id, i + 1, label));
         }
         return result;
     }

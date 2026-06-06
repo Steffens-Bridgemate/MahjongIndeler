@@ -4,6 +4,10 @@ public class Tournament
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
+    /// <summary>Optional compact event name (≤12 chars) carried in scoring invites — keeps the QR
+    /// small while still showing which event the scorer is in. The scoring app reconstructs the
+    /// "Hanchan N — Table M" part from the payload's numbers; this is just the prefix.</summary>
+    public string? ShortName { get; set; }
     public DateTime Date { get; set; } = DateTime.Today;
     public int SessionCount { get; set; } = 4;
     public List<TournamentParticipant> Participants { get; set; } = new();

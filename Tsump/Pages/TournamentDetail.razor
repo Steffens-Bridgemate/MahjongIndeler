@@ -9,6 +9,7 @@
 @inject NavigationManager Nav
 @inject TournamentNavContext TournamentNav
 @inject ContextNavService Ctx
+@inject ScoreInviteService Invites
 @implements IDisposable
 
 <PageTitle>@Lang.Get("TournamentAssignments") - Tsumo!</PageTitle>
@@ -242,6 +243,7 @@ else
                                                    Uma4="uma4Players"
                                                    TitlePrefix="@titlePrefix"
                                                    ShortTitlePrefix="@shortTitlePrefix"
+                                                   ShortName="@tournament.ShortName"
                                                    OnScannedChanged="@(_ => PersistScanned())" />
                             }
                         </div>
@@ -1206,14 +1208,23 @@ else
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, WrapAsHtmlDocument(title, html));
     }
 
-    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(List<TableAssignment> tablesToRender, string? hanchanLabel = null)
+    private List<ScoresheetHtmlBuilder.ScoresheetTable> BuildScoresheetTables(TournamentSession session, string? hanchanLabel = null)
     {
-        return tablesToRender.Select(t =>
+        return session.Tables.Select(t =>
         {
             var names = t.PlayerIds.Select(id => GetParticipantDisplay(id)).ToList();
             if (t.PlayerCount == 3)
                 names.Add(Lang.Get("MrX"));
-            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, tournamentStartingPoints, hanchanLabel);
+            // When scanning is on, stamp the table's invite QR onto the scoresheet's side panel.
+            // Reuses the cached QrCodeRenderer (same URL as the QR modal → shared cache).
+            string? qr = null;
+            if (externalScoringEnabled)
+            {
+                // Payload carries only the compact ShortName (the scoring app rebuilds Hanchan/Table).
+                qr = Invites.BuildInviteQrSvg(session.Id, session.SessionNumber, t, GetParticipantDisplay,
+                    tournamentStartingPoints, t.PlayerCount == 3 ? uma3Players : uma4Players, tournament!.ShortName, Nav.BaseUri);
+            }
+            return new ScoresheetHtmlBuilder.ScoresheetTable(t.TableNumber, t.PlayerCount, names, tournamentStartingPoints, hanchanLabel, qr);
         }).ToList();
     }
 
@@ -1231,7 +1242,7 @@ else
         if (session == null) return;
         var title = $"{Lang.Get("Scoresheets")} — {tournament.Name}";
         var subtitle = BuildScoresheetSubtitle(sessionNumber);
-        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(session.Tables, subtitle), Lang.Get, includePrintButton: true);
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(session, subtitle), Lang.Get, includePrintButton: true);
         await JS.InvokeVoidAsync("openHtmlInNewTab", doc);
     }
 
@@ -1242,7 +1253,7 @@ else
         if (session == null) return;
         var title = $"{Lang.Get("Scoresheets")} — {tournament.Name}";
         var subtitle = BuildScoresheetSubtitle(sessionNumber);
-        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(session.Tables, subtitle), Lang.Get);
+        var doc = ScoresheetHtmlBuilder.BuildDocument(title, subtitle, BuildScoresheetTables(session, subtitle), Lang.Get);
         var filename = $"scoresheets_{tournament.Name.Replace(" ", "_")}_hanchan{sessionNumber}.html";
         await JS.InvokeVoidAsync("downloadHtmlFile", filename, doc);
     }
@@ -1279,7 +1290,7 @@ else
         foreach (var session in tournament!.Sessions.OrderBy(s => s.SessionNumber))
         {
             var label = BuildScoresheetSubtitle(session.SessionNumber);
-            result.AddRange(BuildScoresheetTables(session.Tables, label));
+            result.AddRange(BuildScoresheetTables(session, label));
         }
         return result;
     }

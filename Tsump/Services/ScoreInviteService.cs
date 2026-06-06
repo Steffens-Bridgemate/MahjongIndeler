@@ -26,7 +26,7 @@ public class ScoreInviteService
         Func<Guid, string> playerNameResolver,
         int startingPoints,
         List<int> uma,
-        string title,
+        string? title,
         string organizerBaseUrl)
     {
         var names = table.PlayerIds.Select(playerNameResolver).ToList();
@@ -52,4 +52,23 @@ public class ScoreInviteService
     /// title, instruction, and the URL on three lines.</summary>
     public string BuildShareMessage(string title, string url)
         => $"📋 {title}\n{_lang.Get("ShareScoringLinkInstruction")}\n{url}";
+
+    /// <summary>Invite URL for the table rendered as a (memoised) QR SVG — same URL and
+    /// <c>QrCodeRenderer.ToSvg</c> cache the QR modal uses, so a QR already shown for this table is a
+    /// cache hit here (and vice-versa). Used to stamp invite QRs onto printed scoresheets.</summary>
+    public string BuildInviteQrSvg(
+        Guid contextId,
+        int sessionNumber,
+        TableAssignment table,
+        Func<Guid, string> playerNameResolver,
+        int startingPoints,
+        List<int> uma,
+        string? title,
+        string organizerBaseUrl,
+        int pixelsPerModule = 4)
+    {
+        var url = BuildInviteUrl(contextId, sessionNumber, table, playerNameResolver,
+            startingPoints, uma, title, organizerBaseUrl);
+        return QrCodeRenderer.ToSvg(url, pixelsPerModule);
+    }
 }

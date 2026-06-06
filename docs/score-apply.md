@@ -15,7 +15,7 @@ record ScoringInvite(
     List<string> PlayerNames,          // n
     int StartingPoints,                // p
     List<int> Uma,                     // u
-    string? Title,                     // title
+    string? Title,                     // title — compact event short name only (or null); see below
     string? OrganizerUrl,              // o
     int SessionNumber = 1);            // sn
 
@@ -32,7 +32,8 @@ const int ScorePenalty   = 2;
 
 - `ContextId` is the **only key used for lookup**. It carries either a `Hanchan.Id` (weekly) or a `TournamentSession.Id` (tournament); the organizer's resolvers disambiguate.
 - **No PlayerIds in either payload.** Players are paired by position: the invite's `PlayerNames[i]` corresponds to `table.PlayerIds[i]` on the organizer; the result's `Scores[i]` applies back to the i-th non-virtual `PlayerScore` on that table. The scoring app generates per-session synthetic Guids internally so `ScoreTable` can keep wiring edits up by `PlayerScore.PlayerId`, but those Guids never reach the wire format.
-- `SessionNumber` is display-only (used to build the "Hanchan N" subtitle on the scoring side); never used for lookup.
+- `SessionNumber` is display-only but now load-bearing for the heading: the scoring app **reconstructs** `"Hanchan {SessionNumber} — Table {TableNumber}"` itself (in its own language) rather than receiving a pre-formatted string — that pre-formatted title was a big chunk of the QR payload. Still never used for lookup.
+- `Title` therefore carries **only an optional compact event name** — the tournament's `ShortName` (≤12 chars), or `null` for weekly sessions (which have no event name). Kept short on purpose: every payload byte raises the QR's module count. The scoring app shows it as a prefix to the reconstructed `Hanchan N` line. (Legacy invites that still hold a full title decode fine — it just shows as a longer prefix.)
 - `Uma` is sent in the outbound invite (the scoring app shows it), but **omitted** from the inbound result — the organizer recomputes Uma from its own settings to avoid drift if Uma config changes between invite send and result return.
 - `OrganizerUrl` carries `Nav.BaseUri` so the scoring app can build a return URL back to whichever organizer instance issued the invite.
 

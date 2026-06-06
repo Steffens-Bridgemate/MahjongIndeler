@@ -78,6 +78,11 @@
     [Parameter, EditorRequired] public string TitlePrefix { get; set; } = "";
     /// <summary>Shorter prefix for the on-QR-modal heading (no club/date prefix).</summary>
     [Parameter, EditorRequired] public string ShortTitlePrefix { get; set; } = "";
+    /// <summary>Compact event name carried *in the invite payload* (≤12 chars, tournaments only;
+    /// null for weekly). Kept short to shrink the QR — the scoring app reconstructs the
+    /// "Hanchan N — Table M" part from the payload numbers. The on-screen share message and modal
+    /// heading still use the full <see cref="TitlePrefix"/>/<see cref="ShortTitlePrefix"/>.</summary>
+    [Parameter] public string? ShortName { get; set; }
     /// <summary>Raised when the currently-shown table is marked scanned from the QR modal (Enter).
     /// The flag is already set on the table object; the parent uses this to persist + re-render its
     /// own (mouse-toggled) card checkbox.</summary>
@@ -99,9 +104,11 @@
     private string ShortTitleFor(TableAssignment t) => $"{ShortTitlePrefix} — {Lang.Get("Table")} {t.TableNumber}";
     private string PlayersFor(TableAssignment t) => string.Join(", ", t.PlayerIds.Select(PlayerNameResolver));
 
+    // The payload carries only the compact ShortName (or null) — not the full display title — so the
+    // QR stays small; the scoring app rebuilds "Hanchan N — Table M" from the numbers it already has.
     private string BuildUrlFor(TableAssignment t) => Invites.BuildInviteUrl(
         ContextId, SessionNumber, t, PlayerNameResolver,
-        StartingPoints, UmaFor(t), TitleFor(t), Nav.BaseUri);
+        StartingPoints, UmaFor(t), ShortName, Nav.BaseUri);
 
     private async Task OnShareClick()
     {

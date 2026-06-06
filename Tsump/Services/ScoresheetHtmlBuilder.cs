@@ -8,7 +8,7 @@ namespace Tsump.Services;
 /// </summary>
 public static class ScoresheetHtmlBuilder
 {
-    public record ScoresheetTable(int TableNumber, int PlayerCount, List<string> PlayerNames, int DefaultStartingPoints = 30000, string? HanchanLabel = null);
+    public record ScoresheetTable(int TableNumber, int PlayerCount, List<string> PlayerNames, int DefaultStartingPoints = 30000, string? HanchanLabel = null, string? InviteQrSvg = null);
 
     /// <summary>
     /// Builds a complete HTML document containing scoresheets for all tables.
@@ -30,7 +30,7 @@ public static class ScoresheetHtmlBuilder
         sb.Append($"<title>{headerText}</title>");
         sb.Append("<style>");
         sb.Append(@"
-            @page { margin: 10mm 8mm 0mm 8mm; }
+            @page { margin: 10mm 6mm 0mm 6mm; }
             body { font-family: Verdana, Arial, sans-serif; margin: 0; padding: 0; }
             .no-print { position:sticky;top:0;z-index:100;padding:8px;margin-bottom:6px;background:#f0f0f0;border-bottom:1px solid #ccc; }
             .page-header { font-size: 12px; font-weight: bold; margin-bottom: 6px; }
@@ -42,12 +42,22 @@ public static class ScoresheetHtmlBuilder
             .sheet th { background: #f5f5f5; }
             .sheet .header-3 { background: #ffc107; color: #000; }
             .sheet .header-4 { background: #198754; color: #000; }
-            .sheet .row-label { width: 60px; font-weight: bold; white-space: nowrap; }
+            .sheet .row-label { width: 68px; font-weight: bold; white-space: nowrap; font-size: 11px; }
             .sheet .score-cell { height: 26px; min-width: 70px; }
             .sheet .score-cell-start { height: 18px; min-width: 70px; }
             .sheet .total-row { background: #e9ecef; font-weight: bold; }
             .sheet .initials-row td { border-color: #aaa; border-bottom: none; height: 22px; }
             .sheet .initials-row .row-label { color: #666; font-weight: normal; }
+            /* Left panel: vertical hanchan/table label, plus (when scoring is scanned) the table's
+               invite QR pinned to the BOTTOM. The label centres in the space above it. The inner
+               box is absolutely filled (inset:0) rather than height:100% — a flex child's height:100%
+               doesn't resolve reliably inside a rowspan <td>, which left the QR floating mid-cell. */
+            .sheet .side-panel { border: 1px solid #333; padding: 0; position: relative; }
+            .sheet .side-panel-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 2px; }
+            .sheet .side-label { flex: 1; display: flex; align-items: center; justify-content: center; }
+            .sheet .side-label > span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-size: 11px; }
+            .sheet .side-qr { line-height: 0; padding-bottom: 2px; }
+            .sheet .side-qr svg { width: 94px; height: auto; display: block; shape-rendering: crispEdges; }
             .cut-marks { display: flex; justify-content: space-between; align-items: center;
                          margin: 11px 0; font-size: 12px; color: #999; }
             .cut-marks span { letter-spacing: 2px; }
@@ -90,29 +100,52 @@ public static class ScoresheetHtmlBuilder
     {
         var headerClass = table.PlayerCount == 3 ? "header-3" : "header-4";
         var hasHanchan = !string.IsNullOrEmpty(table.HanchanLabel);
-        var colCount = table.PlayerNames.Count + 1 + (hasHanchan ? 1 : 0);
+        var hasQr = !string.IsNullOrEmpty(table.InviteQrSvg);
+        var hasPanel = hasHanchan || hasQr;
+        var colCount = table.PlayerNames.Count + 1 + (hasPanel ? 1 : 0);
 
         // Total content rows: header + names + 7 scoring + 4 separator + initials = 14
         var totalRows = 14;
 
+        // Wider left panel only when it carries a QR; a label alone keeps the slim vertical strip.
+        var panelWidth = hasQr ? "104px" : "22px";
+
         sb.Append("<div class=\"sheet\">");
         sb.Append("<table>");
 
-        // Header row with table number (and optional hanchan column)
+        // Explicit column widths: panel + a fixed label column, the rest split evenly across the
+        // players. Without this, the colspan header row leaves the label column as wide as a player
+        // column (wasted horizontal space) — pinning the label to 60px hands that width back to the
+        // name columns so longer names fit.
+        sb.Append("<colgroup>");
+        if (hasPanel) sb.Append($"<col style=\"width:{panelWidth};\">");
+        sb.Append("<col style=\"width:68px;\">");
+        for (int i = 0; i < table.PlayerNames.Count; i++) sb.Append("<col>");
+        sb.Append("</colgroup>");
+
+        // Header row with table number (and the optional left panel: vertical label + invite QR)
         sb.Append("<tr>");
-        if (hasHanchan)
+        if (hasPanel)
         {
-            sb.Append($"<td rowspan=\"{totalRows}\" style=\"vertical-align:middle;text-align:center;font-size:11px;padding:2px 6px;border:1px solid #333;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);\">{table.HanchanLabel}</td>");
+            sb.Append($"<td rowspan=\"{totalRows}\" class=\"side-panel\">");
+            sb.Append("<div class=\"side-panel-inner\">");
+            if (hasHanchan)
+                sb.Append($"<div class=\"side-label\"><span>{table.HanchanLabel}</span></div>");
+            if (hasQr)
+                sb.Append($"<div class=\"side-qr\">{table.InviteQrSvg}</div>");
+            sb.Append("</div></td>");
         }
-        sb.Append($"<th colspan=\"{colCount - (hasHanchan ? 1 : 0)}\" class=\"{headerClass}\">");
+        sb.Append($"<th colspan=\"{colCount - (hasPanel ? 1 : 0)}\" class=\"{headerClass}\">");
         sb.Append($"{lang("Table")} {table.TableNumber} ({table.PlayerCount} {lang("players")})");
         sb.Append("</th></tr>");
 
-        // Player names row
+        // Player names row — capped to 16 chars (print/download only) with a slightly smaller header
+        // font so the (wide Verdana) names fit; CSS ellipsis is the final safety net.
         sb.Append("<tr><th class=\"row-label\"></th>");
         foreach (var name in table.PlayerNames)
         {
-            sb.Append($"<th style=\"text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">{name}</th>");
+            var shown = name.Length > 16 ? name.Substring(0, 15) + "…" : name;
+            sb.Append($"<th style=\"text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;\">{shown}</th>");
         }
         sb.Append("</tr>");
 

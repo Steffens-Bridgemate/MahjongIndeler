@@ -143,9 +143,9 @@ static string ToSvg(string url, int pixelsPerModule = 4);   // pristine — no o
 1. **Modal header** ([QrCodeModal.razor](../Tsump.Shared/Components/QrCodeModal.razor)) — small inline-SVG coloured circle + white glyph next to the title. `QrCodeModal` takes an `Overlay`; when non-null it draws the badge.
 2. **PNG title band** — the auto-clipboard PNG fills its title band with the overlay's `BackgroundColor` and draws the title in white. Callers pass `headerBg`/`headerFg` to `copyQrImageToClipboard` ([index.html](../Tsump/wwwroot/index.html)). Pasted into WhatsApp, the recipient sees a coloured banner above an unadorned QR — colour alone differentiates organizer (blue) from scoring result (green).
 
-QR SVG mechanics: ECC level H, `width`/`height` stripped and replaced with a `viewBox` so the canvas rasteriser knows the coordinate space.
+QR SVG mechanics: ECC level M (lower ECC ⇒ fewer modules ⇒ larger, more scannable modules; H was only needed for the old centre badge), `width`/`height` stripped and replaced with a `viewBox` so the canvas rasteriser knows the coordinate space.
 
-`ToSvg` **memoises** by `(url, pixelsPerModule)` — a level-H QR for our payloads costs a few ms, and each QR is rendered more than once (modal + PNG copy) and re-rendered when paging back. Cache is content-addressed: the URL encodes the table's roster/number, so a reassignment or swap yields a *new* URL → cache miss → fresh QR; stale entries are simply never looked up again (bounded at 64, cleared wholesale). No invalidation hook needed.
+`ToSvg` **memoises** by `(url, pixelsPerModule)` — a QR for our payloads costs a few ms, and each QR is rendered more than once (modal + PNG copy) and re-rendered when paging back. Cache is content-addressed: the URL encodes the table's roster/number, so a reassignment or swap yields a *new* URL → cache miss → fresh QR; stale entries are simply never looked up again (bounded at 64, cleared wholesale). No invalidation hook needed.
 
 ## Invite-QR navigation (organizer)
 

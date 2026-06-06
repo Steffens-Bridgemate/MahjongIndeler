@@ -80,6 +80,26 @@ rankings Open/Download still use that local one too. It is *not* the same templa
 them. If unifying later, note the rankings call sites (`WrapAsHtmlDocument(title, html…)`) are not
 textually unique vs the scoresheet ones.
 
+## Scoresheets: side panel + invite QR
+
+[ScoresheetHtmlBuilder.cs](../Tsump/Services/ScoresheetHtmlBuilder.cs) (`Tsump`, not Shared) builds the
+printable scoresheets. Each sheet has an optional **left side panel** (`ScoresheetTable.HanchanLabel`)
+with the hanchan/table description as vertical text. When **external scoring is enabled**, the page
+also passes `ScoresheetTable.InviteQrSvg` — the table's invite QR — which the builder pins to the
+**lower part** of that panel (label centres in the space above it). The panel widens (~86px) only when
+it carries a QR; a label-only panel stays a slim strip.
+
+The QR comes from `ScoreInviteService.BuildInviteQrSvg(...)`, which builds the same invite URL as the
+QR modal and renders it through the **memoised** `QrCodeRenderer.ToSvg` — so a QR already shown in the
+modal is a cache hit here (and re-exports are instant). It's **inline SVG** (vector, `shape-rendering:crispEdges`),
+not a rasterised PNG — that's what keeps print export fast. The renderer uses ECC level M (see
+[QrCodeRenderer.cs](../Tsump.Shared/Scoring/QrCodeRenderer.cs)), the smallest level with a real safety
+margin, so the printed code stays as compact/scannable as is sensible; the invite payload still drives
+the module count, so shorter titles/club names ⇒ smaller QR. If small printed codes scan poorly, the
+levers are: bump ECC to Q (denser but more damage-tolerant), widen the panel a few px, or shorten the
+title. Per-page wiring: `BuildScoresheetTables` takes the session/hanchan so it has the
+`ContextId` + `SessionNumber` to encode; it only emits a QR when `EnableExternalScoring` is on.
+
 ## Lang keys that already exist
 `ExportRankings`, `Print`, `Download`, `Copy`, `Copied`, `Rank`, `Name`, `TotalScore`,
 `PrintGuidesheets`, `DownloadGuidesheets`. (nl + en in
