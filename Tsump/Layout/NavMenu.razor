@@ -290,7 +290,7 @@
     // reuse/refocus the same window) and collapses the (narrow-screen) menu.
     private async Task OpenCalculator()
     {
-        await JS.InvokeVoidAsync("open", CalculatorAppConfig.DeployedUrl, "riichi-calc", "width=480,height=660");
+        await JS.InvokeVoidAsync("open", CalculatorAppConfig.DeployedUrl, "riichi-calc", "width=480,height=700");
         collapseNavMenu = true;
     }
 
