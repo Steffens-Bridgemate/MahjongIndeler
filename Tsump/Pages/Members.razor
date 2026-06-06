@@ -77,7 +77,7 @@
 
 @if (showForm)
 {
-    <div class="card mb-4">
+    <div class="card mb-4" id="member-edit-form">
         <div class="card-body">
             <h5 class="card-title">@(isEditing ? Lang.Get("EditMember") : Lang.Get("AddNewMember"))</h5>
             <EditForm Model="currentMember" OnValidSubmit="SaveMember">
@@ -156,7 +156,7 @@ else
         <tbody>
             @foreach (var member in (activeSortDescending ? members.OrderByDescending(m => m.IsActive) : members.OrderBy(m => m.IsActive)).ThenBy(m => m.Name))
             {
-                <tr>
+                <tr id="@($"member-row-{member.Id}")">
                     <td>
                         <div class="d-flex align-items-center gap-1 member-actions">
                             <button class="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center member-action-btn" title="@Lang.Get("Edit")" @onclick="() => EditMember(member)"><i class="bi bi-pencil"></i></button>
@@ -257,6 +257,10 @@ else
     private HashSet<Guid> exportSelectedIds = new();
     private string exportSearchText = string.Empty;
     private HashSet<string> pinnedColumns = new() { "email" };
+    // Element id to smooth-scroll into view after the next render: the edit form when it opens
+    // (it lives at the top, so a row far down would otherwise edit with nothing visibly happening),
+    // and the member's own row again once editing finishes.
+    private string? scrollTargetId;
     private static readonly (string key, string showClass, string icon, string titleKey)[] pinColumnDefs = new[]
     {
         ("email", "", "bi-envelope", "Email"),
@@ -277,6 +281,14 @@ else
             var settings = await SettingsService.GetAsync();
             pinnedColumns = new HashSet<string>(settings.MembersPinnedColumns);
             StateHasChanged();
+            return;
+        }
+
+        if (scrollTargetId != null)
+        {
+            var id = scrollTargetId;
+            scrollTargetId = null;
+            await JS.InvokeVoidAsync("scrollToElement", id);
         }
     }
 
@@ -287,6 +299,7 @@ else
         showForm = true;
         userLoweredFirst = false;
         deleteConfirmId = null;
+        scrollTargetId = "member-edit-form";
     }
 
     private void EditMember(Member member)
@@ -306,12 +319,15 @@ else
         showForm = true;
         userLoweredFirst = member.Name.Length > 0 && char.IsLower(member.Name[0]);
         deleteConfirmId = null;
+        scrollTargetId = "member-edit-form";
     }
 
     private async Task SaveMember()
     {
         if (string.IsNullOrWhiteSpace(currentMember.Name))
             return;
+
+        var returnRowId = isEditing ? $"member-row-{currentMember.Id}" : null;
 
         if (isEditing)
             await MemberService.UpdateAsync(currentMember);
@@ -321,6 +337,7 @@ else
         members = await MemberService.GetAllAsync();
         showForm = false;
         deleteConfirmId = null;
+        scrollTargetId = returnRowId;
     }
 
     private void OnNameInput(ChangeEventArgs e)
@@ -347,6 +364,8 @@ else
 
     private void CancelForm()
     {
+        if (isEditing)
+            scrollTargetId = $"member-row-{currentMember.Id}";
         showForm = false;
         deleteConfirmId = null;
     }

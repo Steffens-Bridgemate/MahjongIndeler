@@ -12,7 +12,7 @@
         showExtras = true;
 }
 
-<div class="card mb-3 @(Table.PlayerCount == 3 ? "border-warning" : "border-success")">
+<div class="card score-table-card mb-3 @(Table.PlayerCount == 3 ? "border-warning" : "border-success")">
     <div class="card-header @(Table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white") py-1 d-flex align-items-center">
         <span class="flex-grow-1">@Lang.Get("Table") @Table.TableNumber (@Table.PlayerCount @Lang.Get("players"))</span>
         @if (!ReadOnly)
@@ -36,9 +36,10 @@
         }
     </div>
     <div class="card-body p-2">
-        @* Narrow layout (any viewport with width or height under 500px — covers phones
-           in either orientation and foldables in their compact state). The 5-column wide
-           table is transposed: one row per player (Eind / Versch / Totaal), with a
+        @* Narrow layout — shown when the card's own width is below the wide threshold (container
+           query in ScoreTable.razor.css), not the viewport width, so a narrow content column
+           (sidebar nav, page padding, multi-column score grid) gets it even on a wide screen. The
+           5-column wide table is transposed: one row per player (Eind / Versch / Totaal), with a
            per-player Advanced toggle that reveals an inline Loan / Penalty / Uma sub-row.
            Starting points are identical for every seat, so they're entered once above the
            Eind column instead of per player. *@
@@ -193,15 +194,18 @@
                         </th>
                         @foreach (var ps in score.PlayerScores)
                         {
+                            var name = ps.IsVirtual ? ps.VirtualName : GetPlayerName(ps.PlayerId);
                             <th class="text-center" style="min-width:90px;">
-                                @if (ps.IsVirtual)
-                                {
-                                    <em>@ps.VirtualName</em>
-                                }
-                                else
-                                {
-                                    @GetPlayerName(ps.PlayerId)
-                                }
+                                <span class="player-name-clip" title="@name">
+                                    @if (ps.IsVirtual)
+                                    {
+                                        <em>@ps.VirtualName</em>
+                                    }
+                                    else
+                                    {
+                                        @name
+                                    }
+                                </span>
                             </th>
                         }
                     </tr>

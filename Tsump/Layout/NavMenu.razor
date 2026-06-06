@@ -37,7 +37,7 @@
             @foreach (var entry in Ctx.Entries)
             {
                 var e = entry;
-                <div class="nav-item px-3">
+                <div class="nav-item px-3 @(e.Indent > 0 ? "nav-subitem" : "")">
                     @if (e.Href is { } href)
                     {
                         <NavLink class="nav-link" href="@href">
@@ -73,12 +73,13 @@
         }
         else if (CurrentTournamentId is Guid tid)
         {
-            @* Inside a tournament the sidebar becomes the tournament's own sub-nav; "Back to
-               tournaments" returns to the general menu. Guidesheets/Rankings stay disabled until the
-               tournament is generated (TournamentNavContext, kept fresh by the pages). *@
+            @* Inside a tournament the sidebar becomes the tournament's own sub-nav; the top "Back"
+               (home icon) returns to the general menu (the Tournaments list). Guidesheets/Rankings
+               stay disabled until the tournament is generated (TournamentNavContext, kept fresh by
+               the pages). *@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="tournaments">
-                    <span class="bi bi-trophy-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Tournaments")
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @Lang.Get("Back")
                 </NavLink>
             </div>
             <div class="nav-item px-3">

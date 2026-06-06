@@ -311,13 +311,17 @@ else
         @foreach (var tableGroup in BuildAllScoresEntries())
         {
             <h5 class="mt-3 mb-2">@Lang.Get("Table") @tableGroup.TableNumber</h5>
-            @foreach (var entry in tableGroup.Entries)
-            {
-                <h6 class="text-muted mb-1">@entry.Label</h6>
-                <ScoreTable Table="entry.Table" PlayerNameResolver="GetPlayerName"
-                            OnScoresComplete="SaveAllScores" OnScoresCleared="SaveAllScores"
-                            DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
-            }
+            <div class="score-table-grid">
+                @foreach (var entry in tableGroup.Entries)
+                {
+                    <div>
+                        <h6 class="text-muted mb-1">@entry.Label</h6>
+                        <ScoreTable Table="entry.Table" PlayerNameResolver="GetPlayerName"
+                                    OnScoresComplete="SaveAllScores" OnScoresCleared="SaveAllScores"
+                                    DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                    </div>
+                }
+            </div>
         }
     }
     else if (tables.Count > 0)
@@ -392,11 +396,11 @@ else
                 </div>
             }
 
-            <div class="row">
+            <div class="table-assign-grid">
                 @foreach (var table in tables)
                 {
                     var tableRef = table;
-                    <div class="col-md-4 mb-3 table-scroll-anchor" id="@TableAnchorId(table.TableNumber)">
+                    <div class="mb-3 table-scroll-anchor" id="@TableAnchorId(table.TableNumber)">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
                             <div class="card-header d-flex justify-content-between align-items-center @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
                                 <span>@Lang.Get("Table") @table.TableNumber</span>
@@ -423,7 +427,7 @@ else
                                         @ondragover:preventDefault
                                         @ondrop="() => OnDrop(pid)"
                                         @onclick="() => OnPlayerClick(pid)">
-                                        <span>@(player?.Name ?? Lang.Get("Unknown"))</span>
+                                        <span class="player-name-clip" title="@(player?.Name ?? Lang.Get("Unknown"))">@(player?.Name ?? Lang.Get("Unknown"))</span>
                                     </li>
                                 }
                             </ul>
@@ -464,15 +468,17 @@ else
                 <TableNavStrip Tables="tables" IsGreen="TableNavGreen"
                                AnchorId="@(t => TableAnchorId(t.TableNumber))" />
             }
-            @foreach (var table in tables)
-            {
-                <div class="table-scroll-anchor" id="@TableAnchorId(table.TableNumber)">
-                    <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
-                                Table="table" PlayerNameResolver="GetPlayerName"
-                                OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
-                                DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
-                </div>
-            }
+            <div class="score-table-grid">
+                @foreach (var table in tables)
+                {
+                    <div class="table-scroll-anchor" id="@TableAnchorId(table.TableNumber)">
+                        <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
+                                    Table="table" PlayerNameResolver="GetPlayerName"
+                                    OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                    DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                    </div>
+                }
+            </div>
         }
     }
     </div>
@@ -743,10 +749,11 @@ else
                 OnSelect = () => BackToWorkflow(),
             });
 
+        // Top-level "back" out of the session: home icon + generic "Back" label (target stays History).
         entries.Add(new ContextNavEntry
         {
-            Label = Lang.Get("History"),
-            IconClass = "bi-clock-history-nav-menu",
+            Label = Lang.Get("Back"),
+            IconClass = "bi-house-door-fill-nav-menu",
             Href = "history",
         });
 

@@ -8,6 +8,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject TournamentNavContext TournamentNav
+@inject ContextNavService Ctx
 @implements IDisposable
 
 <PageTitle>@Lang.Get("TournamentAssignments") - Tsumo!</PageTitle>
@@ -18,7 +19,7 @@
 }
 else
 {
-    <h1><i class="bi bi-table me-2"></i>@tournament.Name</h1>
+    <h1><i class="bi @ActiveViewIcon() me-2"></i>@tournament.Name</h1>
     <p class="text-muted">@Lang.FormatDate(tournament.Date) &middot; @tournament.SessionCount @Lang.Get("HanchansCount")</p>
 
     @* --- Initial generate button (pre-generation only; once generated the Regenerate
@@ -37,83 +38,43 @@ else
     @* --- Sessions display --- *@
     @if (tournament.Sessions.Count > 0)
     {
-        <CollapsibleCard Title="@Lang.Get("AssignmentsAndScores")" TitleClass="h4 mb-0" CssClass="mt-3 mb-3" @bind-Expanded="assignmentsExpanded">
+        @* Header + action mirror the active sidebar selector: title = that view's name; Regenerate
+           shows only on Assignments, Import scores only on the score views. *@
+        <CollapsibleCard Title="@ActiveViewTitle()" TitleClass="h4 mb-0" CssClass="mt-3 mb-3" @bind-Expanded="assignmentsExpanded">
 
-        @* Regenerate + Import result share a row, each active only on the tab it relates to:
-           Regenerate is live on the Assignments ("Indeling") tab and greys out on a scores tab;
-           Import result is the reverse. Active = blue (btn-primary), inactive = disabled grey. *@
         @{
             var onTablesTab = tournamentActiveTab == "tables";
         }
         <div class="d-flex align-items-start flex-wrap gap-2 mb-3">
-            @if (showRegenerateConfirm)
+            @if (onTablesTab)
             {
-                <div class="alert alert-warning d-inline-block mb-0 py-1">
-                    @Lang.Get("RegenerateConfirmTournament")
-                    <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
-                    <button class="btn btn-sm btn-secondary" @onclick="() => showRegenerateConfirm = false">@Lang.Get("Cancel")</button>
-                </div>
+                @if (showRegenerateConfirm)
+                {
+                    <div class="alert alert-warning d-inline-block mb-0 py-1">
+                        @Lang.Get("RegenerateConfirmTournament")
+                        <button class="btn btn-sm btn-warning ms-2 me-1" @onclick="ConfirmRegenerate">@Lang.Get("YesRegenerate")</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="() => showRegenerateConfirm = false">@Lang.Get("Cancel")</button>
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-primary" @onclick="GenerateSessions">
+                        <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("RegenerateAllHanchans")
+                    </button>
+                }
             }
             else
             {
-                <button class="btn @(onTablesTab ? "btn-primary" : "btn-secondary")" disabled="@(!onTablesTab)" @onclick="GenerateSessions">
-                    <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("RegenerateAllHanchans")
-                </button>
+                <ScoreImportPanel IsEnabled="externalScoringEnabled"
+                                  OnApplied="ReloadTournament"
+                                  PlayerNameResolver="GetParticipantDisplay"
+                                  TriggerButtonClass="btn btn-primary" />
             }
-            <ScoreImportPanel IsEnabled="externalScoringEnabled"
-                              OnApplied="ReloadTournament"
-                              PlayerNameResolver="GetParticipantDisplay"
-                              TriggerButtonClass="@(onTablesTab ? "btn btn-secondary" : "btn btn-primary")"
-                              TriggerDisabled="onTablesTab" />
         </div>
 
-        <ul class="nav nav-tabs mb-3">
-            <li class="nav-item">
-                @{
-                    var tablesActive = tournamentActiveTab == "tables";
-                }
-                <a class="nav-link @(tablesActive ? "active" : "")"
-                   style="@ScoreStatusHelper.TabStyle(tablesActive)"
-                   href="javascript:void(0)" @onclick='() => tournamentActiveTab = "tables"'>
-                    @Lang.Get("Assignments")
-                </a>
-            </li>
-            <li class="nav-item">
-                @{
-                    var scoresStatus = AllSessionsScoreStatus();
-                    var scoresClass = ScoreStatusHelper.TabClass(scoresStatus, tournamentActiveTab == "scores");
-                    var scoresExplain = scoresStatus == ScoreStatusHelper.Status.Partial || scoresStatus == ScoreStatusHelper.Status.Stale;
-                }
-                <a class="nav-link @(tournamentActiveTab == "scores" ? "active" : "") @scoresClass"
-                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "scores", 0.2)"
-                   href="javascript:void(0)" @onclick="ActivateScoresTab">
-                    @Lang.Get("ScoresPerHanchan")
-                    @if (scoresExplain)
-                    {
-                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
-                           @onclick:stopPropagation="true"
-                           @onclick="() => ShowStatusExplanation(scoresStatus, isAggregated: true)"></i>
-                    }
-                </a>
-            </li>
-            <li class="nav-item">
-                @{
-                    var allClass = ScoreStatusHelper.TabClass(scoresStatus, tournamentActiveTab == "allscores");
-                    var allExplain = scoresExplain;
-                }
-                <a class="nav-link @(tournamentActiveTab == "allscores" ? "active" : "") @allClass"
-                   style="@ScoreStatusHelper.TabStyle(tournamentActiveTab == "allscores", 0.2)"
-                   href="javascript:void(0)" @onclick="ActivateAllScoresTab">
-                    @Lang.Get("ScoresPerTable")
-                    @if (allExplain)
-                    {
-                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
-                           @onclick:stopPropagation="true"
-                           @onclick="() => ShowStatusExplanation(scoresStatus, isAggregated: true)"></i>
-                    }
-                </a>
-            </li>
-        </ul>
+        @* The view selectors (Assignments / Scores per Hanchan / Scores per Table) and their
+           per-hanchan / per-table jump lists live in the sidebar (BuildTournamentNav), not in an
+           in-page tab strip — see the contextual-nav pattern in docs/styles.md §12. *@
         @if (statusExplanation != null)
         {
             <div class="alert alert-info alert-dismissible py-2 small">
@@ -168,7 +129,7 @@ else
             var sn = session.SessionNumber;
             var sess = session;
             var isHanchanExpanded = expandedHanchans.Contains(sn);
-            <div class="d-flex align-items-center mt-4 mb-2 flex-wrap gap-1">
+            <div class="d-flex align-items-center mt-4 mb-2 flex-wrap gap-1 table-scroll-anchor" id="@HanchanAssignAnchorId(sn)">
                 <h5 class="mb-0">@Lang.Get("Hanchan") @sn</h5>
                 <select class="form-select form-select-sm" style="max-width:65px;"
                         value="@(sess.StartTime.HasValue ? sess.StartTime.Value.Hours : -1)"
@@ -232,12 +193,12 @@ else
                     }
                 </Leading>
             </TableNavStrip>
-            <div class="row">
+            <div class="table-assign-grid">
                 @foreach (var table in session.Tables)
                 {
                     var tableRef = table;
                     var sessRef = session;
-                    <div class="col-md-4 mb-3 table-scroll-anchor" id="@AssignAnchorId(sessRef.SessionNumber, table.TableNumber)">
+                    <div class="mb-3 table-scroll-anchor" id="@AssignAnchorId(sessRef.SessionNumber, table.TableNumber)">
                         <div class="card @(table.PlayerCount == 3 ? "border-warning" : "border-success")">
                             <div class="card-header d-flex justify-content-between align-items-center @(table.PlayerCount == 3 ? "bg-warning text-dark" : "bg-success text-white")">
                                 <span>@Lang.Get("Table") @table.TableNumber</span>
@@ -263,7 +224,7 @@ else
                                         @ondragover:preventDefault
                                         @ondrop="() => OnDrop(pid, session.SessionNumber)"
                                         @onclick="() => OnPlayerClick(pid, session.SessionNumber)">
-                                        <span>@GetParticipantDisplay(pid)</span>
+                                        <span class="player-name-clip" title="@GetParticipantDisplay(pid)">@GetParticipantDisplay(pid)</span>
                                     </li>
                                 }
                             </ul>
@@ -296,7 +257,7 @@ else
             {
                 var sn = session.SessionNumber;
                 var isHanchanExpanded = expandedHanchans.Contains(sn);
-                <div class="d-flex align-items-baseline mt-3 mb-2 gap-2">
+                <div class="d-flex align-items-baseline mt-3 mb-2 gap-2 table-scroll-anchor" id="@HanchanScoreAnchorId(sn)">
                     <h5 class="mb-0">@Lang.Get("Hanchan") @sn</h5>
                     @if (session.StartTime.HasValue)
                     {
@@ -312,14 +273,16 @@ else
                     @* Per-hanchan strip: green = that table's result entry is complete. *@
                     <TableNavStrip Tables="stripSession.Tables" IsGreen="ScoreStatusHelper.TableIsComplete"
                                    AnchorId="@(t => ScoreAnchorId(stripSession.SessionNumber, t.TableNumber))" />
-                    @foreach (var table in session.Tables)
-                    {
-                        <div class="table-scroll-anchor" id="@ScoreAnchorId(session.SessionNumber, table.TableNumber)">
-                            <ScoreTable @key="(scoreTableVersion, session.Id, table.TableNumber)"
-                                        Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
-                                        DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
-                        </div>
-                    }
+                    <div class="score-table-grid">
+                        @foreach (var table in session.Tables)
+                        {
+                            <div class="table-scroll-anchor" id="@ScoreAnchorId(session.SessionNumber, table.TableNumber)">
+                                <ScoreTable @key="(scoreTableVersion, session.Id, table.TableNumber)"
+                                            Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                            DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                            </div>
+                        }
+                    </div>
                 }
             }
         }
@@ -339,19 +302,23 @@ else
             @foreach (var tableGroup in allGroups)
             {
                 <h5 class="mt-3 mb-2 table-scroll-anchor" id="@AllScoresAnchorId(tableGroup.TableNumber)">@Lang.Get("Table") @tableGroup.TableNumber</h5>
-                @foreach (var entry in tableGroup.Entries)
-                {
-                    <h6 class="text-muted mb-1">@entry.Label</h6>
-                    <ScoreTable @key="(scoreTableVersion, entry.Label, tableGroup.TableNumber)"
-                                Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
-                                DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
-                }
+                <div class="score-table-grid">
+                    @foreach (var entry in tableGroup.Entries)
+                    {
+                        <div>
+                            <h6 class="text-muted mb-1">@entry.Label</h6>
+                            <ScoreTable @key="(scoreTableVersion, entry.Label, tableGroup.TableNumber)"
+                                        Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                        DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
+                        </div>
+                    }
+                </div>
             }
         }
         </CollapsibleCard>
 
         @* --- 3-player distribution --- *@
-        <CollapsibleCard Title="@Lang.Get("ThreePlayerDistribution")" CssClass="mt-4 mb-4" @bind-Expanded="threePlayerExpanded">
+        <CollapsibleCard Id="@DistributionAnchorId" Title="@Lang.Get("ThreePlayerDistribution")" CssClass="mt-4 mb-4 table-scroll-anchor" @bind-Expanded="threePlayerExpanded">
                     <table class="table table-sm">
                         <thead>
                             <tr>
@@ -375,7 +342,7 @@ else
         </CollapsibleCard>
 
         @* --- Meeting matrix --- *@
-        <CollapsibleCard Title="@Lang.Get("MeetingMatrixTitle")" CssClass="mb-4" @bind-Expanded="matrixExpanded">
+        <CollapsibleCard Id="@MatrixAnchorId" Title="@Lang.Get("MeetingMatrixTitle")" CssClass="mb-4 table-scroll-anchor" @bind-Expanded="matrixExpanded">
                     <p class="text-muted">@Lang.Get("MeetingMatrixSubtitle")</p>
                     <div class="mb-3">
                         <table class="table table-bordered table-sm" style="width:auto;">
@@ -513,13 +480,27 @@ else
 
     private HashSet<int> expandedHanchans = new();
 
+    // Element id to smooth-scroll into view after the next render, set by the sidebar jump entries,
+    // plus which JS scroller to use: "scrollToElement" reserves the sticky table-nav strip's height
+    // (table/hanchan jumps under a strip); "scrollToAnchor" is a plain scroll honouring the target's
+    // CSS scroll-margin (the bottom info cards, which sit below all strips).
+    private string? pendingScrollId;
+    private string pendingScrollFn = "scrollToElement";
+
+    private const string DistributionAnchorId = "tnav-distribution";
+    private const string MatrixAnchorId = "tnav-matrix";
+
     private List<Guid> selectedPlayerIds = new();
     private int? selectedSessionNumber;
     private Guid? draggedPlayerId;
     private int? draggedSessionNumber;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
-    public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= StateHasChanged;
+        Ctx.Clear();
+    }
 
     private void ToggleHanchan(int sessionNumber)
     {
@@ -546,7 +527,22 @@ else
         }
         // Keep the sidebar's tournament sub-nav in sync (also reflects IsGenerated flipping after
         // Generate, since this runs on every render). Set() no-ops when nothing changed.
-        if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
+        if (tournament != null)
+        {
+            TournamentNav.Set(Id, tournament.IsGenerated);
+            // Once generated, the page owns the whole tournament sidebar (view selectors + jump
+            // lists) via the contextual nav; before that, fall back to NavMenu's URL-based sub-nav.
+            if (tournament.IsGenerated) PublishNav();
+            else { Ctx.Clear(); navSignature = ""; }
+        }
+
+        if (pendingScrollId != null)
+        {
+            var id = pendingScrollId;
+            var fn = pendingScrollFn;
+            pendingScrollId = null;
+            await JS.InvokeVoidAsync(fn, id);
+        }
     }
 
     private void GenerateSessions()
@@ -831,16 +827,239 @@ else
         return (html.ToString(), text.ToString().TrimEnd());
     }
 
-    private void ActivateScoresTab()
+    // Switch the active view. Ensures the Assignments/Scores card is expanded and that score models
+    // exist before the score views render. No StateHasChanged — callers add it (see SelectTab).
+    private void ApplyTab(string tab)
     {
-        tournamentActiveTab = "scores";
-        InitializeAllTournamentScores();
+        tournamentActiveTab = tab;
+        assignmentsExpanded = true;
+        // The Regenerate confirm only lives on the Assignments view; drop it when navigating away.
+        if (tab != "tables") showRegenerateConfirm = false;
+        if (tab is "scores" or "allscores")
+            InitializeAllTournamentScores();
     }
 
-    private void ActivateAllScoresTab()
+    // Card header / sole action mirror the active sidebar selector.
+    private string ActiveViewTitle() => tournamentActiveTab switch
     {
-        tournamentActiveTab = "allscores";
-        InitializeAllTournamentScores();
+        "scores" => Lang.Get("ScoresPerHanchan"),
+        "allscores" => Lang.Get("ScoresPerTable"),
+        _ => Lang.Get("Assignments"),
+    };
+
+    // Banner glyph for the active view — the bootstrap-icons font twins of the sidebar's
+    // background-image *-nav-menu icons, so the banner and the selected nav item match.
+    private string ActiveViewIcon() => tournamentActiveTab switch
+    {
+        "scores" => "bi-card-list",
+        "allscores" => "bi-grid-3x3-gap",
+        _ => "bi-table",
+    };
+
+    // Sidebar selectors live in NavMenu (a sibling component), so its event dispatch only re-renders
+    // NavMenu — this page must StateHasChanged itself to reflect the new view (and to run
+    // OnAfterRenderAsync, which consumes pendingScrollId and republishes the nav).
+    private void SelectTab(string tab)
+    {
+        ApplyTab(tab);
+        StateHasChanged();
+    }
+
+    // Sidebar jump: switch to the right view, expand the target hanchan, and queue a scroll to it
+    // (performed in OnAfterRenderAsync once the section has rendered).
+    private void JumpToHanchan(int sessionNumber, string tab)
+    {
+        ApplyTab(tab);
+        expandedHanchans.Add(sessionNumber);
+        pendingScrollId = tab == "tables" ? HanchanAssignAnchorId(sessionNumber) : HanchanScoreAnchorId(sessionNumber);
+        pendingScrollFn = "scrollToElement";
+        StateHasChanged();
+    }
+
+    private void JumpToTable(int tableNumber)
+    {
+        ApplyTab("allscores");
+        pendingScrollId = AllScoresAnchorId(tableNumber);
+        pendingScrollFn = "scrollToElement";
+        StateHasChanged();
+    }
+
+    private void JumpToDistribution()
+    {
+        threePlayerExpanded = true;
+        pendingScrollId = DistributionAnchorId;
+        pendingScrollFn = "scrollToAnchor";
+        StateHasChanged();
+    }
+
+    private void JumpToMatrix()
+    {
+        matrixExpanded = true;
+        pendingScrollId = MatrixAnchorId;
+        pendingScrollFn = "scrollToAnchor";
+        StateHasChanged();
+    }
+
+    private static string? StatusDotClass(ScoreStatusHelper.Status s) => s switch
+    {
+        ScoreStatusHelper.Status.Complete => "bg-success",
+        ScoreStatusHelper.Status.Partial => "bg-warning",
+        ScoreStatusHelper.Status.Stale => "bg-danger",
+        _ => null,
+    };
+
+    private Func<Task>? ScoresExplain(ScoreStatusHelper.Status s)
+        => s is ScoreStatusHelper.Status.Partial or ScoreStatusHelper.Status.Stale
+            ? () => { ShowStatusExplanation(s, isAggregated: true); StateHasChanged(); return Task.CompletedTask; }
+            : null;
+
+    // Builds the tournament's contextual sidebar: back-to-tournaments + Participants, the three
+    // view selectors (Assignments / Scores per Hanchan / Scores per Table) each followed — when it
+    // is the active view — by an indented jump list (its hanchans, or its table numbers), then
+    // Guidesheets + Rankings. Replaces the former in-page tab strip + per-hanchan TableNavStrips.
+    private List<ContextNavEntry> BuildTournamentNav()
+    {
+        var entries = new List<ContextNavEntry>();
+        if (tournament == null) return entries;
+
+        // Top-level "back" out of the tournament: home icon + generic "Back" label (target stays
+        // the Tournaments list).
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("Back"),
+            IconClass = "bi-house-door-fill-nav-menu",
+            Href = "tournaments",
+        });
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("TournamentParticipants"),
+            IconClass = "bi-people-fill-nav-menu",
+            Href = $"tournament/{Id}/participants",
+        });
+
+        var ordered = tournament.Sessions.OrderBy(s => s.SessionNumber).ToList();
+
+        // Assignments + per-hanchan jump list (green dot = all tables scanned, when scanning is on).
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("Assignments"),
+            IconClass = "bi-table-nav-menu",
+            IsActive = tournamentActiveTab == "tables",
+            OnSelect = () => { SelectTab("tables"); return Task.CompletedTask; },
+        });
+        if (tournamentActiveTab == "tables")
+        {
+            foreach (var s in ordered)
+            {
+                var sn = s.SessionNumber;
+                entries.Add(new ContextNavEntry
+                {
+                    Indent = 1,
+                    Label = $"{Lang.Get("Hanchan")} {sn}",
+                    StatusClass = externalScoringEnabled && AllTablesScannedIn(s) ? "bg-success" : null,
+                    OnSelect = () => { JumpToHanchan(sn, "tables"); return Task.CompletedTask; },
+                });
+            }
+        }
+
+        var aggStatus = AllSessionsScoreStatus();
+
+        // Scores per Hanchan + per-hanchan jump list (per-hanchan status dots).
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("ScoresPerHanchan"),
+            IconClass = "bi-card-list-nav-menu",
+            IsActive = tournamentActiveTab == "scores",
+            OnSelect = () => { SelectTab("scores"); return Task.CompletedTask; },
+            OnExplain = ScoresExplain(aggStatus),
+        });
+        if (tournamentActiveTab == "scores")
+        {
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                var s = ordered[i];
+                var sn = s.SessionNumber;
+                var status = ScoreStatusHelper.Classify(s.Tables, ordered.Skip(i + 1).Select(o => o.Tables));
+                entries.Add(new ContextNavEntry
+                {
+                    Indent = 1,
+                    Label = $"{Lang.Get("Hanchan")} {sn}",
+                    StatusClass = StatusDotClass(status),
+                    OnSelect = () => { JumpToHanchan(sn, "scores"); return Task.CompletedTask; },
+                });
+            }
+        }
+
+        // Scores per Table + per-table-number jump list (dot = all hanchans' instance complete).
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("ScoresPerTable"),
+            IconClass = "bi-grid-3x3-gap-nav-menu",
+            IsActive = tournamentActiveTab == "allscores",
+            OnSelect = () => { SelectTab("allscores"); return Task.CompletedTask; },
+            OnExplain = ScoresExplain(aggStatus),
+        });
+        if (tournamentActiveTab == "allscores")
+        {
+            foreach (var group in BuildAllScoresEntries())
+            {
+                var tn = group.TableNumber;
+                var allComplete = group.Entries.All(e => ScoreStatusHelper.TableIsComplete(e.Table));
+                var anyScore = group.Entries.Any(e => ScoreStatusHelper.TablesHaveAnyScore(new List<TableAssignment> { e.Table }));
+                var st = allComplete ? ScoreStatusHelper.Status.Complete
+                    : anyScore ? ScoreStatusHelper.Status.Partial
+                    : ScoreStatusHelper.Status.Normal;
+                entries.Add(new ContextNavEntry
+                {
+                    Indent = 1,
+                    Label = $"{Lang.Get("Table")} {tn}",
+                    StatusClass = StatusDotClass(st),
+                    OnSelect = () => { JumpToTable(tn); return Task.CompletedTask; },
+                });
+            }
+        }
+
+        // Auxiliary info cards at the bottom of the page (not views — they expand + scroll).
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("ThreePlayerDistribution"),
+            IconClass = "bi-person-lines-fill-nav-menu",
+            OnSelect = () => { JumpToDistribution(); return Task.CompletedTask; },
+        });
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("MeetingMatrixTitle"),
+            IconClass = "bi-diagram-3-fill-nav-menu",
+            OnSelect = () => { JumpToMatrix(); return Task.CompletedTask; },
+        });
+
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("TournamentGuidesheets"),
+            IconClass = "bi-card-checklist-nav-menu",
+            Href = $"tournament/{Id}/guidesheets",
+        });
+        entries.Add(new ContextNavEntry
+        {
+            Label = Lang.Get("Rankings"),
+            IconClass = "bi-bar-chart-fill-nav-menu",
+            Href = $"tournament/{Id}/rankings",
+        });
+
+        return entries;
+    }
+
+    // Publish to the sidebar only when the visible signature changes, so frequent re-renders don't
+    // churn the nav (mirrors WeeklySessionPage.PublishNav).
+    private string navSignature = "";
+    private void PublishNav()
+    {
+        var entries = BuildTournamentNav();
+        var sig = string.Join("|", entries.Select(e =>
+            $"{e.Label}/{e.Indent}/{e.IsActive}/{e.StatusClass}/{e.Disabled}/{e.Href}/{e.OnExplain != null}"));
+        if (sig == navSignature) return;
+        navSignature = sig;
+        Ctx.Set(entries);
     }
 
     private void InitializeAllTournamentScores()
@@ -855,6 +1074,10 @@ else
     private static string AssignAnchorId(int sessionNumber, int tableNumber) => $"tassign-h{sessionNumber}-t{tableNumber}";
     private static string ScoreAnchorId(int sessionNumber, int tableNumber) => $"tscore-h{sessionNumber}-t{tableNumber}";
     private static string AllScoresAnchorId(int tableNumber) => $"tallscores-t{tableNumber}";
+
+    // Sidebar jump targets: the hanchan heading rows in the Assignments / Scores-per-hanchan views.
+    private static string HanchanAssignAnchorId(int sessionNumber) => $"tnav-assign-h{sessionNumber}";
+    private static string HanchanScoreAnchorId(int sessionNumber) => $"tnav-score-h{sessionNumber}";
 
     // Assignments strip: green only when scanning is enabled and the table was scanned.
     private bool AssignNavGreen(TableAssignment t) => externalScoringEnabled && t.Scanned;

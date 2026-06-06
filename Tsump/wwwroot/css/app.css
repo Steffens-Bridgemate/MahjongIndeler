@@ -296,3 +296,36 @@ code {
 .table-scroll-anchor {
     scroll-margin-top: 3.5rem;
 }
+
+/* Multi-column flow for the per-table cards (assignment views) and ScoreTable cards (score views).
+   auto-fill lets wide screens show several columns side by side; min(100%, …) keeps a single
+   full-width column once the viewport is narrower than one track, so there's never horizontal
+   overflow. Track widths are sized so a player name of up to ~15 characters fits without wrapping
+   (see .player-name-clip). Row spacing comes from each card's own mb-3 (row-gap 0). */
+.table-assign-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    gap: 0 1rem;
+    align-items: start;
+}
+
+.score-table-grid {
+    display: grid;
+    /* 40rem matches ScoreTable's container-query threshold (ScoreTable.razor.css): a cell is either
+       a full-width single column or ≥ 40rem, so each ScoreTable card is always wide enough for its
+       wide layout (no cell that's multi-column yet too narrow, which would force the narrow layout). */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 40rem), 1fr));
+    gap: 0 1rem;
+    align-items: start;
+}
+
+/* Cap a displayed player name at ~15 characters; longer names ellipsize (full value in title).
+   Keeps grid columns from blowing out on an unusually long name. */
+.player-name-clip {
+    display: inline-block;
+    max-width: 15ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}

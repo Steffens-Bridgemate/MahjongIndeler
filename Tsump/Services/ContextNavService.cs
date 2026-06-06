@@ -35,6 +35,9 @@ public sealed class ContextNavEntry
     public string? StatusClass { get; init; }
     public bool IsActive { get; init; }
     public bool Disabled { get; init; }
+    /// <summary>Nesting depth: 0 = top-level, 1 = an indented sub-item (e.g. the tournament's
+    /// per-hanchan / per-table jump list under its active view selector).</summary>
+    public int Indent { get; init; }
     /// <summary>When set, the entry is a plain link; otherwise <see cref="OnSelect"/> drives it.</summary>
     public string? Href { get; init; }
     public Func<Task>? OnSelect { get; init; }

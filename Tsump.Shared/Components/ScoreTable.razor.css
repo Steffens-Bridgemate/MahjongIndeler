@@ -1,12 +1,16 @@
 /*
- * Layout switch for ScoreTable: narrow when the viewport is "phone-sized" in
- * EITHER dimension, wide only when both width and height are at least 500px.
- *
- * Width alone (Bootstrap's md=768px) is wrong for foldables: a Samsung Fold
- * cover screen in landscape is wider than 768px but only ~376px tall, and a
- * regular phone in landscape is wider than 768px but only ~390px tall — both
- * benefit from the narrow stacked layout.
+ * Layout switch for ScoreTable. Uses a *container* query, not a viewport media query: the card can
+ * be far narrower than the viewport (sidebar nav, page padding, a multi-column score grid), so a
+ * viewport-width test would keep the wide 5-column table even when its card can't hold it — it then
+ * overflows the card's right edge. The card is the query container; the wide table shows only when
+ * the card itself is wide enough (≈ what 4 player columns of clipped names + the label column need),
+ * otherwise the transposed narrow layout is used. Threshold is kept in step with the
+ * `.score-table-grid` min track in app.css so a grid cell never lands wide-but-too-narrow.
  */
+
+.score-table-card {
+    container: scoretable / inline-size;
+}
 
 .score-table-narrow {
     display: block;
@@ -16,7 +20,7 @@
     display: none;
 }
 
-@media (min-width: 500px) and (min-height: 500px) {
+@container scoretable (min-width: 40rem) {
     .score-table-narrow {
         display: none;
     }

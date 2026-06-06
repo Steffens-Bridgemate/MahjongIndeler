@@ -6,7 +6,7 @@ Primary file: [Tsump/Components/ScoreImportPanel.razor](../Tsump/Components/Scor
 
 ## Used by
 
-- **[TournamentDetail.razor](../Tsump/Pages/TournamentDetail.razor)** — in a Regenerate+Import row at the top of the assignments card body; `TriggerDisabled` on the Assignments tab. `OnApplied="ReloadTournament"`.
+- **[TournamentDetail.razor](../Tsump/Pages/TournamentDetail.razor)** — at the top of the card body, which is now titled per the active sidebar view. The action there mirrors that view: **Regenerate** shows only on Assignments, the **Import scores** panel only on the score views (Scores per Hanchan / per Table) — it's hidden, not just disabled, off its view. `OnApplied="ReloadTournament"`.
 - **[WeeklySessionPage.razor](../Tsump/Pages/WeeklySessionPage.razor)** — at the top of the Scores tab content. `OnApplied="OnHanchanScoreApplied"`.
 
 Both also use `<TableShareActions>` for the per-table share/QR buttons. There is no inlined import/share code left in either page — the components are the single source of truth.
@@ -157,7 +157,7 @@ QR SVG mechanics: ECC level H, `width`/`height` stripped and replaced with a `vi
 
 ## Score entry layout (narrow / portrait)
 
-[ScoreTable.razor](../Tsump.Shared/Components/ScoreTable.razor)'s narrow layout (viewport <500px) is a **transposed** table — one row per player (`Speler | Eind | Versch. | Totaal | [+]`) instead of a card-per-player — with a single shared **Start** field above the Eind column (starting points are identical for every seat; editing applies to all). The per-player `[+]` reveals an inline Loan/Penalty/Uma sub-row. Real-player End inputs carry `data-end-input`; a small `input` listener in each app's `index.html` **auto-advances** focus to the next empty End cell once a cell holds a complete value (`«int»«,/.»«one digit»`, e.g. `28,5`), committing via the `change` event. The wide layout (≥500px) keeps the original 5-column table.
+[ScoreTable.razor](../Tsump.Shared/Components/ScoreTable.razor)'s narrow layout is a **transposed** table — one row per player (`Speler | Eind | Versch. | Totaal | [+]`) instead of a card-per-player — with a single shared **Start** field above the Eind column (starting points are identical for every seat; editing applies to all). The per-player `[+]` reveals an inline Loan/Penalty/Uma sub-row. Real-player End inputs carry `data-end-input`; a small `input` listener in each app's `index.html` **auto-advances** focus to the next empty End cell once a cell holds a complete value (`«int»«,/.»«one digit»`, e.g. `28,5`), committing via the `change` event. The narrow↔wide switch is a **container query** (`ScoreTable.razor.css`) keyed on the card's own width (≥40rem → wide 5-column table), **not** the viewport — so a narrow content column (sidebar nav, page padding, the multi-column score grid) gets the narrow layout even on a wide screen, instead of the wide table overflowing its card.
 
 ## Hardware (USB HID) scanner notes
 

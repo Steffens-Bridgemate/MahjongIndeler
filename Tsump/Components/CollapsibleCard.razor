@@ -1,7 +1,7 @@
 @* A Bootstrap card whose body collapses behind a clickable header with a chevron.
    Standardises the header + chevron used across the organizer pages. Expanded is
    two-way bound so the caller owns the open/closed flag. *@
-<div class="card @CssClass">
+<div class="card @CssClass" id="@Id">
     <div class="card-header d-flex align-items-center" style="cursor: pointer;" @onclick="Toggle">
         <span class="@TitleClass flex-grow-1">@Title</span>
         <span class="ms-2"><i class="bi @(Expanded ? "bi-chevron-up" : "bi-chevron-down")"></i></span>
@@ -16,6 +16,8 @@
 
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";
+    /// <summary>Optional DOM id on the card root, so it can be a scroll/anchor target.</summary>
+    [Parameter] public string? Id { get; set; }
     [Parameter] public string TitleClass { get; set; } = "h5 mb-0";
     [Parameter] public string CssClass { get; set; } = "mb-3";
     [Parameter] public bool Expanded { get; set; }

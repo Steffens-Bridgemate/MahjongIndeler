@@ -83,7 +83,8 @@ Use the shared [CollapsibleCard.razor](../Tsump/Components/CollapsibleCard.razor
 body collapses behind a clickable header (attendance, assignments, 3-player distribution, meeting
 matrix, scoring overrides, …). It renders the header, the chevron (`bi-chevron-up/down` — never a
 `▲/▼` text glyph), and the body. `Title` is the header text, `@bind-Expanded` owns the open flag,
-`TitleClass` overrides the heading size (default `h5 mb-0`), `CssClass` the card margins.
+`TitleClass` overrides the heading size (default `h5 mb-0`), `CssClass` the card margins, and the
+optional `Id` puts a DOM id on the card root so it can be a scroll/anchor target.
 
 ## 6. Tabs
 
@@ -110,6 +111,21 @@ Assignments, the global all-hanchans export) appear only on the assignment view
 Per-table cards encode player count by colour: 4-player = `border-success` + `bg-success text-white`
 header; 3-player = `border-warning` + `bg-warning text-dark`. Headers omit the "(N players)" suffix on
 the assignment view; the Scores view keeps it (rendered by `ScoreTable`).
+
+**Multi-column flow — don't use a fixed Bootstrap `col-md-4` grid.** The per-table cards and the
+`ScoreTable` cards both flow through CSS-grid wrappers in [app.css](../Tsump/wwwroot/css/app.css) so
+wide screens show as many columns as fit and narrow screens collapse to one (no horizontal
+overflow): `.table-assign-grid` (14rem track) for the assignment cards, `.score-table-grid`
+(36rem track) for the score views.
+Both are `grid-template-columns: repeat(auto-fill, minmax(min(100%, <track>), 1fr))` — the
+`min(100%, …)` is what makes a single full-width column appear once the viewport is below one track.
+Row spacing comes from each card's own `mb-3` (the grid sets `row-gap: 0`), so keep `mb-3` on the
+card wrapper when moving a card into one of these grids.
+
+**Player names are clipped to ~15 chars** with `.player-name-clip` (ellipsis, full value in `title`)
+wherever a name sits in a width-constrained cell — the assignment list items and the `ScoreTable`
+wide-layout column headers. This keeps the grid track widths above from blowing out on one unusually
+long name.
 
 ## 9b. Club theming — never hardcode brand colours
 
@@ -156,19 +172,38 @@ assignment/score views. It's page-agnostic: the caller passes `Tables`, an `IsGr
 ## 12. Contextual sidebar nav
 
 Some pages replace the normal [NavMenu](../Tsump/Layout/NavMenu.razor) menu with their own sub-nav
-("Back to …" at the top), to declutter wide in-page tab strips. Two mechanisms, kept separate on
-purpose (routes vs in-page state) — they could later unify on `ContextNavService`:
+("Back to …" at the top), to declutter wide in-page tab strips. NavMenu picks, in priority order:
+`ContextNavService.Entries` (entry-based, in-page state) → else the URL-based tournament branch →
+else the default menu.
 
-- **Tournament** (URL-based): while the URL is a `/tournament/{id}…` route, NavMenu renders the four
-  tournament destinations as links + a Tournaments (trophy) "back" item.
-  [TournamentNavContext](../Tsump/Services/TournamentNavContext.cs) only carries `IsGenerated`, so
-  Guidesheets/Rankings stay disabled until the tournament is generated — updated live (no nav).
 - **Weekly session** (entry-based): [ContextNavService](../Tsump/Services/ContextNavService.cs) lets
   the page publish a flat list of `ContextNavEntry` (label, icon or status-dot, active, disabled,
-  click or href, optional "?" explainer). NavMenu renders them (so they get sidebar styling); the
-  page rebuilds on a signature change and **clears on `Dispose`**. The hanchan designators (with a
-  `.nav-status-dot` mirroring the tab status colour), Add hanchan, All scores, Rankings and
-  Back-to-workflow live here; History is the escape back to the general menu.
+  `Indent`, click or href, optional "?" explainer). NavMenu renders them (so they get sidebar
+  styling); the page rebuilds on a signature change and **clears on `Dispose`**. The hanchan
+  designators (with a `.nav-status-dot` mirroring the tab status colour), Add hanchan, All scores,
+  Rankings and Back-to-workflow live here. The top item is a generic **"Back"** (home icon) that
+  escapes to the general menu — it navigates to History.
+- **Tournament** (entry-based once generated; URL-based before): a *generated* tournament's
+  [TournamentDetail](../Tsump/Pages/TournamentDetail.razor) page owns its whole sidebar via
+  `ContextNavService` — back-to-Tournaments + Participants, the three **view selectors**
+  (Assignments / Scores per Hanchan / Scores per Table) that drive the in-page `tournamentActiveTab`
+  (there is **no** in-page tab strip), then jumps to the two bottom info cards (3-player
+  distribution, Meetings — they expand the card and scroll to it), then Guidesheets + Rankings. The
+  active selector is followed by an **indented (`Indent = 1`) jump list** — its hanchans (Assignments
+  / Scores per Hanchan) or its table numbers (Scores per Table); each entry switches the view,
+  expands the target, and smooth-scrolls to it (`pendingScrollId` / `pendingScrollFn` consumed in
+  `OnAfterRenderAsync`: `scrollToElement` reserves a sticky strip's height, `scrollToAnchor` is a
+  plain scroll for targets with no strip above them). Before generation, and
+  on the other `/tournament/{id}/…` sub-pages (which don't publish entries), NavMenu falls back to
+  its URL-based branch: the four tournament destinations as links + a top **"Back"** item, with
+  [TournamentNavContext](../Tsump/Services/TournamentNavContext.cs) carrying `IsGenerated` so
+  Guidesheets/Rankings stay disabled until generated. Both the entry-based and URL-based back items
+  use the **home icon** and the generic `Back` label, and navigate to the Tournaments list.
+
+Indented sub-items use `.nav-subitem` (tighter, smaller) in
+[NavMenu.razor.css](../Tsump/Layout/NavMenu.razor.css). The per-granularity in-page
+[`TableNavStrip`](#11-table-nav-strip-jump-to-table) strips stay (table-within-a-hanchan jumps); the
+sidebar adds the coarser hanchan / table-number jumps.
 
 On narrow screens the menu button is pinned top-right (fixed) and the menu drops in as a floating
 panel — see the `max-width` block in [NavMenu.razor.css](../Tsump/Layout/NavMenu.razor.css).

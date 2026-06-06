@@ -276,8 +276,19 @@
             strips.forEach(function (s) {
                 if (s.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) strip = s;
             });
-            el.style.scrollMarginTop = (strip ? strip.offsetHeight + 8 : 0) + 'px';
+            // With a preceding strip, reserve its height. Without one (e.g. the first hanchan/table
+            // header, which has no strip above it), clear the inline value so the element's CSS
+            // scroll-margin-top (.table-scroll-anchor = 3.5rem) applies — pinning to 0 would land it
+            // flush under the top bar, so you'd see the first table instead of the header.
+            if (strip) el.style.scrollMarginTop = (strip.offsetHeight + 8) + 'px';
+            else el.style.scrollMarginTop = '';
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        // Plain smooth scroll honouring the element's CSS scroll-margin-top (no strip compensation).
+        // For targets that don't sit under a sticky table-nav strip (e.g. the bottom info cards).
+        window.scrollToAnchor = function (id) {
+            var el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
         window.openHtmlInNewTab = function (html) {
             var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
