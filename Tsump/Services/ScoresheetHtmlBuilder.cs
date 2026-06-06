@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace Tsump.Services;
@@ -107,20 +108,26 @@ public static class ScoresheetHtmlBuilder
         // Total content rows: header + names + 7 scoring + 4 separator + initials = 14
         var totalRows = 14;
 
-        // Wider left panel only when it carries a QR; a label alone keeps the slim vertical strip.
-        var panelWidth = hasQr ? "104px" : "22px";
+        // Column widths as percentages that sum to 100 so the table fills the full page width.
+        // Why not leave the player columns at width:auto (like the guidesheet does for its last
+        // column)? The guidesheet's first row has a real <th> in every column, so table-layout:fixed
+        // has somewhere to distribute the leftover width. Here the first row is a rowspanned side
+        // panel + a single colspanned header <th> — the player columns have no per-column cell in the
+        // first row, so auto columns get no width to distribute and collapse to their minimum, leaving
+        // the table narrower than the page. Explicit percentages remove that ambiguity. The side panel
+        // takes more room when it carries a QR; the label is a slim strip; players split the rest evenly.
+        double panelPct = hasQr ? 14 : (hasPanel ? 3 : 0);
+        double labelPct = 9;
+        double playerPct = (100 - panelPct - labelPct) / table.PlayerNames.Count;
 
         sb.Append("<div class=\"sheet\">");
         sb.Append("<table>");
 
-        // Explicit column widths: panel + a fixed label column, the rest split evenly across the
-        // players. Without this, the colspan header row leaves the label column as wide as a player
-        // column (wasted horizontal space) — pinning the label to 60px hands that width back to the
-        // name columns so longer names fit.
         sb.Append("<colgroup>");
-        if (hasPanel) sb.Append($"<col style=\"width:{panelWidth};\">");
-        sb.Append("<col style=\"width:68px;\">");
-        for (int i = 0; i < table.PlayerNames.Count; i++) sb.Append("<col>");
+        if (hasPanel) sb.Append($"<col style=\"width:{panelPct.ToString(CultureInfo.InvariantCulture)}%;\">");
+        sb.Append($"<col style=\"width:{labelPct.ToString(CultureInfo.InvariantCulture)}%;\">");
+        for (int i = 0; i < table.PlayerNames.Count; i++)
+            sb.Append($"<col style=\"width:{playerPct.ToString(CultureInfo.InvariantCulture)}%;\">");
         sb.Append("</colgroup>");
 
         // Header row with table number (and the optional left panel: vertical label + invite QR)
@@ -139,12 +146,12 @@ public static class ScoresheetHtmlBuilder
         sb.Append($"{lang("Table")} {table.TableNumber} ({table.PlayerCount} {lang("players")})");
         sb.Append("</th></tr>");
 
-        // Player names row — capped to 16 chars (print/download only) with a slightly smaller header
+        // Player names row — capped to 18 chars (print/download only) with a slightly smaller header
         // font so the (wide Verdana) names fit; CSS ellipsis is the final safety net.
         sb.Append("<tr><th class=\"row-label\"></th>");
         foreach (var name in table.PlayerNames)
         {
-            var shown = name.Length > 16 ? name.Substring(0, 15) + "…" : name;
+            var shown = name.Length > 18 ? name.Substring(0, 17) + "…" : name;
             sb.Append($"<th style=\"text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;\">{shown}</th>");
         }
         sb.Append("</tr>");

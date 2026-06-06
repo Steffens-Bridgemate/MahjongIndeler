@@ -86,8 +86,12 @@ textually unique vs the scoresheet ones.
 printable scoresheets. Each sheet has an optional **left side panel** (`ScoresheetTable.HanchanLabel`)
 with the hanchan/table description as vertical text. When **external scoring is enabled**, the page
 also passes `ScoresheetTable.InviteQrSvg` — the table's invite QR — which the builder pins to the
-**lower part** of that panel (label centres in the space above it). The panel widens (~86px) only when
-it carries a QR; a label-only panel stays a slim strip.
+**lower part** of that panel (label centres in the space above it). All columns are sized as
+percentages that sum to 100 (panel 14% with a QR / 3% label-only, label 9%, players split the rest) so
+the table fills the full page width — `table-layout:fixed` won't expand `width:auto` player columns here
+because the first row is a colspanned header over the rowspanned panel, giving it no per-column cell to
+distribute leftover width to (the guidesheet gets away with one `auto` column only because its first row
+has a real `<th>` in every column).
 
 The QR comes from `ScoreInviteService.BuildInviteQrSvg(...)`, which builds the same invite URL as the
 QR modal and renders it through the **memoised** `QrCodeRenderer.ToSvg` — so a QR already shown in the
