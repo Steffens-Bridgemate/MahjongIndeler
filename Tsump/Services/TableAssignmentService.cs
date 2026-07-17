@@ -6,6 +6,8 @@ namespace Tsump.Services;
 /// Assigns present players to tables of 4 (preferred) and 3.
 /// Priority 1: Evenly spread who plays at 3-player tables (by ratio to attendance).
 /// Priority 2: Spread meetings between players — using meeting ratio relative to co-attendance.
+/// Pairs that already met earlier the same day carry a heavy penalty, so a second hanchan
+/// of an evening avoids repeat opponents wherever the player count allows it.
 /// </summary>
 public class TableAssignmentService
 {
@@ -21,6 +23,20 @@ public class TableAssignmentService
     private const int MaxAttempts = 5;
     private const double ThreeFairnessWeight = 10.0;
     private const double MeetingSpreadWeight = 1.0;
+
+    /// <summary>
+    /// The 3-player ratio a player would have AFTER being assigned to a 3-player table
+    /// this session. Candidate selection must rank on this (not the historical ratio) so it
+    /// agrees with ScoreThreePlayerFairness — and so first-timers (attendance 0) come out as
+    /// the least attractive candidates (ratio 1.0) instead of the most attractive (0.0).
+    /// </summary>
+    private static double PostAssignmentThreeRatio(
+        Guid id, Dictionary<Guid, int> threePlayerCounts, Dictionary<Guid, int> attendance)
+    {
+        var attended = attendance.GetValueOrDefault(id, 0) + 1;
+        var threeCount = threePlayerCounts.GetValueOrDefault(id, 0) + 1;
+        return (double)threeCount / attended;
+    }
 
     public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds, Guid? currentSessionId = null, DateTime? currentDate = null, bool currentDateExcluded = false)
     {
@@ -50,6 +66,10 @@ public class TableAssignmentService
         Dictionary<Guid, int> attendance = CountAttendance(history, presentPlayerIds);
         Dictionary<Guid, int> threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
         Dictionary<string, int> meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
+        Dictionary<string, int> sameDayMeetingCounts = currentDay.HasValue
+            ? BuildMeetingMatrix(history.Where(s => s.Date.Date == currentDay.Value).ToList(), presentPlayerIds)
+            : new Dictionary<string, int>();
+        var pairCosts = new PairCostModel(meetingCounts, sameDayMeetingCounts, attendance);
 
         // Special case: 21 players, second hanchan of a date. Builds tables by rearranging
         // the prior hanchan so no pair repeats and no one plays a 3-table twice in the day.
@@ -79,12 +99,11 @@ public class TableAssignmentService
         {
             var (tables, threePool) = BuildOneAttempt(
                 presentPlayerIds, eligible, excluded, threePlayerSlots,
-                threePlayerCounts, attendance, meetingCounts);
+                threePlayerCounts, attendance, pairCosts);
 
             // Score this attempt
             double threeScore = ScoreThreePlayerFairness(threePool, threePlayerCounts, attendance);
-            double meetingScore = ScoreAssignmentRatio(
-                tables.Select(t => t.PlayerIds).ToList(), meetingCounts, attendance);
+            double meetingScore = pairCosts.ScoreAssignment(tables.Select(t => t.PlayerIds));
             double combined = ThreeFairnessWeight * threeScore + MeetingSpreadWeight * meetingScore;
 
             if (combined < bestCombinedScore)
@@ -111,17 +130,11 @@ public class TableAssignmentService
         List<Guid> eligible, List<Guid> excluded, int threePlayerSlots,
         Dictionary<Guid, int> threePlayerCounts,
         Dictionary<Guid, int> attendance,
-        Dictionary<string, int> meetingCounts)
+        PairCostModel pairCosts)
     {
         // Re-sort with fresh random tie-breaking each attempt.
-        // Tiebreaker: prefer higher attendance (smaller post-assignment ratio impact).
         var sortedEligible = eligible
-            .OrderBy(id =>
-            {
-                var attended = attendance.GetValueOrDefault(id, 0);
-                var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
-                return attended == 0 ? 0.0 : (double)threeCount / attended;
-            })
+            .OrderBy(id => PostAssignmentThreeRatio(id, threePlayerCounts, attendance))
             .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
             .ThenBy(_ => Random.Shared.Next())
             .ToList();
@@ -132,19 +145,14 @@ public class TableAssignmentService
         if (sortedEligible.Count >= threePlayerSlots)
         {
             threePlayerPool = SelectThreePlayerCandidates(
-                sortedEligible, threePlayerSlots, threePlayerCounts, attendance, meetingCounts);
+                sortedEligible, threePlayerSlots, threePlayerCounts, attendance, pairCosts);
             var threePlayerSet = new HashSet<Guid>(threePlayerPool);
             fourPlayerPool = sortedEligible.Where(id => !threePlayerSet.Contains(id)).Concat(excluded).ToList();
         }
         else
         {
             var sortedExcluded = excluded
-                .OrderBy(id =>
-                {
-                    var attended = attendance.GetValueOrDefault(id, 0);
-                    var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
-                    return attended == 0 ? 0.0 : (double)threeCount / attended;
-                })
+                .OrderBy(id => PostAssignmentThreeRatio(id, threePlayerCounts, attendance))
                 .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
                 .ThenBy(_ => Random.Shared.Next())
                 .ToList();
@@ -154,16 +162,52 @@ public class TableAssignmentService
             fourPlayerPool = sortedExcluded.Skip(remaining).ToList();
         }
 
+        var threeTables = FormTablesGreedy(threePlayerPool, 3, pairCosts);
+        var fourTables = FormTablesGreedy(fourPlayerPool, 4, pairCosts);
+        ImproveBySwaps(threeTables, pairCosts);
+        ImproveBySwaps(fourTables, pairCosts);
+
         var tables = new List<TableAssignment>();
         var tableNumber = 1;
 
-        foreach (var group in FormTablesGreedy(threePlayerPool, 3, meetingCounts, attendance))
+        foreach (var group in threeTables)
             tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
 
-        foreach (var group in FormTablesGreedy(fourPlayerPool, 4, meetingCounts, attendance))
+        foreach (var group in fourTables)
             tables.Add(new TableAssignment { TableNumber = tableNumber++, PlayerIds = group });
 
         return (tables, threePlayerPool);
+    }
+
+    /// <summary>
+    /// Hill-climb refinement after greedy seating: swap players between same-size tables
+    /// while the total meeting score improves. The pools stay intact, so 3-player-duty
+    /// fairness is untouched — only WHO sits WITH whom changes.
+    /// </summary>
+    private static void ImproveBySwaps(List<List<Guid>> tables, PairCostModel pairCosts)
+    {
+        if (tables.Count < 2)
+            return;
+
+        var improved = true;
+        var guard = 0;
+        while (improved && guard++ < 100)
+        {
+            improved = false;
+            for (int t1 = 0; t1 < tables.Count; t1++)
+                for (int t2 = t1 + 1; t2 < tables.Count; t2++)
+                    for (int i = 0; i < tables[t1].Count; i++)
+                        for (int j = 0; j < tables[t2].Count; j++)
+                        {
+                            var before = pairCosts.TableScore(tables[t1]) + pairCosts.TableScore(tables[t2]);
+                            (tables[t1][i], tables[t2][j]) = (tables[t2][j], tables[t1][i]);
+                            var after = pairCosts.TableScore(tables[t1]) + pairCosts.TableScore(tables[t2]);
+                            if (after < before - 1e-12)
+                                improved = true;
+                            else
+                                (tables[t1][i], tables[t2][j]) = (tables[t2][j], tables[t1][i]);
+                        }
+        }
     }
 
     private static readonly int[][] Perms3 =
@@ -388,15 +432,10 @@ public class TableAssignmentService
         if (threePlayerPool.Count == 0)
             return 0;
 
-        var threeSet = new HashSet<Guid>(threePlayerPool);
         // Compute post-assignment ratios for the selected players
-        var ratios = new List<double>();
-        foreach (var id in threePlayerPool)
-        {
-            var attended = attendance.GetValueOrDefault(id, 0) + 1; // +1 for this session
-            var threeCount = threePlayerCounts.GetValueOrDefault(id, 0) + 1; // +1 for being assigned
-            ratios.Add((double)threeCount / attended);
-        }
+        var ratios = threePlayerPool
+            .Select(id => PostAssignmentThreeRatio(id, threePlayerCounts, attendance))
+            .ToList();
 
         var mean = ratios.Average();
         return ratios.Sum(r => (r - mean) * (r - mean));
@@ -414,14 +453,9 @@ public class TableAssignmentService
         if (slots == 0)
             return 0;
 
-        // Deterministically pick the best candidates (lowest ratio, highest attendance)
+        // Deterministically pick the best candidates (lowest post-ratio, highest attendance)
         var sorted = eligible
-            .OrderBy(id =>
-            {
-                var attended = attendance.GetValueOrDefault(id, 0);
-                var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
-                return attended == 0 ? 0.0 : (double)threeCount / attended;
-            })
+            .OrderBy(id => PostAssignmentThreeRatio(id, threePlayerCounts, attendance))
             .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
             .ToList();
 
@@ -433,12 +467,7 @@ public class TableAssignmentService
         else
         {
             var sortedExcluded = excluded
-                .OrderBy(id =>
-                {
-                    var attended = attendance.GetValueOrDefault(id, 0);
-                    var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
-                    return attended == 0 ? 0.0 : (double)threeCount / attended;
-                })
+                .OrderBy(id => PostAssignmentThreeRatio(id, threePlayerCounts, attendance))
                 .ThenByDescending(id => attendance.GetValueOrDefault(id, 0))
                 .ToList();
             var remaining = slots - sorted.Count;
@@ -454,9 +483,7 @@ public class TableAssignmentService
     /// players who attend less often are not unfairly penalized for having met someone.
     /// </summary>
     private static List<List<Guid>> FormTablesGreedy(
-        List<Guid> playerGuids, int tableSize,
-        Dictionary<string, int> meetingCounts,
-        Dictionary<Guid, int> attendance)
+        List<Guid> playerGuids, int tableSize, PairCostModel pairCosts)
     {
         if (playerGuids.Count == 0)
             return new List<List<Guid>>();
@@ -494,11 +521,11 @@ public class TableAssignmentService
                         break;
 
                     var bestPlayer = remaining[0];
-                    var bestPlayerScore = PairScoreRatio(tables[t], remaining[0], meetingCounts, attendance);
+                    var bestPlayerScore = pairCosts.PairScore(tables[t], remaining[0]);
 
                     for (int p = 1; p < remaining.Count; p++)
                     {
-                        var score = PairScoreRatio(tables[t], remaining[p], meetingCounts, attendance);
+                        var score = pairCosts.PairScore(tables[t], remaining[p]);
                         if (score < bestPlayerScore)
                         {
                             bestPlayerScore = score;
@@ -511,7 +538,7 @@ public class TableAssignmentService
                 }
             }
 
-            var totalScore = ScoreAssignmentRatio(tables, meetingCounts, attendance);
+            var totalScore = pairCosts.ScoreAssignment(tables);
             if (totalScore < bestScore)
             {
                 bestScore = totalScore;
@@ -523,62 +550,71 @@ public class TableAssignmentService
     }
 
     /// <summary>
-    /// Score for placing a candidate at a table: sum of meeting ratios with each existing member.
-    /// Ratio = meetingCount / min(attendanceA, attendanceB).
-    /// This normalizes so that a pair who met 2 out of 3 possible times (0.67)
-    /// scores higher than a pair who met 2 out of 10 possible times (0.20).
+    /// The cost of seating two players together, and aggregates of it.
+    /// Base cost = meeting ratio: meetingCount / min(attendanceA, attendanceB) — the min is the
+    /// max times the pair could have met, so infrequent attendees aren't unfairly penalized.
+    /// A pair that already met earlier the SAME day additionally carries a heavy flat penalty,
+    /// so a second hanchan of an evening avoids repeat opponents whenever the layout allows.
     /// </summary>
-    private static double PairScoreRatio(
-        List<Guid> tableMembers, Guid candidate,
-        Dictionary<string, int> meetingCounts,
-        Dictionary<Guid, int> attendance)
+    private sealed class PairCostModel
     {
-        double score = 0;
-        var candidateAttendance = attendance.GetValueOrDefault(candidate, 0);
+        // Dominates any realistic sum of meeting ratios, so avoiding one same-day repeat
+        // always outweighs seasonal meeting-spread preferences.
+        private const double SameDayRepeatPenalty = 10.0;
 
-        foreach (var member in tableMembers)
+        private readonly Dictionary<string, int> _meetingCounts;
+        private readonly Dictionary<string, int> _sameDayMeetingCounts;
+        private readonly Dictionary<Guid, int> _attendance;
+
+        public PairCostModel(
+            Dictionary<string, int> meetingCounts,
+            Dictionary<string, int> sameDayMeetingCounts,
+            Dictionary<Guid, int> attendance)
         {
-            var key = MakeKey(member, candidate);
-            var met = meetingCounts.GetValueOrDefault(key, 0);
-            var memberAttendance = attendance.GetValueOrDefault(member, 0);
-
-            // min(attendanceA, attendanceB) = max times they could have met
-            var coAttendancePossible = Math.Min(candidateAttendance, memberAttendance);
-            if (coAttendancePossible > 0)
-                score += (double)met / coAttendancePossible;
-            // If neither has attendance history yet, score stays 0 (neutral)
+            _meetingCounts = meetingCounts;
+            _sameDayMeetingCounts = sameDayMeetingCounts;
+            _attendance = attendance;
         }
 
-        return score;
-    }
-
-    /// <summary>
-    /// Total score for an assignment: sum of all pair meeting ratios across all tables.
-    /// </summary>
-    private static double ScoreAssignmentRatio(
-        List<List<Guid>> tables,
-        Dictionary<string, int> meetingCounts,
-        Dictionary<Guid, int> attendance)
-    {
-        double total = 0;
-        foreach (var table in tables)
+        public double PairCost(Guid a, Guid b)
         {
+            var key = MakeKey(a, b);
+            var met = _meetingCounts.GetValueOrDefault(key, 0);
+            var coAttendancePossible = Math.Min(
+                _attendance.GetValueOrDefault(a, 0),
+                _attendance.GetValueOrDefault(b, 0));
+            // No shared history yet => neutral 0
+            var cost = coAttendancePossible > 0 ? (double)met / coAttendancePossible : 0;
+            if (_sameDayMeetingCounts.GetValueOrDefault(key, 0) > 0)
+                cost += SameDayRepeatPenalty;
+            return cost;
+        }
+
+        /// <summary>Cost of adding a candidate to a (partial) table.</summary>
+        public double PairScore(List<Guid> tableMembers, Guid candidate)
+        {
+            double score = 0;
+            foreach (var member in tableMembers)
+                score += PairCost(member, candidate);
+            return score;
+        }
+
+        public double TableScore(List<Guid> table)
+        {
+            double score = 0;
             for (int i = 0; i < table.Count; i++)
-            {
                 for (int j = i + 1; j < table.Count; j++)
-                {
-                    var key = MakeKey(table[i], table[j]);
-                    var met = meetingCounts.GetValueOrDefault(key, 0);
-                    var possibleCoAttendance = Math.Min(
-                        attendance.GetValueOrDefault(table[i], 0),
-                        attendance.GetValueOrDefault(table[j], 0));
-
-                    if (possibleCoAttendance > 0)
-                        total += (double)met / possibleCoAttendance;
-                }
-            }
+                    score += PairCost(table[i], table[j]);
+            return score;
         }
-        return total;
+
+        public double ScoreAssignment(IEnumerable<List<Guid>> tables)
+        {
+            double total = 0;
+            foreach (var table in tables)
+                total += TableScore(table);
+            return total;
+        }
     }
 
     /// <summary>
@@ -592,7 +628,7 @@ public class TableAssignmentService
         List<Guid> sortedEligible, int slots,
         Dictionary<Guid, int> threePlayerCounts,
         Dictionary<Guid, int> attendance,
-        Dictionary<string, int> meetingCounts)
+        PairCostModel pairCosts)
     {
         if (slots <= 0)
             return new List<Guid>();
@@ -600,12 +636,7 @@ public class TableAssignmentService
         if (sortedEligible.Count <= slots)
             return sortedEligible.ToList();
 
-        double ThreeRatio(Guid id)
-        {
-            var attended = attendance.GetValueOrDefault(id, 0);
-            var threeCount = threePlayerCounts.GetValueOrDefault(id, 0);
-            return attended == 0 ? 0.0 : (double)threeCount / attended;
-        }
+        double ThreeRatio(Guid id) => PostAssignmentThreeRatio(id, threePlayerCounts, attendance);
 
         var cutoffRatio = ThreeRatio(sortedEligible[slots - 1]);
 
@@ -656,11 +687,11 @@ public class TableAssignmentService
                 for (int i = 0; i < slotsLeft; i++)
                 {
                     var bestCandidate = pool[0];
-                    var bestScore = MeetingScoreAgainstGroup(selected, pool[0], meetingCounts, attendance);
+                    var bestScore = pairCosts.PairScore(selected, pool[0]);
 
                     for (int c = 1; c < pool.Count; c++)
                     {
-                        var score = MeetingScoreAgainstGroup(selected, pool[c], meetingCounts, attendance);
+                        var score = pairCosts.PairScore(selected, pool[c]);
                         if (score < bestScore || (Math.Abs(score - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
                         {
                             bestScore = score;
@@ -676,32 +707,6 @@ public class TableAssignmentService
         }
 
         return selected;
-    }
-
-    /// <summary>
-    /// Sum of meeting ratios between a candidate and each member of a group.
-    /// Lower = candidate has met the group less. Used within attendance tiers
-    /// to pick 3-player candidates with the least meeting overlap.
-    /// </summary>
-    private static double MeetingScoreAgainstGroup(
-        List<Guid> groupMembers, Guid candidate,
-        Dictionary<string, int> meetingCounts,
-        Dictionary<Guid, int> attendance)
-    {
-        double score = 0;
-        var candidateAttendance = attendance.GetValueOrDefault(candidate, 0);
-
-        foreach (var member in groupMembers)
-        {
-            var key = MakeKey(member, candidate);
-            var met = meetingCounts.GetValueOrDefault(key, 0);
-            var memberAttendance = attendance.GetValueOrDefault(member, 0);
-            var coAttendancePossible = Math.Min(candidateAttendance, memberAttendance);
-            if (coAttendancePossible > 0)
-                score += (double)met / coAttendancePossible;
-        }
-
-        return score;
     }
 
     private static void Shuffle(List<Guid> list)

@@ -14,7 +14,7 @@ The paired scoring app lives in the [MahjongScoring](https://github.com/Steffens
 |---|---|---|
 | `Tsump` | Blazor WASM | The organizer app — members, weekly sessions, tournaments |
 | `Tsump.Shared` | Razor Class Library | Models, codec, `ScoreTable`, `QrCodeModal`, `QrCodeRenderer`, `LanguageService`. Consumed by `Tsump` directly and by MahjongScoring via git submodule |
-| `Simulation` | Console | Offline table-assignment optimisation analysis (not deployed) |
+| `Simulation` | Console | Offline table-assignment test bench (not deployed): walk-forward replay of a real export across algorithm variants, and `--regen` to rewrite an export's assignments with the live algorithm (see [docs/domain.md](docs/domain.md#table-assignment-weekly)) |
 | `Tsump.Scoring` (in this tree) | — | Build-output / IDE-restored stub only. **Source lives in the MahjongScoring repo.** Don't edit files here |
 
 ## Two-repo relationship & deploy dance

@@ -32,6 +32,16 @@ Both `Hanchan` and `TournamentSession` carry a `Guid Id`. The shared codec ([Sco
 
 `TournamentSession.Id` is back-filled when missing. Stored tournaments from before the field existed deserialise with `Guid.Empty`; `TournamentService.GetAllAsync` ([TournamentService.cs](../Tsump/Services/TournamentService.cs)) assigns new Guids and re-saves on first load.
 
+## Table assignment (weekly)
+
+`TableAssignmentService.AssignTables` ([TableAssignmentService.cs](../Tsump/Services/TableAssignmentService.cs)) seats present players at 4-player (preferred) and 3-player tables. Rules, in priority order:
+
+1. **Hard constraint**: whoever sat at a 3-player table in their most recent attended session is not eligible for one now (unless there's no other way to fill the slots). Because same-date hanchans always count as history, this also blocks double 3-duty within one evening.
+2. **3-player duty fairness**: candidates are ranked on the **post-assignment ratio** `(threeCount + 1) / (attended + 1)` — the ratio a player *would* have after taking duty. This must stay consistent with `ScoreThreePlayerFairness` and makes first-timers (attendance 0) the *least* attractive candidates (ratio 1.0). The pre-2026-07 code ranked on the historical ratio, which mapped "no history" to 0.0 and *guaranteed* newcomers a 3-player seat. `Member.ExtraThreePlayerTableCount` seeds the count for players who owe extra duty.
+3. **Meeting spread**: seating minimizes pair meeting ratios (`met / min(attendance)`), via greedy table formation followed by a swap hill-climb (`ImproveBySwaps` — swaps between same-size tables only, so duty fairness is untouched). Pairs that already met earlier the **same day** carry a flat penalty of 10 (`PairCostModel`), so a second hanchan of an evening avoids repeat opponents wherever the player count allows (with 8 or 12 players some repeats are mathematically forced). The exactly-21-players second hanchan keeps its dedicated solver (`TryBuildSpecialCase21SecondHanchan`) which *guarantees* zero repeats.
+
+The `Simulation` console project is the offline test bench: walk-forward replay of a real export across algorithm variants (`dotnet run -- export.json`), plus `--regen out.json` to rewrite an export's assignments with the live algorithm for in-app comparison. Real club exports (`currentdata.json`, `*regenerated*.json`) are gitignored.
+
 ## Tables and scores
 
 `TableAssignment` ([Tsump.Shared/Models/Hanchan.cs](../Tsump.Shared/Models/Hanchan.cs)) holds `TableNumber`, `PlayerIds`, and optional `TableScore`. `PlayerCount` is `PlayerIds.Count`. Tables are 3 or 4 players.
