@@ -462,6 +462,7 @@ else
         {
             <ScoreImportPanel IsEnabled="externalScoringEnabled"
                               OnApplied="OnHanchanScoreApplied"
+                              OnPreviewShown="OnImportPreviewShown"
                               PlayerNameResolver="GetPlayerName" />
             @* Scores tab: green = result entry complete, so the strip is useful regardless of scanning. *@
             @if (HasNavTables)
@@ -564,6 +565,10 @@ else
     private bool attendanceExpanded = true;
 
     private List<Hanchan> hanchansOnDate = new();
+
+    // Table anchor to smooth-scroll into view after the next render (set when an import
+    // preview identifies its target table; consumed in OnAfterRenderAsync).
+    private string? pendingScrollId;
     private Hanchan? currentHanchan;
 
     private List<Guid> selectedPlayerIds = new();
@@ -673,6 +678,13 @@ else
         }
         // Refresh the sidebar's contextual nav after every render (dedup'd by signature).
         PublishNav();
+
+        if (pendingScrollId != null)
+        {
+            var id = pendingScrollId;
+            pendingScrollId = null;
+            await JS.InvokeVoidAsync("scrollToElement", id);
+        }
     }
 
     private async Task LoadSessionsForDate()
@@ -1244,6 +1256,24 @@ else
                 scoreTableVersion++;
             }
         }
+        StateHasChanged();
+    }
+
+    /// <summary>Invoked by <see cref="ScoreImportPanel"/> when an import preview appears:
+    /// scrolls the table that will be updated into view. When the result targets a sibling
+    /// hanchan of the same date, switches to it first (staying on the Scores tab).</summary>
+    private void OnImportPreviewShown(Tsump.Scoring.ScoringResult result)
+    {
+        var target = hanchansOnDate.FirstOrDefault(h => h.Id == result.ContextId);
+        if (target == null || !target.Tables.Any(t => t.TableNumber == result.TableNumber))
+            return; // other date or regenerated table — the preview label tells the user
+
+        if (currentHanchan == null || currentHanchan.Id != target.Id)
+        {
+            LoadFromHanchan(target);          // resets activeTab to "tables"…
+            ActivateScoresTab();              // …so bring the Scores tab (and Score init) back
+        }
+        pendingScrollId = TableAnchorId(result.TableNumber);
         StateHasChanged();
     }
 

@@ -9,7 +9,7 @@
 
 @if (IsEnabled)
 {
-    <div class="mb-3">
+    <div class="mb-3 @(floating ? "import-panel-floating" : null)">
         @if (!showPanel)
         {
             <button class="@TriggerButtonClass" disabled="@TriggerDisabled" @onclick="OpenPanel">
@@ -277,11 +277,33 @@
     /* The QR indicator doubles as a "click to re-arm" button. */
     .scan-indicator { cursor: pointer; }
     .scan-indicator:hover .bi-qr-code { opacity: 0.85; }
+
+    /* While a preview is up (and through the states that follow it), the panel floats fixed at
+       the top of the viewport so the host page can scroll the target table into view *under* it —
+       the preview itself must never scroll away. scrollToElement (index.html) reserves this
+       overlay's height when positioning the table. */
+    .import-panel-floating {
+        position: fixed;
+        top: .75rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(96vw, 640px);
+        max-height: calc(100vh - 1.5rem);
+        overflow-y: auto;
+        z-index: 1050;
+    }
+
+    .import-panel-floating > .card {
+        box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .3);
+    }
 </style>
 
 @code {
     [Parameter] public bool IsEnabled { get; set; }
     [Parameter] public EventCallback OnApplied { get; set; }
+    /// <summary>Fires when a decoded result reaches the preview (or overwrite-warning) state,
+    /// with the parsed result. Hosts use it to scroll the table that will be updated into view.</summary>
+    [Parameter] public EventCallback<ScoringResult> OnPreviewShown { get; set; }
     [Parameter] public Func<Guid, string>? PlayerNameResolver { get; set; }
     /// <summary>CSS classes for the collapsed "Import result" trigger button, so a host can
     /// colour it to match its surroundings. Defaults to the neutral outline style.</summary>
@@ -315,6 +337,12 @@
     private enum FocusTarget { None, Next, ReadImage }
 
     private bool showPanel;
+    // True from the moment a preview is shown until the panel returns to neutral or closes.
+    // Renders the panel as a fixed overlay (see .import-panel-floating) so the preview stays on
+    // screen while the host page scrolls the target table into view — and stays floating through
+    // Applied + the auto-continued capture states, keeping the camera view / scan indicator
+    // visible even when the page is scrolled down at a table.
+    private bool floating;
     private ImportStatus status = ImportStatus.Neutral;
     private InputMethod method = InputMethod.None;
     private ScoringResult? pendingResult;
@@ -527,6 +555,7 @@
     private void ReturnToNeutralCore()
     {
         autoContinueCts?.Cancel();
+        floating = false;
         status = ImportStatus.Neutral;
         method = InputMethod.None;
         pendingResult = null;
@@ -711,11 +740,15 @@
 
         pendingResult = parsed;
         pendingLookup = lookup;
+        floating = true;
         status = lookup.Context.Table.Score != null
                  && lookup.Context.Table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue)
             ? ImportStatus.AlreadyScored
             : ImportStatus.Preview;
         StateHasChanged();
+
+        if (OnPreviewShown.HasDelegate)
+            await OnPreviewShown.InvokeAsync(parsed);
     }
 
     private async Task Apply(bool confirmOverwrite)

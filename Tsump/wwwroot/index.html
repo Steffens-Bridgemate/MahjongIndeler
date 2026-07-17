@@ -280,7 +280,12 @@
             // header, which has no strip above it), clear the inline value so the element's CSS
             // scroll-margin-top (.table-scroll-anchor = 3.5rem) applies — pinning to 0 would land it
             // flush under the top bar, so you'd see the first table instead of the header.
-            if (strip) el.style.scrollMarginTop = (strip.offsetHeight + 8) + 'px';
+            var reserve = strip ? strip.offsetHeight : 0;
+            // The import panel's floating preview overlay (fixed, top .75rem) covers the strip and
+            // more — reserve whichever occludes the most so the target lands fully below it.
+            var overlay = document.querySelector('.import-panel-floating');
+            if (overlay) reserve = Math.max(reserve, overlay.offsetHeight + 12);
+            if (reserve > 0) el.style.scrollMarginTop = (reserve + 8) + 'px';
             else el.style.scrollMarginTop = '';
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };

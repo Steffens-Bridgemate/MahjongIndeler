@@ -68,6 +68,7 @@ else
             {
                 <ScoreImportPanel IsEnabled="externalScoringEnabled"
                                   OnApplied="ReloadTournament"
+                                  OnPreviewShown="OnImportPreviewShown"
                                   PlayerNameResolver="GetParticipantDisplay"
                                   TriggerButtonClass="btn btn-primary" />
             }
@@ -882,6 +883,28 @@ else
     {
         ApplyTab("allscores");
         pendingScrollId = AllScoresAnchorId(tableNumber);
+        pendingScrollFn = "scrollToElement";
+        StateHasChanged();
+    }
+
+    /// <summary>Invoked by <see cref="ScoreImportPanel"/> when an import preview appears:
+    /// scrolls the table that will be updated into view on whichever score view is active,
+    /// expanding the target hanchan on the per-hanchan view if it's collapsed.</summary>
+    private void OnImportPreviewShown(Tsump.Scoring.ScoringResult result)
+    {
+        var session = tournament?.Sessions.FirstOrDefault(s => s.Id == result.ContextId);
+        if (session == null || !session.Tables.Any(t => t.TableNumber == result.TableNumber))
+            return; // another tournament or regenerated table — the preview label tells the user
+
+        if (tournamentActiveTab == "allscores")
+        {
+            pendingScrollId = AllScoresAnchorId(result.TableNumber);
+        }
+        else
+        {
+            expandedHanchans.Add(session.SessionNumber);
+            pendingScrollId = ScoreAnchorId(session.SessionNumber, result.TableNumber);
+        }
         pendingScrollFn = "scrollToElement";
         StateHasChanged();
     }
