@@ -55,7 +55,9 @@ var regenFlag = twoHanchans ? regen2Flag : Array.IndexOf(args, "--regen");
 if (regenFlag >= 0)
 {
     var outPath = args[regenFlag + 1];
-    var live = new Options(PostRatio: true, Sel: Selection.Tiered, Attempts: 5, TrueCoAtt: false, Swap: true, SameDayPenalty: 10);
+    // Mirrors the live service; pass --linear to A/B against the pre-convex cost
+    var convex = Array.IndexOf(args, "--linear") < 0;
+    var live = new Options(PostRatio: true, Sel: Selection.Tiered, Attempts: 5, TrueCoAtt: false, Swap: true, SameDayPenalty: 10, ConvexCost: convex);
     var doc = System.Text.Json.Nodes.JsonNode.Parse(json)!;
     var sessionsNode = (System.Text.Json.Nodes.JsonArray)doc["Sessions"]!;
 
@@ -127,7 +129,7 @@ if (regenFlag >= 0)
     doc["ExportDate"] = DateTime.Now.ToString("o");
     File.WriteAllText(outPath, doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
-    (int met2Plus, int maxMeet, int sameDayRepeats) SeasonStats(List<Session> sessions)
+    (int met2Plus, int maxMeet, int sameDayRepeats, int met3, int met4Plus) SeasonStats(List<Session> sessions)
     {
         var m = new Dictionary<string, int>();
         var sameDay = 0;
@@ -147,14 +149,16 @@ if (regenFlag >= 0)
                         }
             sameDay += dayPairs.Count(kv => kv.Value >= 2);
         }
-        return (m.Count(kv => kv.Value >= 2), m.Count == 0 ? 0 : m.Values.Max(), sameDay);
+        return (m.Count(kv => kv.Value >= 2), m.Count == 0 ? 0 : m.Values.Max(), sameDay, m.Count(kv => kv.Value == 3), m.Count(kv => kv.Value >= 4));
     }
 
-    var (origRepeats, origMax, origSameDay) = SeasonStats(ordered);
-    var (newRepeats, newMax, newSameDay) = SeasonStats(working);
+    var (origRepeats, origMax, origSameDay, origMet3, origMet4) = SeasonStats(ordered);
+    var (newRepeats, newMax, newSameDay, newMet3, newMet4) = SeasonStats(working);
     Console.WriteLine($"Regenerated {regeneratedCount} of {ordered.Count} sessions" +
-                      $"{(twoHanchans ? $" (+{regeneratedCount} second hanchans)" : "")} -> {outPath}");
+                      $"{(twoHanchans ? $" (+{regeneratedCount} second hanchans)" : "")}" +
+                      $"{(convex ? "" : " [linear cost]")} -> {outPath}");
     Console.WriteLine($"  pairs that met 2+ times over the season: {origRepeats} -> {newRepeats}");
+    Console.WriteLine($"  pairs at exactly 3 / at 4+ meetings:     {origMet3} / {origMet4} -> {newMet3} / {newMet4}");
     Console.WriteLine($"  max meetings of any pair:                {origMax} -> {newMax}");
     Console.WriteLine($"  same-day repeat pairs (whole season):    {origSameDay} -> {newSameDay}");
     return;
@@ -167,12 +171,12 @@ var variants = new (string Name, Options O)[]
     ("OLD       pre-ratio, simple take, 1 attempt",   new Options(PostRatio: false, Sel: Selection.SimpleTake,        Attempts: 1,  TrueCoAtt: false, Swap: false, SameDayPenalty: 0)),
     ("FIXED     pre-ratio, att-tiebreak, 5 attempts", new Options(PostRatio: false, Sel: Selection.AttendanceTiebreak, Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 0)),
     ("TIERED    pre-ratio, tiers (live until today)", new Options(PostRatio: false, Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 0)),
-    ("CURRENT   post-ratio, tiers (live now)",        new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 0)),
+    ("CURRENT   post-ratio, tiers (live now)",        new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 0, ConvexCost: true)),
     ("C+COATT   + true co-attendance denominator",    new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: true,  Swap: false, SameDayPenalty: 0)),
     ("C+SWAP    + swap local search",                 new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: true,  SameDayPenalty: 0)),
     ("C+SAMEDAY + same-day repeat penalty",           new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 10)),
     ("C+20      + 20 attempts",                       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 20, TrueCoAtt: false, Swap: false, SameDayPenalty: 0)),
-    ("BEST      co-att + swap + same-day + 20",       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 20, TrueCoAtt: true,  Swap: true,  SameDayPenalty: 10)),
+    ("BEST      co-att + swap + same-day + 20",       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 20, TrueCoAtt: true,  Swap: true,  SameDayPenalty: 10, ConvexCost: true)),
 };
 
 var agg = variants.ToDictionary(v => v.Name, _ => new Agg());
@@ -309,7 +313,8 @@ enum Selection { SimpleTake, AttendanceTiebreak, Tiered }
 /// <param name="TrueCoAtt">meeting ratio denominator = sessions both present, instead of min(attendance)</param>
 /// <param name="Swap">hill-climb pairwise swaps between same-size tables after greedy seating</param>
 /// <param name="SameDayPenalty">score penalty per pair that already met earlier the same day</param>
-record Options(bool PostRatio, Selection Sel, int Attempts, bool TrueCoAtt, bool Swap, double SameDayPenalty);
+/// <param name="ConvexCost">pair cost = met * ratio instead of ratio — a 3rd meeting costs 9/denom, not 3/denom, so repeats can't concentrate on the cheap high-attendance pairs</param>
+record Options(bool PostRatio, Selection Sel, int Attempts, bool TrueCoAtt, bool Swap, double SameDayPenalty, bool ConvexCost = false);
 
 record SimResult(double ThreeVariance, bool ThreePlayerOptimal, int MaxPairMeetings, double MeetingScore,
     int NewcomersAtThree, int HardViolations, int SameDayRepeats, int Unseated, List<Guid> ThreeAssigned);
@@ -648,6 +653,8 @@ class Sim
         var met = meetings.GetValueOrDefault(key, 0);
         var denom = Denominator(a, b, o);
         var cost = denom > 0 ? (double)met / denom : 0;
+        if (o.ConvexCost)
+            cost *= met;
         if (o.SameDayPenalty > 0 && sameDayMeetings.GetValueOrDefault(key, 0) > 0)
             cost += o.SameDayPenalty;
         return cost;

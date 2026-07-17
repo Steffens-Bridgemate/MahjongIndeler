@@ -583,8 +583,12 @@ public class TableAssignmentService
             var coAttendancePossible = Math.Min(
                 _attendance.GetValueOrDefault(a, 0),
                 _attendance.GetValueOrDefault(b, 0));
-            // No shared history yet => neutral 0
-            var cost = coAttendancePossible > 0 ? (double)met / coAttendancePossible : 0;
+            // No shared history yet => neutral 0.
+            // The extra * met makes the cost convex: each further repeat gets quadratically more
+            // expensive. With a linear cost, a 3rd meeting between two ever-presents is cheaper
+            // than a 2nd between two occasional visitors, so repeats pile up on the most loyal
+            // attendees (observed on real data: 4x-meeting pairs were all high-attendance).
+            var cost = coAttendancePossible > 0 ? (double)(met * met) / coAttendancePossible : 0;
             if (_sameDayMeetingCounts.GetValueOrDefault(key, 0) > 0)
                 cost += SameDayRepeatPenalty;
             return cost;
