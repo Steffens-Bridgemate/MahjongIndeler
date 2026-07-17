@@ -2,5 +2,5 @@ namespace Tsump;
 
 public static class AppVersion
 {
-    public const string Version = "2.24";
+    public const string Version = "2.25";
 }
