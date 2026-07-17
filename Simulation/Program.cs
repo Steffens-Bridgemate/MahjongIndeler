@@ -41,13 +41,17 @@ var ordered = data.Sessions
 Console.WriteLine($"Loaded {members.Count} members, {ordered.Count} sessions " +
                   $"({ordered.First().Date:yyyy-MM-dd} .. {ordered.Last().Date:yyyy-MM-dd}) from {path}");
 
-// ─── Regen mode: `<input.json> --regen <output.json>` ───
+// ─── Regen mode: `<input.json> --regen <output.json>` or `--regen2 <output.json>` ───
 // Walk-forward rewrite of every non-excluded session's tables with the LIVE algorithm
 // (post-ratio + tiered selection + swap local search + same-day penalty), each regenerated
 // session feeding the next one's history. Only the Tables arrays change in the output file
 // (scores are cleared for regenerated sessions); everything else is preserved verbatim,
 // so the result imports straight back into the app.
-var regenFlag = Array.IndexOf(args, "--regen");
+// --regen2 additionally simulates the September format: every regenerated evening gets a
+// SECOND hanchan (same attendance, +90 min, new Guid) generated against the first one.
+var regen2Flag = Array.IndexOf(args, "--regen2");
+var twoHanchans = regen2Flag >= 0;
+var regenFlag = twoHanchans ? regen2Flag : Array.IndexOf(args, "--regen");
 if (regenFlag >= 0)
 {
     var outPath = args[regenFlag + 1];
@@ -58,23 +62,8 @@ if (regenFlag >= 0)
     var working = new List<Session>();
     var regeneratedCount = 0;
 
-    foreach (var s in ordered)
+    static System.Text.Json.Nodes.JsonArray BuildTablesArray(List<List<Guid>> tables)
     {
-        if (s.ExcludeFromOptimization || s.PresentMemberIds.Count < 3)
-        {
-            working.Add(s);
-            continue;
-        }
-
-        var history = working
-            .Where(h => h.Date.Date == s.Date.Date || !h.ExcludeFromOptimization)
-            .ToList();
-        var sim = new Sim(s.PresentMemberIds, history, extraCounts, s.Date.Date);
-        var tables = sim.Run(live);
-        working.Add(s with { Tables = tables.Select((g, i) => new Table(i + 1, g)).ToList() });
-        regeneratedCount++;
-
-        var node = sessionsNode.First(n => Guid.Parse((string)n!["Id"]!) == s.Id)!;
         var tablesArr = new System.Text.Json.Nodes.JsonArray();
         var tableNumber = 1;
         foreach (var g in tables)
@@ -90,31 +79,84 @@ if (regenFlag >= 0)
                 ["Scanned"] = false,
             });
         }
-        node["Tables"] = tablesArr;
+        return tablesArr;
+    }
+
+    foreach (var s in ordered)
+    {
+        if (s.ExcludeFromOptimization || s.PresentMemberIds.Count < 3)
+        {
+            working.Add(s);
+            continue;
+        }
+
+        List<Session> HistoryFor() => working
+            .Where(h => h.Date.Date == s.Date.Date || !h.ExcludeFromOptimization)
+            .ToList();
+
+        var sim = new Sim(s.PresentMemberIds, HistoryFor(), extraCounts, s.Date.Date);
+        var tables = sim.Run(live);
+        working.Add(s with { Tables = tables.Select((g, i) => new Table(i + 1, g)).ToList() });
+        regeneratedCount++;
+
+        var node = sessionsNode.First(n => Guid.Parse((string)n!["Id"]!) == s.Id)!;
+        node["Tables"] = BuildTablesArray(tables);
+
+        if (twoHanchans)
+        {
+            // Second hanchan of the evening: same attendance, generated with hanchan 1 in history
+            var sim2 = new Sim(s.PresentMemberIds, HistoryFor(), extraCounts, s.Date.Date);
+            var tables2 = sim2.Run(live);
+            var h2Id = Guid.NewGuid();
+            var h2Start = (s.StartTime ?? TimeSpan.Zero) + TimeSpan.FromMinutes(90);
+            working.Add(s with
+            {
+                Id = h2Id,
+                StartTime = h2Start,
+                Tables = tables2.Select((g, i) => new Table(i + 1, g)).ToList(),
+            });
+
+            var node2 = node.DeepClone();
+            node2["Id"] = h2Id.ToString();
+            node2["StartTime"] = h2Start.ToString(@"hh\:mm\:ss");
+            node2["Tables"] = BuildTablesArray(tables2);
+            sessionsNode.Insert(sessionsNode.IndexOf(node) + 1, node2);
+        }
     }
 
     doc["ExportDate"] = DateTime.Now.ToString("o");
     File.WriteAllText(outPath, doc.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
 
-    (int met2Plus, int maxMeet) SeasonStats(List<Session> sessions)
+    (int met2Plus, int maxMeet, int sameDayRepeats) SeasonStats(List<Session> sessions)
     {
         var m = new Dictionary<string, int>();
-        foreach (var s in sessions)
-            foreach (var t in s.Tables)
-                for (int i = 0; i < t.PlayerIds.Count; i++)
-                    for (int j = i + 1; j < t.PlayerIds.Count; j++)
-                    {
-                        var k = $"{t.PlayerIds[i]}_{t.PlayerIds[j]}";
-                        m[k] = m.GetValueOrDefault(k, 0) + 1;
-                    }
-        return (m.Count(kv => kv.Value >= 2), m.Count == 0 ? 0 : m.Values.Max());
+        var sameDay = 0;
+        foreach (var byDate in sessions.GroupBy(s => s.Date.Date))
+        {
+            var dayPairs = new Dictionary<string, int>();
+            foreach (var s in byDate)
+                foreach (var t in s.Tables)
+                    for (int i = 0; i < t.PlayerIds.Count; i++)
+                        for (int j = i + 1; j < t.PlayerIds.Count; j++)
+                        {
+                            var a = t.PlayerIds[i].ToString();
+                            var b = t.PlayerIds[j].ToString();
+                            var k = string.CompareOrdinal(a, b) < 0 ? $"{a}_{b}" : $"{b}_{a}";
+                            m[k] = m.GetValueOrDefault(k, 0) + 1;
+                            dayPairs[k] = dayPairs.GetValueOrDefault(k, 0) + 1;
+                        }
+            sameDay += dayPairs.Count(kv => kv.Value >= 2);
+        }
+        return (m.Count(kv => kv.Value >= 2), m.Count == 0 ? 0 : m.Values.Max(), sameDay);
     }
 
-    var (origRepeats, origMax) = SeasonStats(ordered);
-    var (newRepeats, newMax) = SeasonStats(working);
-    Console.WriteLine($"Regenerated {regeneratedCount} of {ordered.Count} sessions -> {outPath}");
+    var (origRepeats, origMax, origSameDay) = SeasonStats(ordered);
+    var (newRepeats, newMax, newSameDay) = SeasonStats(working);
+    Console.WriteLine($"Regenerated {regeneratedCount} of {ordered.Count} sessions" +
+                      $"{(twoHanchans ? $" (+{regeneratedCount} second hanchans)" : "")} -> {outPath}");
     Console.WriteLine($"  pairs that met 2+ times over the season: {origRepeats} -> {newRepeats}");
     Console.WriteLine($"  max meetings of any pair:                {origMax} -> {newMax}");
+    Console.WriteLine($"  same-day repeat pairs (whole season):    {origSameDay} -> {newSameDay}");
     return;
 }
 
