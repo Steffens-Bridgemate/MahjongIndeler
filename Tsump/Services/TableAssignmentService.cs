@@ -23,6 +23,10 @@ public class TableAssignmentService
     private const int MaxAttempts = 5;
     private const double ThreeFairnessWeight = 10.0;
     private const double MeetingSpreadWeight = 1.0;
+    // A tier holds players tied on BOTH post-ratio and attendance, so it is tiny in practice.
+    // The cap only guards pathological data (e.g. a club's first-ever session, where everyone
+    // is tied at attendance 0), falling back to the cheaper greedy pick.
+    private const long MaxTierSubsets = 5000;
 
     /// <summary>
     /// The 3-player ratio a player would have AFTER being assigned to a 3-player table
@@ -626,7 +630,9 @@ public class TableAssignmentService
     /// Players with clearly lower 3-player ratios are always included.
     /// Among borderline players (same ratio at the cutoff), groups by attendance tier
     /// and fills from highest attendance first (fairness). Within a partial tier,
-    /// uses meeting scores to pick the candidates who have met the group the least.
+    /// exhaustively picks the subset with the lowest mutual meeting cost (all C(n,k)
+    /// subsets; greedy fallback above a combination cap), choosing randomly among
+    /// equal-best subsets.
     /// </summary>
     private static List<Guid> SelectThreePlayerCandidates(
         List<Guid> sortedEligible, int slots,
@@ -686,31 +692,135 @@ public class TableAssignmentService
             }
             else
             {
-                // Partial tier: greedy selection by meeting score against already-selected
-                var pool = new List<Guid>(tierPlayers);
-                for (int i = 0; i < slotsLeft; i++)
-                {
-                    var bestCandidate = pool[0];
-                    var bestScore = pairCosts.PairScore(selected, pool[0]);
-
-                    for (int c = 1; c < pool.Count; c++)
-                    {
-                        var score = pairCosts.PairScore(selected, pool[c]);
-                        if (score < bestScore || (Math.Abs(score - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
-                        {
-                            bestScore = score;
-                            bestCandidate = pool[c];
-                        }
-                    }
-
-                    selected.Add(bestCandidate);
-                    pool.Remove(bestCandidate);
-                }
+                selected.AddRange(SelectTierSubset(selected, tierPlayers, slotsLeft, pairCosts));
                 slotsLeft = 0;
             }
         }
 
         return selected;
+    }
+
+    /// <summary>
+    /// Picks which k players of a partially-fitting tier take the remaining 3-player slots:
+    /// the subset with the lowest meeting cost, over all C(n,k) subsets.
+    /// </summary>
+    private static List<Guid> SelectTierSubset(
+        List<Guid> selected, List<Guid> tierPlayers, int slotsLeft, PairCostModel pairCosts)
+    {
+        var n = tierPlayers.Count;
+        var k = slotsLeft;
+
+        if (CountCombinationsCapped(n, k, MaxTierSubsets) > MaxTierSubsets)
+            return SelectTierSubsetGreedy(selected, tierPlayers, slotsLeft, pairCosts);
+
+        // Subset cost = cross-cost to already-selected + intra-subset pair cost. That equals
+        // TableScore(selected ∪ subset) minus the constant TableScore(selected), so minimizing
+        // it minimizes the full 3-pool cost. With one 3-player table this IS the eventual table
+        // cost; with several, it's a proxy — the pool is split later, but ImproveBySwaps only
+        // trades within same-size tables, so the pool composition fixed here is final.
+        var cross = new double[n];
+        var intra = new double[n, n];
+        for (int i = 0; i < n; i++)
+        {
+            cross[i] = pairCosts.PairScore(selected, tierPlayers[i]);
+            for (int j = i + 1; j < n; j++)
+                intra[i, j] = pairCosts.PairCost(tierPlayers[i], tierPlayers[j]);
+        }
+
+        var idx = new int[k];
+        for (int i = 0; i < k; i++)
+            idx[i] = i;
+
+        int[]? bestIdx = null;
+        double bestCost = double.MaxValue;
+        int ties = 0;
+
+        while (true)
+        {
+            double cost = 0;
+            for (int i = 0; i < k; i++)
+            {
+                cost += cross[idx[i]];
+                for (int j = i + 1; j < k; j++)
+                    cost += intra[idx[i], idx[j]];
+            }
+
+            if (cost < bestCost - 1e-9)
+            {
+                bestCost = cost;
+                bestIdx = (int[])idx.Clone();
+                ties = 1;
+            }
+            else if (Math.Abs(cost - bestCost) <= 1e-9)
+            {
+                // Reservoir sampling: uniform choice among all equal-best subsets without
+                // storing them — keeps the run-to-run variety the old coin-flip provided.
+                ties++;
+                if (Random.Shared.Next(ties) == 0)
+                    bestIdx = (int[])idx.Clone();
+            }
+
+            // Advance to the next combination in lexicographic order.
+            int pos = k - 1;
+            while (pos >= 0 && idx[pos] == n - k + pos)
+                pos--;
+            if (pos < 0)
+                break;
+            idx[pos]++;
+            for (int j = pos + 1; j < k; j++)
+                idx[j] = idx[j - 1] + 1;
+        }
+
+        var result = new List<Guid>(k);
+        foreach (var i in bestIdx!)
+            result.Add(tierPlayers[i]);
+        return result;
+    }
+
+    /// <summary>
+    /// Fallback for oversized tiers: greedy one-at-a-time pick by meeting score
+    /// against the group selected so far.
+    /// </summary>
+    private static List<Guid> SelectTierSubsetGreedy(
+        List<Guid> selected, List<Guid> tierPlayers, int slotsLeft, PairCostModel pairCosts)
+    {
+        var group = new List<Guid>(selected);
+        var picks = new List<Guid>(slotsLeft);
+        var pool = new List<Guid>(tierPlayers);
+        for (int i = 0; i < slotsLeft; i++)
+        {
+            var bestCandidate = pool[0];
+            var bestScore = pairCosts.PairScore(group, pool[0]);
+
+            for (int c = 1; c < pool.Count; c++)
+            {
+                var score = pairCosts.PairScore(group, pool[c]);
+                if (score < bestScore || (Math.Abs(score - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
+                {
+                    bestScore = score;
+                    bestCandidate = pool[c];
+                }
+            }
+
+            group.Add(bestCandidate);
+            picks.Add(bestCandidate);
+            pool.Remove(bestCandidate);
+        }
+        return picks;
+    }
+
+    /// <summary>C(n,k), returning cap+1 as soon as the count exceeds the cap.</summary>
+    private static long CountCombinationsCapped(int n, int k, long cap)
+    {
+        long c = 1;
+        for (int i = 1; i <= k; i++)
+        {
+            // Exact at every step: the running product is always a binomial coefficient.
+            c = c * (n - k + i) / i;
+            if (c > cap)
+                return cap + 1;
+        }
+        return c;
     }
 
     private static void Shuffle(List<Guid> list)

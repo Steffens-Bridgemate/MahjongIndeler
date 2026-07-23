@@ -57,7 +57,7 @@ if (regenFlag >= 0)
     var outPath = args[regenFlag + 1];
     // Mirrors the live service; pass --linear to A/B against the pre-convex cost
     var convex = Array.IndexOf(args, "--linear") < 0;
-    var live = new Options(PostRatio: true, Sel: Selection.Tiered, Attempts: 5, TrueCoAtt: false, Swap: true, SameDayPenalty: 10, ConvexCost: convex);
+    var live = new Options(PostRatio: true, Sel: Selection.Tiered, Attempts: 5, TrueCoAtt: false, Swap: true, SameDayPenalty: 10, ConvexCost: convex, ExhaustiveTier: true);
     var doc = System.Text.Json.Nodes.JsonNode.Parse(json)!;
     var sessionsNode = (System.Text.Json.Nodes.JsonArray)doc["Sessions"]!;
 
@@ -175,8 +175,9 @@ var variants = new (string Name, Options O)[]
     ("C+COATT   + true co-attendance denominator",    new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: true,  Swap: false, SameDayPenalty: 0)),
     ("C+SWAP    + swap local search",                 new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: true,  SameDayPenalty: 0)),
     ("C+SAMEDAY + same-day repeat penalty",           new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 10)),
+    ("C+COMBO   + exhaustive tied-tier subset",       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 5,  TrueCoAtt: false, Swap: false, SameDayPenalty: 0, ConvexCost: true, ExhaustiveTier: true)),
     ("C+20      + 20 attempts",                       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 20, TrueCoAtt: false, Swap: false, SameDayPenalty: 0)),
-    ("BEST      co-att + swap + same-day + 20",       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 20, TrueCoAtt: true,  Swap: true,  SameDayPenalty: 10, ConvexCost: true)),
+    ("BEST      co-att + swap + same-day + 20",       new Options(PostRatio: true,  Sel: Selection.Tiered,            Attempts: 20, TrueCoAtt: true,  Swap: true,  SameDayPenalty: 10, ConvexCost: true, ExhaustiveTier: true)),
 };
 
 var agg = variants.ToDictionary(v => v.Name, _ => new Agg());
@@ -314,7 +315,8 @@ enum Selection { SimpleTake, AttendanceTiebreak, Tiered }
 /// <param name="Swap">hill-climb pairwise swaps between same-size tables after greedy seating</param>
 /// <param name="SameDayPenalty">score penalty per pair that already met earlier the same day</param>
 /// <param name="ConvexCost">pair cost = met * ratio instead of ratio — a 3rd meeting costs 9/denom, not 3/denom, so repeats can't concentrate on the cheap high-attendance pairs</param>
-record Options(bool PostRatio, Selection Sel, int Attempts, bool TrueCoAtt, bool Swap, double SameDayPenalty, bool ConvexCost = false);
+/// <param name="ExhaustiveTier">partially-fitting borderline tier: exhaustive min-meeting-cost subset over all C(n,k) subsets, instead of greedy one-at-a-time (whose first pick is random when nothing is selected yet)</param>
+record Options(bool PostRatio, Selection Sel, int Attempts, bool TrueCoAtt, bool Swap, double SameDayPenalty, bool ConvexCost = false, bool ExhaustiveTier = false);
 
 record SimResult(double ThreeVariance, bool ThreePlayerOptimal, int MaxPairMeetings, double MeetingScore,
     int NewcomersAtThree, int HardViolations, int SameDayRepeats, int Unseated, List<Guid> ThreeAssigned);
@@ -523,25 +525,104 @@ class Sim
             }
             else
             {
-                var pool = new List<Guid>(tierPlayers);
-                for (int i = 0; i < slotsLeft; i++)
-                {
-                    var best = pool[0];
-                    var bestScore = MeetingScoreAgainstGroup(selected, pool[0], o);
-                    for (int c = 1; c < pool.Count; c++)
-                    {
-                        var s = MeetingScoreAgainstGroup(selected, pool[c], o);
-                        if (s < bestScore || (Math.Abs(s - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
-                        { bestScore = s; best = pool[c]; }
-                    }
-                    selected.Add(best);
-                    pool.Remove(best);
-                }
+                selected.AddRange(o.ExhaustiveTier
+                    ? SelectTierSubset(selected, tierPlayers, slotsLeft, o)
+                    : SelectTierSubsetGreedy(selected, tierPlayers, slotsLeft, o));
                 slotsLeft = 0;
             }
         }
 
         return selected;
+    }
+
+    const long MaxTierSubsets = 5000;
+
+    // Mirrors TableAssignmentService.SelectTierSubset: exhaustive min-cost subset of a
+    // partially-fitting tier (cross-cost to already-selected + intra-subset pair cost),
+    // reservoir tie-break among equal-best, greedy fallback above the combination cap.
+    List<Guid> SelectTierSubset(List<Guid> selected, List<Guid> tierPlayers, int slotsLeft, Options o)
+    {
+        var n = tierPlayers.Count;
+        var k = slotsLeft;
+
+        if (CountCombinationsCapped(n, k, MaxTierSubsets) > MaxTierSubsets)
+            return SelectTierSubsetGreedy(selected, tierPlayers, slotsLeft, o);
+
+        var cross = new double[n];
+        var intra = new double[n, n];
+        for (int i = 0; i < n; i++)
+        {
+            cross[i] = PairScore(selected, tierPlayers[i], o);
+            for (int j = i + 1; j < n; j++)
+                intra[i, j] = PairCost(tierPlayers[i], tierPlayers[j], o);
+        }
+
+        var idx = new int[k];
+        for (int i = 0; i < k; i++) idx[i] = i;
+
+        int[]? bestIdx = null;
+        double bestCost = double.MaxValue;
+        int ties = 0;
+
+        while (true)
+        {
+            double cost = 0;
+            for (int i = 0; i < k; i++)
+            {
+                cost += cross[idx[i]];
+                for (int j = i + 1; j < k; j++)
+                    cost += intra[idx[i], idx[j]];
+            }
+
+            if (cost < bestCost - 1e-9)
+            { bestCost = cost; bestIdx = (int[])idx.Clone(); ties = 1; }
+            else if (Math.Abs(cost - bestCost) <= 1e-9)
+            {
+                ties++;
+                if (Random.Shared.Next(ties) == 0) bestIdx = (int[])idx.Clone();
+            }
+
+            int pos = k - 1;
+            while (pos >= 0 && idx[pos] == n - k + pos) pos--;
+            if (pos < 0) break;
+            idx[pos]++;
+            for (int j = pos + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+        }
+
+        return bestIdx!.Select(i => tierPlayers[i]).ToList();
+    }
+
+    List<Guid> SelectTierSubsetGreedy(List<Guid> selected, List<Guid> tierPlayers, int slotsLeft, Options o)
+    {
+        var group = new List<Guid>(selected);
+        var picks = new List<Guid>(slotsLeft);
+        var pool = new List<Guid>(tierPlayers);
+        for (int i = 0; i < slotsLeft; i++)
+        {
+            var best = pool[0];
+            var bestScore = MeetingScoreAgainstGroup(group, pool[0], o);
+            for (int c = 1; c < pool.Count; c++)
+            {
+                var s = MeetingScoreAgainstGroup(group, pool[c], o);
+                if (s < bestScore || (Math.Abs(s - bestScore) < 1e-9 && Random.Shared.Next(2) == 0))
+                { bestScore = s; best = pool[c]; }
+            }
+            group.Add(best);
+            picks.Add(best);
+            pool.Remove(best);
+        }
+        return picks;
+    }
+
+    static long CountCombinationsCapped(int n, int k, long cap)
+    {
+        long c = 1;
+        for (int i = 1; i <= k; i++)
+        {
+            c = c * (n - k + i) / i;
+            if (c > cap) return cap + 1;
+        }
+        return c;
     }
 
     double ComputeIdealThreeFairnessScore(Options o)
