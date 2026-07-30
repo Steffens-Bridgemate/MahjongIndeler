@@ -257,7 +257,9 @@ else
     private int duplicateNumber;
     private string numberEditText = string.Empty;
     private int numberInputEpoch;
-    private string? pendingFocusNumberId;
+    private string? pendingFocusId;
+    // Number boxes want their contents selected (type straight over them); name boxes don't.
+    private bool pendingFocusSelect;
     private Func<Task>? pendingAction;
     // Two-click delete confirmation, mirroring the Members page: first click arms the row's trash
     // button (turns solid + "confirm" tooltip), the second performs the removal.
@@ -279,11 +281,12 @@ else
 
         // Focus after the render, so the reordered rows (and any re-created inputs) are in the DOM —
         // and so that Tab's own focus move has already happened and gets overridden.
-        if (pendingFocusNumberId != null)
+        if (pendingFocusId != null)
         {
-            var id = pendingFocusNumberId;
-            pendingFocusNumberId = null;
-            await JS.InvokeVoidAsync("focusAndSelectElement", id);
+            var id = pendingFocusId;
+            var select = pendingFocusSelect;
+            pendingFocusId = null;
+            await JS.InvokeVoidAsync("focusRowInput", id, select);
         }
     }
 
@@ -361,6 +364,7 @@ else
         }
 
         editingNames = true;
+        FocusFirstNameInput();
         ResetAssignments();
         await TournamentService.SaveAsync(tournament);
     }
@@ -449,6 +453,8 @@ else
         if (editingNames && tournament != null)
             await TournamentService.SaveAsync(tournament);
         editingNames = !editingNames;
+
+        if (editingNames) FocusFirstNameInput();
     }
 
     private void OnEditParticipantName(TournamentParticipant participant, ChangeEventArgs e)
@@ -477,7 +483,7 @@ else
             }
 
             if (next != null)
-                await JS.InvokeVoidAsync("focusElement", $"participant-name-{next.Id}");
+                await JS.InvokeVoidAsync("focusRowInput", NameInputId(next), false);
         }
     }
 
@@ -604,7 +610,7 @@ else
         // Resume where the organizer left off: the first player still without a number.
         var ordered = OrderedParticipants().ToList();
         var first = ordered.FirstOrDefault(p => p.Number == 0) ?? ordered.FirstOrDefault();
-        if (first != null) pendingFocusNumberId = NumberInputId(first);
+        if (first != null) FocusNumberInput(first);
 
         ResetAssignments();
         await TournamentService.SaveAsync(tournament);
@@ -685,7 +691,7 @@ else
     {
         numberInputEpoch++;
         numberEditText = participant.Number == 0 ? string.Empty : participant.Number.ToString();
-        pendingFocusNumberId = NumberInputId(participant);
+        FocusNumberInput(participant);
     }
 
     private void FocusNextUnnumbered(TournamentParticipant current)
@@ -703,13 +709,33 @@ else
             var candidate = ordered[(index + i) % ordered.Count];
             if (candidate.Number == 0)
             {
-                pendingFocusNumberId = NumberInputId(candidate);
+                FocusNumberInput(candidate);
                 return;
             }
         }
     }
 
     private static string NumberInputId(TournamentParticipant participant) => $"participant-number-{participant.Id}";
+
+    private static string NameInputId(TournamentParticipant participant) => $"participant-name-{participant.Id}";
+
+    private void FocusNumberInput(TournamentParticipant participant)
+    {
+        pendingFocusId = NumberInputId(participant);
+        pendingFocusSelect = true;
+    }
+
+    // Entering an edit mode should land the caret in a field rather than making the organizer click
+    // one: the first row still missing the value being edited, else the top row.
+    private void FocusFirstNameInput()
+    {
+        var ordered = OrderedParticipants().ToList();
+        var target = ordered.FirstOrDefault(p => string.IsNullOrWhiteSpace(p.Name)) ?? ordered.FirstOrDefault();
+        if (target == null) return;
+
+        pendingFocusId = NameInputId(target);
+        pendingFocusSelect = false;
+    }
 
     private int MaxNumberLength => (tournament?.Participants.Count ?? 0).ToString().Length;
 

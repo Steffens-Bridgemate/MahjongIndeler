@@ -275,13 +275,19 @@
             var el = e.target;
             if (el && el.dataset && el.dataset.tabHandled !== undefined) e.preventDefault();
         }, true);
-        // Same as focusElement, but pre-selects the text so the next keystroke replaces it (number
-        // assignment: tabbing onto a field should let you just type the number).
-        window.focusAndSelectElement = function (id) {
+        // Focus a field in a long editable table (participant names / numbers) and make sure its row
+        // is actually on screen. `select` pre-selects the contents so the next keystroke replaces
+        // them (number assignment). The visibility test keeps Tab/Enter from re-centering the list on
+        // every step — it only scrolls when the target is off screen.
+        window.focusRowInput = function (id, select) {
             var el = document.getElementById(id);
             if (!el) return;
-            el.focus();
-            if (el.select) el.select();
+            el.focus({ preventScroll: true });
+            if (select && el.select) el.select();
+            var r = el.getBoundingClientRect();
+            var h = window.innerHeight || document.documentElement.clientHeight;
+            if (r.top < 0 || r.bottom > h)
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         };
         window.scrollToElement = function (id) {
             var el = document.getElementById(id);
