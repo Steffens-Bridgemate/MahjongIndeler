@@ -49,13 +49,30 @@ else
 
         @if (tournament.Participants.Count > 0)
         {
-            <button class="btn btn-outline-secondary btn-sm ms-auto" @onclick="RequestRandomize">
-                @Lang.Get("RandomizeNumbers")
-            </button>
-            <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary")"
-                    @onclick="ToggleEditNames">
-                @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
-            </button>
+            @if (assigningNumbers)
+            {
+                <button class="btn btn-success btn-sm ms-auto" @onclick="StopAssigningNumbers">
+                    @Lang.Get("Save")
+                </button>
+            }
+            else
+            {
+                <button class="btn btn-outline-secondary btn-sm ms-auto" @onclick="RequestRandomize">
+                    @Lang.Get("RandomizeNumbers")
+                </button>
+                <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary")"
+                        @onclick="ToggleEditNames">
+                    @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
+                </button>
+                @* The two manual-numbering actions get a row of their own. *@
+                <div class="w-100"></div>
+                <button class="btn btn-outline-secondary btn-sm ms-auto" @onclick="RequestClearNumbers">
+                    @Lang.Get("ClearAllNumbers")
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="StartAssigningNumbers">
+                    @Lang.Get("EditNumbers")
+                </button>
+            }
         }
     </div>
 
@@ -68,12 +85,43 @@ else
         </div>
     }
 
+    @if (showClearNumbersConfirm)
+    {
+        <div class="alert alert-warning py-2 mb-2">
+            @Lang.Get("ConfirmClearNumbers")
+            <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmClearNumbers">@Lang.Get("YesContinue")</button>
+            <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showClearNumbersConfirm = false">@Lang.Get("Cancel")</button>
+        </div>
+    }
+
+    @if (duplicateTargetId != null)
+    {
+        <div class="alert alert-warning py-2 mb-2">
+            @DuplicateWarningText()
+            <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmDuplicateNumber">@Lang.Get("YesContinue")</button>
+            <button class="btn btn-sm btn-secondary ms-1" @onclick="ClearDuplicatePrompt">@Lang.Get("Cancel")</button>
+        </div>
+    }
+
+    @if (tournament.Participants.Any(p => p.Number == 0))
+    {
+        @* Unnumbered participants block table assignment (see TournamentDetail.HasUnnumberedParticipants),
+           so outside assignment mode this is a warning, not just a progress counter. *@
+        <div class="alert @(assigningNumbers ? "alert-info" : "alert-warning") py-1 mb-2">
+            @Lang.Get("StillWithoutNumber") @tournament.Participants.Count(p => p.Number == 0)
+            @if (!assigningNumbers)
+            {
+                <span> &mdash; @Lang.Get("NumbersMissing")</span>
+            }
+        </div>
+    }
+
     @if (showResetWarning)
     {
         <div class="alert alert-warning py-2 mb-2">
-            @Lang.Get("ChangeParticipantsWarning")
+            @Lang.Get(resetWarningKey)
             <button class="btn btn-sm btn-warning ms-2" @onclick="ConfirmReset">@Lang.Get("YesContinue")</button>
-            <button class="btn btn-sm btn-secondary ms-1" @onclick="() => showResetWarning = false">@Lang.Get("Cancel")</button>
+            <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelReset">@Lang.Get("Cancel")</button>
         </div>
     }
 
@@ -95,22 +143,43 @@ else
     <table class="table table-sm">
         <thead>
             <tr>
-                <th style="width: 50px;">@Lang.Get("ParticipantNumber")</th>
+                <th style="width: @(assigningNumbers ? "6em" : "50px");">@Lang.Get("ParticipantNumber")</th>
                 <th style="min-width: 14em;">@Lang.Get("ParticipantName")</th>
                 <th>@Lang.Get("LeagueId")</th>
                 <th style="width: 40px;"></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var p in tournament.Participants.OrderBy(x => x.Number))
+            @foreach (var p in OrderedParticipants())
             {
                 var participant = p;
                 <tr @key="participant.Id">
-                    <td>@participant.Number</td>
+                    <td>
+                        @if (assigningNumbers)
+                        {
+                            @* type=text (not number) — no spinner arrows, and maxlength actually
+                               applies. The epoch in the key forces the DOM value back after a
+                               rejected entry, which a plain value-diff can't do. *@
+                            <input @key="(participant.Id, numberInputEpoch)"
+                                   id="participant-number-@participant.Id"
+                                   type="text" inputmode="numeric" autocomplete="off"
+                                   data-tab-handled maxlength="@MaxNumberLength"
+                                   class="form-control form-control-sm" style="width: 5em;"
+                                   value="@NumberDisplay(participant)"
+                                   @onfocus="() => numberEditText = NumberDisplay(participant)"
+                                   @oninput="e => numberEditText = e.Value?.ToString() ?? string.Empty"
+                                   @onkeydown="e => OnNumberKeyDown(participant, e)"
+                                   @onchange="e => CommitNumber(participant, e.Value?.ToString(), false)" />
+                        }
+                        else if (participant.Number > 0)
+                        {
+                            @participant.Number
+                        }
+                    </td>
                     <td>
                         @if (editingNames)
                         {
-                            <input id="participant-name-@participant.Number"
+                            <input id="participant-name-@participant.Id"
                                    class="form-control form-control-sm"
                                    value="@participant.Name"
                                    @oninput="e => OnEditParticipantName(participant, e)"
@@ -173,8 +242,22 @@ else
     private bool userLoweredFirst;
     private bool resetConfirmed;
     private bool showResetWarning;
+    // The shared reset consent carries the reason for the action that raised it.
+    private const string DefaultResetWarning = "ChangeParticipantsWarning";
+    private const string NumbersResetWarning = "ChangeNumbersWarning";
+    private string resetWarningKey = DefaultResetWarning;
     private bool showRandomizeConfirm;
     private bool showGenerateConfirm;
+    // Manual number assignment: Number == 0 means "not assigned yet". Those rows sort alphabetically
+    // above the already-numbered ones, so the organizer can find the next name to number.
+    private bool assigningNumbers;
+    private bool showClearNumbersConfirm;
+    private Guid? duplicateTargetId;
+    private Guid? duplicateOwnerId;
+    private int duplicateNumber;
+    private string numberEditText = string.Empty;
+    private int numberInputEpoch;
+    private string? pendingFocusNumberId;
     private Func<Task>? pendingAction;
     // Two-click delete confirmation, mirroring the Members page: first click arms the row's trash
     // button (turns solid + "confirm" tooltip), the second performs the removal.
@@ -193,6 +276,15 @@ else
             StateHasChanged();
         }
         if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
+
+        // Focus after the render, so the reordered rows (and any re-created inputs) are in the DOM —
+        // and so that Tab's own focus move has already happened and gets overridden.
+        if (pendingFocusNumberId != null)
+        {
+            var id = pendingFocusNumberId;
+            pendingFocusNumberId = null;
+            await JS.InvokeVoidAsync("focusAndSelectElement", id);
+        }
     }
 
     private void OnParticipantNameInput(ChangeEventArgs e)
@@ -226,15 +318,11 @@ else
         if (tournament == null || string.IsNullOrWhiteSpace(newParticipantName))
             return;
 
-        if (NeedsResetConfirmation())
-        {
-            pendingAction = AddParticipant;
-            showResetWarning = true;
-            return;
-        }
+        if (RequireResetConsent(AddParticipant)) return;
 
-        var nextNumber = tournament.Participants.Count > 0
-            ? tournament.Participants.Max(p => p.Number) + 1
+        // Mid-assignment a new entry joins the unnumbered list; the organizer numbers it by hand.
+        var nextNumber = assigningNumbers ? 0
+            : tournament.Participants.Count > 0 ? tournament.Participants.Max(p => p.Number) + 1
             : 1;
 
         tournament.Participants.Add(new TournamentParticipant
@@ -253,12 +341,7 @@ else
     {
         if (tournament == null || generatePlayerCount < 13) return;
 
-        if (NeedsResetConfirmation())
-        {
-            pendingAction = GeneratePlayers;
-            showResetWarning = true;
-            return;
-        }
+        if (RequireResetConsent(GeneratePlayers)) return;
 
         if (tournament.Participants.Count > 0 && !showGenerateConfirm)
         {
@@ -300,12 +383,7 @@ else
 
     private async Task TriggerCsvImport()
     {
-        if (NeedsResetConfirmation())
-        {
-            pendingAction = TriggerCsvImport;
-            showResetWarning = true;
-            return;
-        }
+        if (RequireResetConsent(TriggerCsvImport)) return;
         csvImportError = null;
         await JS.InvokeVoidAsync("triggerFileInput", "csvImportInput");
     }
@@ -399,7 +477,7 @@ else
             }
 
             if (next != null)
-                await JS.InvokeVoidAsync("focusElement", $"participant-name-{next.Number}");
+                await JS.InvokeVoidAsync("focusElement", $"participant-name-{next.Id}");
         }
     }
 
@@ -422,18 +500,17 @@ else
     {
         if (tournament == null) return;
 
-        if (NeedsResetConfirmation())
-        {
-            pendingAction = () => RemoveParticipant(participantId);
-            showResetWarning = true;
-            return;
-        }
+        if (RequireResetConsent(() => RemoveParticipant(participantId))) return;
 
         tournament.Participants.RemoveAll(p => p.Id == participantId);
 
-        var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
-        for (int i = 0; i < sorted.Count; i++)
-            sorted[i].Number = i + 1;
+        // Don't compact numbers mid-assignment — that would overwrite the numbers just handed out.
+        if (!assigningNumbers)
+        {
+            var sorted = tournament.Participants.OrderBy(p => p.Number).ToList();
+            for (int i = 0; i < sorted.Count; i++)
+                sorted[i].Number = i + 1;
+        }
 
         ResetAssignments();
         await TournamentService.SaveAsync(tournament);
@@ -444,16 +521,229 @@ else
         return tournament != null && tournament.IsGenerated && !resetConfirmed;
     }
 
+    // Parks `action` behind the inline consent when the tournament is already generated; returns true
+    // when the caller must bail out and wait for the answer.
+    private bool RequireResetConsent(Func<Task> action, string warningKey = DefaultResetWarning)
+    {
+        if (!NeedsResetConfirmation()) return false;
+
+        pendingAction = action;
+        resetWarningKey = warningKey;
+        showResetWarning = true;
+        return true;
+    }
+
     private void ConfirmReset()
     {
         resetConfirmed = true;
         showResetWarning = false;
+        resetWarningKey = DefaultResetWarning;
         if (pendingAction != null)
         {
             var action = pendingAction;
             pendingAction = null;
             _ = action();
         }
+    }
+
+    private void CancelReset()
+    {
+        showResetWarning = false;
+        pendingAction = null;
+        resetWarningKey = DefaultResetWarning;
+    }
+
+    private IEnumerable<TournamentParticipant> OrderedParticipants()
+    {
+        if (tournament == null) return Enumerable.Empty<TournamentParticipant>();
+
+        return assigningNumbers
+            ? tournament.Participants
+                .OrderBy(p => p.Number == 0 ? 0 : 1)
+                .ThenBy(p => p.Number)
+                .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            : tournament.Participants.OrderBy(p => p.Number);
+    }
+
+    private void RequestClearNumbers()
+    {
+        showClearNumbersConfirm = true;
+    }
+
+    private async Task ConfirmClearNumbers()
+    {
+        showClearNumbersConfirm = false;
+        if (tournament == null || tournament.Participants.Count == 0) return;
+
+        if (RequireResetConsent(ConfirmClearNumbers, NumbersResetWarning)) return;
+
+        foreach (var p in tournament.Participants)
+            p.Number = 0;
+
+        await EnterAssignMode();
+    }
+
+    // Same mode the clear lands in, reachable on its own so a half-finished round can be resumed.
+    private async Task StartAssigningNumbers()
+    {
+        if (tournament == null || tournament.Participants.Count == 0) return;
+
+        if (RequireResetConsent(StartAssigningNumbers, NumbersResetWarning)) return;
+
+        await EnterAssignMode();
+    }
+
+    private async Task EnterAssignMode()
+    {
+        if (tournament == null) return;
+
+        editingNames = false;
+        assigningNumbers = true;
+        ClearDuplicatePrompt();
+
+        // Resume where the organizer left off: the first player still without a number.
+        var ordered = OrderedParticipants().ToList();
+        var first = ordered.FirstOrDefault(p => p.Number == 0) ?? ordered.FirstOrDefault();
+        if (first != null) pendingFocusNumberId = NumberInputId(first);
+
+        ResetAssignments();
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task StopAssigningNumbers()
+    {
+        assigningNumbers = false;
+        ClearDuplicatePrompt();
+        if (tournament != null) await TournamentService.SaveAsync(tournament);
+    }
+
+    // While a duplicate is pending we keep showing the typed number, so the warning matches the field.
+    private string NumberDisplay(TournamentParticipant participant)
+    {
+        if (participant.Id == duplicateTargetId) return duplicateNumber.ToString();
+        return participant.Number == 0 ? string.Empty : participant.Number.ToString();
+    }
+
+    // Enter and Tab both commit and jump; Tab's own focus move is harmless because the focus call in
+    // OnAfterRenderAsync runs after it and wins.
+    private async Task OnNumberKeyDown(TournamentParticipant participant, KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter" && e.Key != "Tab") return;
+        // Shift+Tab still commits, but leaves the backwards move to the browser.
+        await CommitNumber(participant, numberEditText, advance: !(e.Key == "Tab" && e.ShiftKey));
+    }
+
+    private async Task CommitNumber(TournamentParticipant participant, string? raw, bool advance)
+    {
+        // Deliberately reads `raw`, never numberEditText: a blur-commit can arrive *after* the next
+        // field's focus handler has already re-pointed numberEditText at that field.
+        if (tournament == null) return;
+        ClearDuplicatePrompt();
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            if (participant.Number != 0)
+            {
+                participant.Number = 0;
+                await TournamentService.SaveAsync(tournament);
+            }
+            if (advance) FocusNextUnnumbered(participant);
+            return;
+        }
+
+        // Out of 1..N (or not a number at all): drop the entry and put the field back.
+        if (!int.TryParse(raw.Trim(), out var number) || number < 1 || number > tournament.Participants.Count)
+        {
+            RejectNumberEntry(participant);
+            return;
+        }
+
+        if (number == participant.Number)
+        {
+            if (advance) FocusNextUnnumbered(participant);
+            return;
+        }
+
+        var owner = tournament.Participants.FirstOrDefault(p => p.Id != participant.Id && p.Number == number);
+        if (owner != null)
+        {
+            // Wait for the organizer to resolve the clash before moving on.
+            duplicateTargetId = participant.Id;
+            duplicateOwnerId = owner.Id;
+            duplicateNumber = number;
+            return;
+        }
+
+        participant.Number = number;
+        await TournamentService.SaveAsync(tournament);
+        if (advance) FocusNextUnnumbered(participant);
+    }
+
+    // Bumping the epoch re-creates the inputs, which is the only reliable way to restore a value the
+    // model never took; the focus request puts the caret back where the organizer was typing.
+    private void RejectNumberEntry(TournamentParticipant participant)
+    {
+        numberInputEpoch++;
+        numberEditText = participant.Number == 0 ? string.Empty : participant.Number.ToString();
+        pendingFocusNumberId = NumberInputId(participant);
+    }
+
+    private void FocusNextUnnumbered(TournamentParticipant current)
+    {
+        if (tournament == null) return;
+
+        // Evaluated after the commit, so `current` has already dropped into the numbered block —
+        // walking forward (wrapping) therefore lands on the first participant still without a number.
+        var ordered = OrderedParticipants().ToList();
+        var index = ordered.FindIndex(p => p.Id == current.Id);
+        if (index < 0) return;
+
+        for (int i = 1; i <= ordered.Count; i++)
+        {
+            var candidate = ordered[(index + i) % ordered.Count];
+            if (candidate.Number == 0)
+            {
+                pendingFocusNumberId = NumberInputId(candidate);
+                return;
+            }
+        }
+    }
+
+    private static string NumberInputId(TournamentParticipant participant) => $"participant-number-{participant.Id}";
+
+    private int MaxNumberLength => (tournament?.Participants.Count ?? 0).ToString().Length;
+
+    private string DuplicateWarningText()
+    {
+        var owner = tournament?.Participants.FirstOrDefault(p => p.Id == duplicateOwnerId);
+        var name = string.IsNullOrWhiteSpace(owner?.Name) ? Lang.Get("Unknown") : owner!.Name;
+        return Lang.Get("NumberInUse")
+            .Replace("{0}", duplicateNumber.ToString())
+            .Replace("{1}", name);
+    }
+
+    private async Task ConfirmDuplicateNumber()
+    {
+        if (tournament == null || duplicateTargetId == null) return;
+
+        var target = tournament.Participants.FirstOrDefault(p => p.Id == duplicateTargetId);
+        var owner = tournament.Participants.FirstOrDefault(p => p.Id == duplicateOwnerId);
+        var number = duplicateNumber;
+        ClearDuplicatePrompt();
+
+        if (target == null) return;
+
+        // The previous holder drops back into the alphabetical unnumbered list.
+        if (owner != null) owner.Number = 0;
+        target.Number = number;
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private void ClearDuplicatePrompt()
+    {
+        duplicateTargetId = null;
+        duplicateOwnerId = null;
+        duplicateNumber = 0;
     }
 
     private void RequestRandomize()
@@ -466,12 +756,7 @@ else
         showRandomizeConfirm = false;
         if (tournament == null || tournament.Participants.Count == 0) return;
 
-        if (NeedsResetConfirmation())
-        {
-            pendingAction = ConfirmRandomize;
-            showResetWarning = true;
-            return;
-        }
+        if (RequireResetConsent(ConfirmRandomize)) return;
 
         var rng = new Random();
         var numbers = Enumerable.Range(1, tournament.Participants.Count).OrderBy(_ => rng.Next()).ToList();

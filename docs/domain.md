@@ -42,6 +42,17 @@ Both `Hanchan` and `TournamentSession` carry a `Guid Id`. The shared codec ([Sco
 
 The `Simulation` console project is the offline test bench: walk-forward replay of a real export across algorithm variants (`dotnet run -- export.json`), plus `--regen out.json` to rewrite an export's assignments with the live algorithm for in-app comparison, and `--regen2 out.json` to additionally give every regenerated evening a second hanchan (same attendance, +90 min, new Guid) — the September two-hanchan format. Real club exports (`currentdata.json`, `*regenerated*.json`) are gitignored.
 
+## Table assignment (tournament)
+
+`TournamentAssignmentService.GenerateAllSessions` ([TournamentAssignmentService.cs](../Tsump/Services/TournamentAssignmentService.cs)) builds *all* hanchans at once from a fixed movement pattern (players split into remaining/+1/+2/+3 groups by their position in number order; phantoms stand in for the missing seats of 3-player tables), then post-processes: `BalanceThreePlayerDistribution`, `ReduceDuplicateMeetings`, `ApplyUniversalStartPositions`.
+
+**Numbering contract.** `TournamentParticipant.Number` is the player's identity for the whole event — the club hands out numbered lots *before* generating, so a number must never move to another person. Generation therefore guarantees both halves:
+
+- **Numbers survive generation.** `ApplyUniversalStartPositions` computes seat numbers 1..N from the session-1 table order and then **relabels the seats, not the people**: seat *k* is given to the participant ranked *k*-th by number. Substituting player ids across the whole schedule is a bijection, so the meeting spread and 3-player balance the earlier passes produced are unchanged (verified: the resulting meeting/3-player distributions are identical to the pre-2026-07 renumbering path for N=15…40 × 2 and 4 hanchans). Until 2026-07 the method instead wrote fresh numbers onto the participants, which reshuffled who held which number — with 30 players *all 30* came out with a different number than they went in with.
+- **Session 1 seats numbers in order**: table 1 holds 1-4, table 2 holds 5-8, … and 3-player tables get the highest table *and* participant numbers. Later sessions reuse the same table numbering, ordered 4-player-first then by lowest player number.
+
+The relabeling needs numbers that are a clean 1..N-style set: if any participant has `Number == 0` or two share a number, it falls back to the old behaviour (hand out numbers by seat). The organizer UI blocks generation while anyone is unnumbered (see [pages.md](pages.md#tournamentsrazor--tournamentparticipantsrazor--tournamentscoringsettingsrazor)), so in practice only the bench and legacy data reach the fallback.
+
 ## Tables and scores
 
 `TableAssignment` ([Tsump.Shared/Models/Hanchan.cs](../Tsump.Shared/Models/Hanchan.cs)) holds `TableNumber`, `PlayerIds`, and optional `TableScore`. `PlayerCount` is `PlayerIds.Count`. Tables are 3 or 4 players.

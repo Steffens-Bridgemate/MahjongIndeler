@@ -295,12 +295,14 @@ public class TournamentAssignmentService
     }
 
     /// <summary>
-    /// Renumber participants and tables using "universal start positions":
+    /// Seat participants at "universal start positions":
     /// - Session 1 tables are ordered: 4-player tables first, then 3-player tables
-    /// - Participants are renumbered sequentially by table order in session 1:
-    ///   table 1 gets 1-4, table 2 gets 5-8, etc.
+    /// - Session 1 seats run sequentially by table order: table 1 holds numbers 1-4,
+    ///   table 2 holds 5-8, etc.
     /// - 3-player tables get the highest table numbers and participant numbers.
     /// - All sessions use the same table numbering; players are sorted by number within each table.
+    /// Participants keep the numbers they came in with (they were handed out before generation);
+    /// the seats are relabeled to match, not the people. See the comment on `numbersUsable`.
     /// </summary>
     private static void ApplyUniversalStartPositions(
         List<TournamentSession> sessions, List<TournamentParticipant> participants)
@@ -318,30 +320,60 @@ public class TournamentAssignmentService
             ordered[i].TableNumber = i + 1;
         session1.Tables = ordered;
 
-        // Assign new participant numbers sequentially by table order
-        var newNumberById = new Dictionary<Guid, int>();
+        // Seat numbers 1..N in session-1 table order: table 1 holds seats 1-4, table 2 seats 5-8, …
+        var seatNumberById = new Dictionary<Guid, int>();
         int num = 1;
         foreach (var table in session1.Tables)
         {
             foreach (var playerId in table.PlayerIds)
             {
-                newNumberById[playerId] = num++;
+                seatNumberById[playerId] = num++;
             }
         }
 
-        // Apply new numbers to the participant objects
-        foreach (var p in participants)
+        // Participants already carry the numbers they were handed before generation (drawn lots), so
+        // we must not renumber them. Instead we relabel the seats: seat k goes to the participant
+        // ranked k-th by number. Substituting identities across the whole schedule is a bijection, so
+        // the meeting spread and 3-player balance produced above survive untouched — only *who* sits
+        // in a given seat changes, and table 1 still holds numbers 1-4.
+        var numbersUsable = seatNumberById.Count == participants.Count
+            && participants.All(p => p.Number > 0)
+            && participants.Select(p => p.Number).Distinct().Count() == participants.Count;
+
+        Dictionary<Guid, int> numberById;
+        if (numbersUsable)
         {
-            if (newNumberById.TryGetValue(p.Id, out var newNum))
-                p.Number = newNum;
+            var byRank = participants.OrderBy(p => p.Number).ToList();
+            var replacement = seatNumberById.ToDictionary(kv => kv.Key, kv => byRank[kv.Value - 1].Id);
+
+            foreach (var session in sessions)
+            {
+                foreach (var table in session.Tables)
+                    table.PlayerIds = table.PlayerIds
+                        .Select(id => replacement.TryGetValue(id, out var seated) ? seated : id)
+                        .ToList();
+            }
+
+            numberById = participants.ToDictionary(p => p.Id, p => p.Number);
+        }
+        else
+        {
+            // Unnumbered or duplicate-numbered input (the organizer UI blocks this, but the
+            // simulation bench and legacy data can hit it): hand out numbers by seat, as before.
+            foreach (var p in participants)
+            {
+                if (seatNumberById.TryGetValue(p.Id, out var newNum))
+                    p.Number = newNum;
+            }
+            numberById = seatNumberById;
         }
 
-        // Sort players within each table by new number, in all sessions
+        // Sort players within each table by number, in all sessions
         foreach (var session in sessions)
         {
             foreach (var table in session.Tables)
                 table.PlayerIds = table.PlayerIds
-                    .OrderBy(id => newNumberById.GetValueOrDefault(id, int.MaxValue))
+                    .OrderBy(id => numberById.GetValueOrDefault(id, int.MaxValue))
                     .ToList();
         }
 
@@ -352,7 +384,7 @@ public class TournamentAssignmentService
             var session = sessions[s];
             var reordered = session.Tables
                 .OrderBy(t => t.PlayerCount == 3 ? 1 : 0)
-                .ThenBy(t => t.PlayerIds.Select(id => newNumberById.GetValueOrDefault(id, int.MaxValue)).Min())
+                .ThenBy(t => t.PlayerIds.Select(id => numberById.GetValueOrDefault(id, int.MaxValue)).Min())
                 .ToList();
             for (int i = 0; i < reordered.Count; i++)
                 reordered[i].TableNumber = i + 1;

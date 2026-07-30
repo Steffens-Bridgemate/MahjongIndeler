@@ -29,10 +29,16 @@ else
     {
         <div class="d-flex align-items-center flex-wrap gap-1 mb-3">
             <button class="btn btn-primary" @onclick="GenerateSessions"
-                    disabled="@(tournament.Participants.Count < 13)"
-                    title="@(tournament.Participants.Count < 13 ? Lang.Get("NeedAtLeast13") : null)">
+                    disabled="@(tournament.Participants.Count < 13 || HasUnnumberedParticipants)"
+                    title="@GenerateBlockedReason()">
                 <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("GenerateAllHanchans")
             </button>
+            @* A disabled button's title tooltip never shows in most browsers, so the reason has to
+               be on the page. *@
+            @if (HasUnnumberedParticipants)
+            {
+                @UnnumberedNotice
+            }
         </div>
     }
 
@@ -59,9 +65,15 @@ else
                 }
                 else
                 {
-                    <button class="btn btn-primary" @onclick="GenerateSessions">
+                    <button class="btn btn-primary" @onclick="GenerateSessions"
+                            disabled="@HasUnnumberedParticipants"
+                            title="@GenerateBlockedReason()">
                         <i class="bi bi-arrow-clockwise me-1"></i>@Lang.Get("RegenerateAllHanchans")
                     </button>
+                    @if (HasUnnumberedParticipants)
+                    {
+                        @UnnumberedNotice
+                    }
                 }
             }
             else
@@ -548,9 +560,27 @@ else
         }
     }
 
+    // Number == 0 means the participant hasn't been given a number yet (see TournamentParticipants'
+    // manual-assignment mode). Assigning tables then would hand out duplicate/blank player numbers.
+    private bool HasUnnumberedParticipants =>
+        tournament?.Participants.Any(p => p.Number == 0) == true;
+
+    private RenderFragment UnnumberedNotice => @<span class="alert alert-warning d-inline-block mb-0 py-1">
+        <i class="bi bi-exclamation-triangle me-1"></i>@Lang.Get("NumbersMissing")
+        <a class="ms-2" href="@($"tournament/{Id}/participants")">@Lang.Get("TournamentParticipants")</a>
+    </span>;
+
+    private string? GenerateBlockedReason()
+    {
+        if (tournament == null) return null;
+        if (tournament.Participants.Count < 13) return Lang.Get("NeedAtLeast13");
+        if (HasUnnumberedParticipants) return Lang.Get("NumbersMissing");
+        return null;
+    }
+
     private void GenerateSessions()
     {
-        if (tournament == null) return;
+        if (tournament == null || HasUnnumberedParticipants) return;
 
         if (tournament.IsGenerated)
         {

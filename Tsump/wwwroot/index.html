@@ -265,6 +265,24 @@
             var el = document.getElementById(id);
             if (el) el.focus();
         };
+        // Fields marked data-tab-handled do their own Tab navigation from Blazor (participant number
+        // assignment: commit, then jump to the next player without a number). Without this the
+        // browser *also* runs its own tab move on top of ours, landing two rows on instead of one.
+        // Blazor's @onkeydown:preventDefault is decided at render time, so it can't single out Tab —
+        // it would block typing as well. Shift+Tab is left to the browser on purpose.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Tab' || e.shiftKey) return;
+            var el = e.target;
+            if (el && el.dataset && el.dataset.tabHandled !== undefined) e.preventDefault();
+        }, true);
+        // Same as focusElement, but pre-selects the text so the next keystroke replaces it (number
+        // assignment: tabbing onto a field should let you just type the number).
+        window.focusAndSelectElement = function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.focus();
+            if (el.select) el.select();
+        };
         window.scrollToElement = function (id) {
             var el = document.getElementById(id);
             if (!el) return;
