@@ -275,19 +275,27 @@
             var el = e.target;
             if (el && el.dataset && el.dataset.tabHandled !== undefined) e.preventDefault();
         }, true);
-        // Focus a field in a long editable table (participant names / numbers) and make sure its row
-        // is actually on screen. `select` pre-selects the contents so the next keystroke replaces
-        // them (number assignment). The visibility test keeps Tab/Enter from re-centering the list on
-        // every step — it only scrolls when the target is off screen.
+        // Focus a field in a long editable table (participant names / numbers) and park its row in the
+        // middle of the viewport. `select` pre-selects the contents so the next keystroke replaces
+        // them (number assignment).
+        //
+        // Two things this gets wrong if you do it naively, both of which show up as the view trailing
+        // one row behind the focus while typing numbers quickly:
+        //  - 'smooth' scrolling is still animating when the next row is committed, so the measurements
+        //    for that step read mid-flight positions. Instant scrolling keeps every step exact.
+        //  - the rows re-sort as a number is assigned (the row drops out of the unnumbered block), so
+        //    the scroll has to be measured after that layout lands, hence the rAF.
+        // Centering unconditionally is deliberate: the target is normally the top row of the table,
+        // so it stays put on screen and the list advances underneath it instead of jumping about.
         window.focusRowInput = function (id, select) {
             var el = document.getElementById(id);
             if (!el) return;
             el.focus({ preventScroll: true });
             if (select && el.select) el.select();
-            var r = el.getBoundingClientRect();
-            var h = window.innerHeight || document.documentElement.clientHeight;
-            if (r.top < 0 || r.bottom > h)
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            requestAnimationFrame(function () {
+                var target = document.getElementById(id);
+                if (target) target.scrollIntoView({ block: 'center' });
+            });
         };
         window.scrollToElement = function (id) {
             var el = document.getElementById(id);
