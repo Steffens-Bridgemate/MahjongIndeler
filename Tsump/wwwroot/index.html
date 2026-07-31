@@ -275,61 +275,52 @@
             var el = e.target;
             if (el && el.dataset && el.dataset.tabHandled !== undefined) e.preventDefault();
         }, true);
-        // Focus a field in a long editable table (participant names / numbers) and park its row in the
-        // middle of the viewport. `select` pre-selects the contents so the next keystroke replaces
-        // them (number assignment).
+        // Park a field of a long editable table (participant names / numbers) in the middle of the
+        // viewport. Both number-commit keys route through this, so Enter and Tab leave the list in
+        // exactly the same place — the only difference between them is whether the caret comes along.
         //
-        // Two things this gets wrong if you do it naively, both of which show up as the view trailing
-        // one row behind the caret while numbers are typed quickly:
+        // Three things this gets wrong if you do it naively, all of which show up as the view
+        // lurching about while numbers are typed quickly:
         //  - the scroll must be INSTANT. `behavior` has to be spelled out: the default ('auto')
         //    follows CSS scroll-behavior, and bootstrap-reboot sets :root{scroll-behavior:smooth}.
         //    A smooth scroll is still animating when the next row is committed, so each step starts
         //    from a mid-flight position and never catches up.
         //  - the rows re-sort as a number is assigned (the row leaves the unnumbered block), so the
         //    scroll has to happen after that layout lands, hence the rAF.
+        //  - any smooth scroll already in flight has to be aborted explicitly. An instant scroll only
+        //    cancels one when it actually moves the viewport, so when we are already on target the
+        //    animation would otherwise survive and run on by itself.
         // Centering unconditionally is deliberate: the target is normally the top row of the table,
         // so it stays put on screen and the list advances underneath it instead of jumping about.
+        window.scrollRowIntoView = function (id) {
+            requestAnimationFrame(function () {
+                var target = document.getElementById(id);
+                if (!target) return;
+                window.scrollTo({ top: window.scrollY, behavior: 'instant' });
+                try { target.scrollIntoView({ block: 'center', behavior: 'instant' }); }
+                catch (e) { target.scrollIntoView(true); }
+            });
+        };
+        // As above, but the caret comes too. `select` pre-selects the contents so the next keystroke
+        // replaces them (number assignment).
         window.focusRowInput = function (id, select) {
             var el = document.getElementById(id);
             if (!el) return;
             el.focus({ preventScroll: true });
             if (select && el.select) el.select();
-            requestAnimationFrame(function () {
-                var target = document.getElementById(id);
-                if (!target) return;
-                try { target.scrollIntoView({ block: 'center', behavior: 'instant' }); }
-                catch (e) { target.scrollIntoView(true); }
-            });
+            window.scrollRowIntoView(id);
         };
-        // Enter-commit in the participants number grid, in two parts. Enter means "commit and show
-        // me the top of the list" — deliberately NOT "keep typing" (that's Tab).
-        //
-        // This MUST run before the commit re-renders the table. Blazor's renderer re-applies focus
-        // to an element it moves while that element is focused (`updateComponent` calls a plain
-        // .focus(), with no preventScroll), and since bootstrap-reboot sets
-        // :root{scroll-behavior:smooth} that starts a SMOOTH scroll chasing the input — which has
-        // just re-sorted *down* into the numbered block, i.e. towards the bottom of the page.
-        // Blurring afterwards is too late: blur does not cancel a scroll already in flight, and an
-        // instant scroll only cancels one when it actually moves the viewport. That made the bug
-        // alternate — every other commit was already at the target, so its scroll was a no-op,
-        // cancelled nothing, and the animation ran on to the bottom.
+        // Called by BOTH number-commit keys, and it MUST run before the commit re-renders the table.
+        // Blazor's renderer re-applies focus to an element it moves while that element is focused
+        // (`updateComponent` calls a plain .focus(), with no preventScroll), and since
+        // bootstrap-reboot sets :root{scroll-behavior:smooth} that starts a SMOOTH scroll chasing the
+        // input — which has just re-sorted *down* into the numbered block, i.e. towards the bottom of
+        // the page. Blurring afterwards is too late: blur does not cancel a scroll already in flight.
+        // That made the bug alternate — every other commit was already on target, so its corrective
+        // scroll was a no-op, cancelled nothing, and the animation ran on to the bottom.
+        // Enter leaves the caret dropped; Tab has FocusNextUnnumbered put it on the next player.
         window.blurActiveElement = function () {
             if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-        };
-        // Instant for the same reason focusRowInput is — a smooth scroll would still be animating
-        // when the next number is committed, so each step starts mid-flight and never catches up.
-        // The rAF is needed because the rows re-sort as the number lands, so the scroll must follow
-        // that layout.
-        window.scrollRowToTop = function (id) {
-            requestAnimationFrame(function () {
-                var el = document.getElementById(id);
-                if (!el) return;
-                // Belt and braces: abort any smooth scroll still running before we position, so a
-                // no-op scrollIntoView can never leave one to finish on its own.
-                window.scrollTo({ top: window.scrollY, behavior: 'instant' });
-                try { el.scrollIntoView({ block: 'start', behavior: 'instant' }); }
-                catch (e) { el.scrollIntoView(true); }
-            });
         };
         window.scrollToElement = function (id) {
             var el = document.getElementById(id);

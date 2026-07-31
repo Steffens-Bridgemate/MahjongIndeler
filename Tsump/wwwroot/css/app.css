@@ -297,13 +297,6 @@ code {
     scroll-margin-top: 3.5rem;
 }
 
-/* Participants grid: after an Enter-commit the top row is scrolled to the top of the viewport.
-   MainLayout's .top-row is sticky (3.5rem) on wide screens, so leave room or the row lands
-   underneath it. */
-.participant-row {
-    scroll-margin-top: 4rem;
-}
-
 /* Multi-column flow for the per-table cards (assignment views) and ScoreTable cards (score views).
    auto-fill lets wide screens show several columns side by side; min(100%, …) keeps a single
    full-width column once the viewport is narrower than one track, so there's never horizontal

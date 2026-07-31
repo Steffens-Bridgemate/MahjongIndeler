@@ -153,7 +153,7 @@ else
             @foreach (var p in OrderedParticipants())
             {
                 var participant = p;
-                <tr @key="participant.Id" id="@RowId(participant)" class="participant-row">
+                <tr @key="participant.Id">
                     <td>
                         @if (assigningNumbers)
                         {
@@ -296,7 +296,8 @@ else
         {
             pendingScrollToTopRow = false;
             var top = OrderedParticipants().FirstOrDefault();
-            if (top != null) await JS.InvokeVoidAsync("scrollRowToTop", RowId(top));
+            // Same element and same scroll Tab uses, so both keys leave the list identically placed.
+            if (top != null) await JS.InvokeVoidAsync("scrollRowIntoView", NumberInputId(top));
         }
     }
 
@@ -640,9 +641,11 @@ else
         return participant.Number == 0 ? string.Empty : participant.Number.ToString();
     }
 
-    // What a successful commit does next. The two keys mean different things on purpose:
-    // Enter = "commit and show me the top of the list" (no caret anywhere), Tab = "commit and keep
-    // typing" (caret moves on). Blur- and Shift+Tab-commits do neither.
+    // What a successful commit does next. Both keys land the list in the SAME place — the next
+    // player still without a number, centered — and differ only in whether the caret follows:
+    // Enter = "commit and stop" (no caret anywhere), Tab = "commit and keep typing" (caret moves on).
+    // Both therefore route their scroll through scrollRowIntoView. Blur- and Shift+Tab-commits
+    // do neither.
     private enum CommitFollowUp { None, ScrollToTopRow, FocusNext }
 
     private async Task OnNumberKeyDown(TournamentParticipant participant, KeyboardEventArgs e)
@@ -661,10 +664,12 @@ else
         // rejected entry re-points numberEditText at the participant's existing number.
         var raw = numberEditText;
 
-        // Enter drops the caret, and it has to happen *before* the commit re-renders the table —
-        // otherwise Blazor's renderer re-focuses the moved input and starts a smooth scroll chasing
-        // it down into the numbered block. See blurActiveElement in index.html.
-        if (followUp == CommitFollowUp.ScrollToTopRow)
+        // Both keys drop the caret *before* the commit re-renders the table — otherwise Blazor's
+        // renderer re-focuses the moved input and starts a smooth scroll chasing it down into the
+        // numbered block (see blurActiveElement in index.html). Enter leaves it dropped; Tab has
+        // FocusNextUnnumbered put it on the next player once the re-sorted rows are in the DOM.
+        // Shift+Tab is excluded on purpose: the browser still owns that backwards move.
+        if (followUp != CommitFollowUp.None)
             await JS.InvokeVoidAsync("blurActiveElement");
 
         await CommitNumber(participant, raw, followUp);
@@ -760,8 +765,6 @@ else
             }
         }
     }
-
-    private static string RowId(TournamentParticipant participant) => $"participant-row-{participant.Id}";
 
     private static string NumberInputId(TournamentParticipant participant) => $"participant-number-{participant.Id}";
 
