@@ -153,7 +153,7 @@ else
             @foreach (var p in OrderedParticipants())
             {
                 var participant = p;
-                <tr @key="participant.Id">
+                <tr @key="participant.Id" id="@RowId(participant)" class="participant-row">
                     <td>
                         @if (assigningNumbers)
                         {
@@ -169,7 +169,7 @@ else
                                    @onfocus="() => numberEditText = NumberDisplay(participant)"
                                    @oninput="e => numberEditText = e.Value?.ToString() ?? string.Empty"
                                    @onkeydown="e => OnNumberKeyDown(participant, e)"
-                                   @onchange="e => CommitNumber(participant, e.Value?.ToString(), false)" />
+                                   @onchange="e => CommitNumber(participant, e.Value?.ToString(), CommitFollowUp.None)" />
                         }
                         else if (participant.Number > 0)
                         {
@@ -260,6 +260,9 @@ else
     private string? pendingFocusId;
     // Number boxes want their contents selected (type straight over them); name boxes don't.
     private bool pendingFocusSelect;
+    // Set by an Enter-commit; consumed after the re-sorted rows are in the DOM. Never set together
+    // with pendingFocusId — Enter drops the caret, the paths that set pendingFocusId keep it.
+    private bool pendingScrollToTopRow;
     private Func<Task>? pendingAction;
     // Two-click delete confirmation, mirroring the Members page: first click arms the row's trash
     // button (turns solid + "confirm" tooltip), the second performs the removal.
@@ -287,6 +290,13 @@ else
             var select = pendingFocusSelect;
             pendingFocusId = null;
             await JS.InvokeVoidAsync("focusRowInput", id, select);
+        }
+
+        if (pendingScrollToTopRow)
+        {
+            pendingScrollToTopRow = false;
+            var top = OrderedParticipants().FirstOrDefault();
+            if (top != null) await JS.InvokeVoidAsync("scrollRowToTop", RowId(top));
         }
     }
 
@@ -630,16 +640,37 @@ else
         return participant.Number == 0 ? string.Empty : participant.Number.ToString();
     }
 
-    // Enter and Tab both commit and jump; Tab's own focus move is harmless because the focus call in
-    // OnAfterRenderAsync runs after it and wins.
+    // What a successful commit does next. The two keys mean different things on purpose:
+    // Enter = "commit and show me the top of the list" (no caret anywhere), Tab = "commit and keep
+    // typing" (caret moves on). Blur- and Shift+Tab-commits do neither.
+    private enum CommitFollowUp { None, ScrollToTopRow, FocusNext }
+
     private async Task OnNumberKeyDown(TournamentParticipant participant, KeyboardEventArgs e)
     {
         if (e.Key != "Enter" && e.Key != "Tab") return;
+
         // Shift+Tab still commits, but leaves the backwards move to the browser.
-        await CommitNumber(participant, numberEditText, advance: !(e.Key == "Tab" && e.ShiftKey));
+        var followUp = e.Key switch
+        {
+            "Enter" => CommitFollowUp.ScrollToTopRow,
+            "Tab" when !e.ShiftKey => CommitFollowUp.FocusNext,
+            _ => CommitFollowUp.None
+        };
+
+        // Read the typed value before the blur below: the blur fires the @onchange commit, which on a
+        // rejected entry re-points numberEditText at the participant's existing number.
+        var raw = numberEditText;
+
+        // Enter drops the caret, and it has to happen *before* the commit re-renders the table —
+        // otherwise Blazor's renderer re-focuses the moved input and starts a smooth scroll chasing
+        // it down into the numbered block. See blurActiveElement in index.html.
+        if (followUp == CommitFollowUp.ScrollToTopRow)
+            await JS.InvokeVoidAsync("blurActiveElement");
+
+        await CommitNumber(participant, raw, followUp);
     }
 
-    private async Task CommitNumber(TournamentParticipant participant, string? raw, bool advance)
+    private async Task CommitNumber(TournamentParticipant participant, string? raw, CommitFollowUp followUp)
     {
         // Deliberately reads `raw`, never numberEditText: a blur-commit can arrive *after* the next
         // field's focus handler has already re-pointed numberEditText at that field.
@@ -653,7 +684,7 @@ else
                 participant.Number = 0;
                 await TournamentService.SaveAsync(tournament);
             }
-            if (advance) FocusNextUnnumbered(participant);
+            ApplyFollowUp(followUp, participant);
             return;
         }
 
@@ -666,7 +697,7 @@ else
 
         if (number == participant.Number)
         {
-            if (advance) FocusNextUnnumbered(participant);
+            ApplyFollowUp(followUp, participant);
             return;
         }
 
@@ -682,7 +713,7 @@ else
 
         participant.Number = number;
         await TournamentService.SaveAsync(tournament);
-        if (advance) FocusNextUnnumbered(participant);
+        ApplyFollowUp(followUp, participant);
     }
 
     // Bumping the epoch re-creates the inputs, which is the only reliable way to restore a value the
@@ -692,6 +723,21 @@ else
         numberInputEpoch++;
         numberEditText = participant.Number == 0 ? string.Empty : participant.Number.ToString();
         FocusNumberInput(participant);
+    }
+
+    private void ApplyFollowUp(CommitFollowUp followUp, TournamentParticipant current)
+    {
+        switch (followUp)
+        {
+            case CommitFollowUp.FocusNext:
+                FocusNextUnnumbered(current);
+                break;
+            case CommitFollowUp.ScrollToTopRow:
+                // Which row is topmost can only be read after the commit has re-sorted the list,
+                // so resolve it in OnAfterRenderAsync rather than here.
+                pendingScrollToTopRow = true;
+                break;
+        }
     }
 
     private void FocusNextUnnumbered(TournamentParticipant current)
@@ -714,6 +760,8 @@ else
             }
         }
     }
+
+    private static string RowId(TournamentParticipant participant) => $"participant-row-{participant.Id}";
 
     private static string NumberInputId(TournamentParticipant participant) => $"participant-number-{participant.Id}";
 
