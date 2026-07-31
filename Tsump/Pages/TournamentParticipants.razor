@@ -51,8 +51,9 @@ else
         {
             @if (assigningNumbers)
             {
+                @* "Done", not "Save": every commit already persists, so this only leaves the mode. *@
                 <button class="btn btn-success btn-sm ms-auto" @onclick="StopAssigningNumbers">
-                    @Lang.Get("Save")
+                    @Lang.Get("Done")
                 </button>
             }
             else
@@ -62,7 +63,7 @@ else
                 </button>
                 <button class="btn btn-sm @(editingNames ? "btn-success" : "btn-outline-secondary")"
                         @onclick="ToggleEditNames">
-                    @(editingNames ? Lang.Get("Save") : Lang.Get("EditNames"))
+                    @(editingNames ? Lang.Get("Done") : Lang.Get("EditNames"))
                 </button>
                 @* The two manual-numbering actions get a row of their own. *@
                 <div class="w-100"></div>
@@ -107,11 +108,16 @@ else
     {
         @* Unnumbered participants block table assignment (see TournamentDetail.HasUnnumberedParticipants),
            so outside assignment mode this is a warning, not just a progress counter. *@
+        var unnumbered = tournament.Participants.Count(p => p.Number == 0);
         <div class="alert @(assigningNumbers ? "alert-info" : "alert-warning") py-1 mb-2">
-            @Lang.Get("StillWithoutNumber") @tournament.Participants.Count(p => p.Number == 0)
+            @Lang.Get("StillWithoutNumber") @unnumbered
             @if (!assigningNumbers)
             {
                 <span> &mdash; @Lang.Get("NumbersMissing")</span>
+            }
+            else if (unnumbered <= FreeNumberHintThreshold)
+            {
+                <span> &mdash; @Lang.Get("NumbersStillFree") <strong>@string.Join(", ", FreeNumbers())</strong></span>
             }
         </div>
     }
@@ -789,6 +795,19 @@ else
     }
 
     private int MaxNumberLength => (tournament?.Participants.Count ?? 0).ToString().Length;
+
+    // Down to the last few, the organizer is scanning the grid for which numbers are still going
+    // spare rather than reading them off in order — so spell them out instead.
+    private const int FreeNumberHintThreshold = 5;
+
+    // Numbers run 1..ParticipantCount and each numbered participant holds a distinct one, so this
+    // always yields exactly as many numbers as there are participants still at 0.
+    private IEnumerable<int> FreeNumbers()
+    {
+        if (tournament == null) return Enumerable.Empty<int>();
+        var taken = tournament.Participants.Where(p => p.Number > 0).Select(p => p.Number).ToHashSet();
+        return Enumerable.Range(1, tournament.Participants.Count).Where(n => !taken.Contains(n));
+    }
 
     private string DuplicateWarningText()
     {

@@ -218,6 +218,12 @@ Deliberate departures from the rules above — don't "fix" these:
   is *session-scoped* (hanchan/tournament editing). A form that edits a discrete record — e.g. the
   member form in [Members.razor](../Tsump/Pages/Members.razor) — legitimately uses an explicit
   Save (`btn-success`); auto-saving every keystroke there would be wrong.
+- **A button that only *leaves* an auto-saving inline edit mode is labelled `Done`, not `Save`.**
+  The green toggle stays (`btn-success`), but the two modes on
+  [TournamentParticipants.razor](../Tsump/Pages/TournamentParticipants.razor) — edit names, assign
+  numbers — persist on every commit, so by the time the button is pressed there is nothing left to
+  save and "Save" reads as if the work so far were unsaved. Use the `Done` string for that; reserve
+  `Save` for the record-edit forms above, where it really does write.
 - **Confirmation-step buttons may be solid `btn-warning`/`btn-danger`.** §1 reserves *warning* for
   caution, but the "Yes, continue / Yes, delete" button inside an inline confirm (§5) is correctly
   a solid warning/danger button. That's not the "warning for an ordinary action" misuse.
