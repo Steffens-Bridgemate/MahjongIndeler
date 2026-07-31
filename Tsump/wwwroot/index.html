@@ -280,11 +280,13 @@
         // them (number assignment).
         //
         // Two things this gets wrong if you do it naively, both of which show up as the view trailing
-        // one row behind the focus while typing numbers quickly:
-        //  - 'smooth' scrolling is still animating when the next row is committed, so the measurements
-        //    for that step read mid-flight positions. Instant scrolling keeps every step exact.
-        //  - the rows re-sort as a number is assigned (the row drops out of the unnumbered block), so
-        //    the scroll has to be measured after that layout lands, hence the rAF.
+        // one row behind the caret while numbers are typed quickly:
+        //  - the scroll must be INSTANT. `behavior` has to be spelled out: the default ('auto')
+        //    follows CSS scroll-behavior, and bootstrap-reboot sets :root{scroll-behavior:smooth}.
+        //    A smooth scroll is still animating when the next row is committed, so each step starts
+        //    from a mid-flight position and never catches up.
+        //  - the rows re-sort as a number is assigned (the row leaves the unnumbered block), so the
+        //    scroll has to happen after that layout lands, hence the rAF.
         // Centering unconditionally is deliberate: the target is normally the top row of the table,
         // so it stays put on screen and the list advances underneath it instead of jumping about.
         window.focusRowInput = function (id, select) {
@@ -294,7 +296,9 @@
             if (select && el.select) el.select();
             requestAnimationFrame(function () {
                 var target = document.getElementById(id);
-                if (target) target.scrollIntoView({ block: 'center' });
+                if (!target) return;
+                try { target.scrollIntoView({ block: 'center', behavior: 'instant' }); }
+                catch (e) { target.scrollIntoView(true); }
             });
         };
         window.scrollToElement = function (id) {
