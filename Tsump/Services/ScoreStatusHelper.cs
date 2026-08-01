@@ -30,10 +30,16 @@ public static class ScoreStatusHelper
     public static bool TablesAreComplete(List<TableAssignment> tables)
         => tables.Count > 0 && tables.All(TableIsComplete);
 
+    /// <summary>Any real PlayerScore on this table has an EndPoints value set. Also the
+    /// "don't reseat this table" test: scores are bound to the seat, not the player, so swapping
+    /// players at a table that already has scores would silently re-label them.</summary>
+    public static bool HasAnyScore(TableAssignment table)
+        => table.Score != null
+            && table.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue);
+
     /// <summary>Any real PlayerScore has an EndPoints value set.</summary>
     public static bool TablesHaveAnyScore(List<TableAssignment> tables)
-        => tables.Any(t => t.Score != null
-            && t.Score.PlayerScores.Any(p => !p.IsVirtual && p.EndPoints.HasValue));
+        => tables.Any(HasAnyScore);
 
     /// <summary>
     /// Status for one entry given its later siblings.

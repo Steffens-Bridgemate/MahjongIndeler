@@ -55,11 +55,19 @@ The relabeling needs numbers that are a clean 1..N-style set: if any participant
 
 ## Tables and scores
 
-`TableAssignment` ([Tsump.Shared/Models/Hanchan.cs](../Tsump.Shared/Models/Hanchan.cs)) holds `TableNumber`, `PlayerIds`, and optional `TableScore`. `PlayerCount` is `PlayerIds.Count`. Tables are 3 or 4 players.
+`TableAssignment` ([Tsump.Shared/Models/Hanchan.cs](../Tsump.Shared/Models/Hanchan.cs)) holds `TableNumber`, `PlayerIds`, `AbsentPlayerIds`, and optional `TableScore`. Tables are 3 or 4 players.
+
+**`PlayerIds` is the seating record; `ActivePlayerIds()` is who's playing.** A player who quits mid-event is added to `AbsentPlayerIds` — they stay in `PlayerIds` (so the seating, and the meeting matrix built from it, survive) but stop counting: `PlayerCount` is `PlayerIds.Count(id => !AbsentPlayerIds.Contains(id))`, so a 4-player table with one dropout becomes a 3-player table with Mr. X and 3-player Uma, with no other code needing to know. `ActivePlayerIds()` is a **method**, not a property, so System.Text.Json doesn't write it into every stored table.
+
+Anything that means *"who is playing"* must use `ActivePlayerIds()`, not `PlayerIds` — in particular every **positionally paired** path, since a mismatch silently lands scores on the wrong people: `ScoreTable.InitializeScores`, `ScoreInviteService.BuildInviteUrl` (the QR carries three names), both `IScoreContextResolver` implementations' `PlayerNames`, `ScoreImportService.ByPosition`, the import-preview name columns, and the printed scoresheets. `PlayerIds` stays correct for the seating record: History, MeetingMatrix, the assignment generators, and the assignment exports.
+
+Marking absent is **organizer-only and per table** — there is no cascade to the player's later hanchans, and the scoring app has no notion of it at all (it just receives an ordinary 3-player invite). The control is behind `ScoreTable`'s `AllowAbsence` parameter, which only [TournamentDetail.razor](../Tsump/Pages/TournamentDetail.razor) sets. It is offered only on a 4-player table: a second dropout would leave two real players plus Mr. X, which has no Uma set and isn't playable — that has to be fixed by reseating.
 
 `TableAssignment.Scanned` is organizer-side bookkeeping: "this table's invite QR has been handed out / scanned". Set from the QR modal (Enter sets, never clears — a scanner's trailing key) and the per-table card checkbox (mouse toggles), persisted with the container. It's **not** on the scoring wire payload, and the whole scanned UI is gated on `ClubSettings.EnableExternalScoring`.
 
-`TableScore.PlayerScores` order matters: real players in `PlayerIds` order, then any virtual players at the end. `ScoreTable.InitializeScores` enforces this ordering and adds the virtual Mr. X for 3-player tables.
+`TableScore.PlayerScores` order matters: real players in `ActivePlayerIds()` order, then any virtual players at the end. `ScoreTable.InitializeScores` enforces this ordering, drops rows for players who left the table (including dropouts), and adds the virtual Mr. X for 3-player tables.
+
+**Scores are bound to the seat, not the person.** Nothing in `PlayerScores` records who a row belongs to once written, beyond `PlayerId` — so reseating a table that already has scores would re-label them. Both pages therefore refuse to swap any player at a table where `ScoreStatusHelper.HasAnyScore(table)`; see [pages.md](pages.md#tournamentdetailrazor--weeklysessionpagerazor).
 
 ### Mr. X (the 3-player virtual fourth)
 
@@ -70,7 +78,11 @@ realDiff = Σ (real.EndPoints - real.StartingPoints + real.Loan)
 mrX.EndPoints = mrX.StartingPoints - realDiff
 ```
 
-so the sum of differences across all four `PlayerScore` rows is zero. `ScoreTable.DeriveVirtualEnd` ([ScoreTable.razor:520](../Tsump.Shared/Components/ScoreTable.razor)) runs this on every edit. Crucially, `ScoreImportService.ApplyAsync` ([ScoreImportService.cs](../Tsump/Services/ScoreImportService.cs)) also calls it on imported results, so manual entry and imported results produce identical Mr. X values.
+so the sum of differences across all four `PlayerScore` rows is zero. (Real players' `Penalty` is deliberately excluded — a penalty isn't a point transfer.)
+
+**The derivation is never trusted from storage.** `ScoreTable.DeriveVirtualEnd` runs on every edit, at the tail of `InitializeScores`, and in `ScoreTable.OnParametersSet` — the last one matters because the `Table` parameter is re-pointed at freshly-deserialised objects after every save/import/reload, and a stored Mr. X value can predate a later edit. Deriving on parameter-set means a stale number can't reach the screen. `ScoreImportService.ApplyAsync` ([ScoreImportService.cs](../Tsump/Services/ScoreImportService.cs)) calls it too, so manual entry and imported results produce identical Mr. X values.
+
+The *persistence* side of the same problem: `OnScoresComplete` only fires on a fully-filled, balanced table, so an edit that blanks or unbalances a score was never written and reload resurrected the old numbers. `ScoreTable.OnScoresChanged` fires after **every** edit and is wired to a plain save on both pages — on WeeklySessionPage deliberately to `PersistScoresOnly`, *not* `SaveScores`, because the latter re-reads storage and re-points `tables` at new objects, which mid-typing would churn the inputs under the caret.
 
 ### Uma
 
@@ -80,7 +92,7 @@ Weekly Uma is from `ClubSettings.WeeklyUma{3,4}Players`. Tournament Uma is from 
 
 ### Score-status classification
 
-`ScoreStatusHelper.TableIsComplete(table)` is the single-table predicate (all real `EndPoints` set + differences sum to 0); `TablesAreComplete` delegates to it. Used by the table-nav strip to colour a Scores-view button green per table (see [styles.md](styles.md#table-nav-strip)).
+`ScoreStatusHelper.TableIsComplete(table)` is the single-table predicate (all real `EndPoints` set + differences sum to 0); `TablesAreComplete` delegates to it. Used by the table-nav strip to colour a Scores-view button green per table (see [styles.md](styles.md#table-nav-strip)). `HasAnyScore(table)` is the single-table "any real `EndPoints` set" predicate — `TablesHaveAnyScore` delegates to it, and it doubles as the *don't reseat this table* test for the swap UI.
 
 [ScoreStatusHelper.cs](../Tsump/Services/ScoreStatusHelper.cs) classifies a hanchan/session against its later siblings:
 

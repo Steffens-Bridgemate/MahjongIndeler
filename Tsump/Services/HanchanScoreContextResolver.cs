@@ -35,7 +35,9 @@ public class HanchanScoreContextResolver : IScoreContextResolver
 
         var settings = await _settings.GetAsync();
         var members = await _members.GetAllAsync();
-        var names = table.PlayerIds
+        // Active players only — see the note in TournamentScoreContextResolver: PlayerNames is a
+        // positional list matched against the non-virtual score rows.
+        var names = table.ActivePlayerIds()
             .Select(id => members.FirstOrDefault(m => m.Id == id)?.Name ?? _lang.Get("Unknown"))
             .ToList();
         var context = new ResolvedContext(

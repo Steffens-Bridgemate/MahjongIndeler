@@ -61,7 +61,7 @@ else
             @for (int i = 0; i < result.Scores.Count; i++)
             {
                 var s = result.Scores[i];
-                var pids = lookup.Context.Table.PlayerIds;
+                var pids = lookup.Context.Table.ActivePlayerIds();
                 var playerName = i < pids.Count ? ResolveName(pids[i]) : "—";
                 var end = s[ScoringPayloadCodec.ScoreEndPoints];
                 var loan = s[ScoringPayloadCodec.ScoreLoan];

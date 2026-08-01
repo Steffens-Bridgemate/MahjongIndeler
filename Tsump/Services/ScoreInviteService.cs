@@ -29,9 +29,11 @@ public class ScoreInviteService
         string? title,
         string organizerBaseUrl)
     {
-        var names = table.PlayerIds.Select(playerNameResolver).ToList();
+        // Players who dropped out mid-event are skipped: the scoring app then sees an ordinary
+        // 3-player table (Mr. X is derived organizer-side) and never learns about the absence.
+        var names = table.ActivePlayerIds().Select(playerNameResolver).ToList();
         // PlayerIds intentionally not carried — the scoring app and the organizer both pair
-        // players by position (index in `names` == index in table.PlayerIds).
+        // players by position (index in `names` == index in table.ActivePlayerIds()).
         var invite = new ScoringInvite(
             contextId,
             table.TableNumber,

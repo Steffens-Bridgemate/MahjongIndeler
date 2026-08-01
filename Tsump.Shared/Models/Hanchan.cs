@@ -16,7 +16,19 @@ public class TableAssignment
 {
     public int TableNumber { get; set; }
     public List<Guid> PlayerIds { get; set; } = new();
-    public int PlayerCount => PlayerIds.Count;
+
+    /// <summary>Players seated here who dropped out mid-event. They stay in <see cref="PlayerIds"/>
+    /// so the seating record survives, but stop counting as players: the table then scores as a
+    /// 3-player table with Mr. X in the fourth seat. Set only from the organizer app.</summary>
+    public List<Guid> AbsentPlayerIds { get; set; } = new();
+
+    /// <summary>Seated players still actually playing, in <see cref="PlayerIds"/> order — the
+    /// order every positional pairing (invite QR, score rows) depends on. A method rather than a
+    /// property so System.Text.Json doesn't write it into every stored table.</summary>
+    public List<Guid> ActivePlayerIds()
+        => PlayerIds.Where(id => !AbsentPlayerIds.Contains(id)).ToList();
+
+    public int PlayerCount => PlayerIds.Count(id => !AbsentPlayerIds.Contains(id));
     public TableScore? Score { get; set; }
 
     /// <summary>Organizer-side bookkeeping: has this table's invite QR been handed out / scanned.

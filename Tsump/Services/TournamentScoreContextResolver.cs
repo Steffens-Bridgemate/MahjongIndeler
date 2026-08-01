@@ -43,7 +43,9 @@ public class TournamentScoreContextResolver : IScoreContextResolver
         if (table == null) return new ResolveOutcome.ContainerOnly(label);
 
         var settings = await _settings.GetAsync();
-        var names = table.PlayerIds
+        // Active players only: PlayerNames is paired positionally against the returned scores and
+        // against the table's non-virtual PlayerScore rows, both of which skip dropped-out players.
+        var names = table.ActivePlayerIds()
             .Select(id => matchingTournament.Participants.FirstOrDefault(p => p.Id == id)?.Name ?? _lang.Get("Unknown"))
             .ToList();
         var context = new ResolvedContext(

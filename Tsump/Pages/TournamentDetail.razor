@@ -120,24 +120,6 @@ else
             }
         </div>
 
-        @if (selectedPlayerIds.Count > 0)
-        {
-            <div class="mb-3">
-                <span class="text-muted me-2">
-                    @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetParticipantDisplay(id)))
-                </span>
-                @if (selectedPlayerIds.Count == 2)
-                {
-                    <button class="btn btn-sm btn-primary me-1" @onclick="SwapSelectedPlayers">
-                        @Lang.Get("SwapPlayers")
-                    </button>
-                }
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => selectedPlayerIds.Clear()">
-                    @Lang.Get("ClearSelection")
-                </button>
-            </div>
-        }
-
         @foreach (var session in tournament.Sessions.OrderBy(s => s.SessionNumber))
         {
             var sn = session.SessionNumber;
@@ -207,6 +189,26 @@ else
                     }
                 </Leading>
             </TableNavStrip>
+            @* Selection banner sits with the hanchan it belongs to. It used to render once above
+               the whole session list, which put the Swap button off-screen for every hanchan but
+               the first — the selection worked, the button was just nowhere near the cards. *@
+            @if (selectedPlayerIds.Count > 0 && selectedSessionNumber == stripSess.SessionNumber)
+            {
+                <div class="mb-2">
+                    <span class="text-muted me-2">
+                        @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetParticipantDisplay(id)))
+                    </span>
+                    @if (selectedPlayerIds.Count == 2)
+                    {
+                        <button class="btn btn-sm btn-primary me-1" @onclick="SwapSelectedPlayers">
+                            @Lang.Get("SwapPlayers")
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => selectedPlayerIds.Clear()">
+                        @Lang.Get("ClearSelection")
+                    </button>
+                </div>
+            }
             <div class="table-assign-grid">
                 @foreach (var table in session.Tables)
                 {
@@ -227,18 +229,36 @@ else
                                 }
                             </div>
                             <ul class="list-group list-group-flush">
+                                @{
+                                    // Scores are bound to the seat, so a table that already has any
+                                    // score can no longer be reseated; players who dropped out are
+                                    // no longer swappable either.
+                                    var tableLocked = ScoreStatusHelper.HasAnyScore(table);
+                                }
                                 @foreach (var playerId in table.PlayerIds)
                                 {
                                     var pid = playerId;
-                                    var isSelected = selectedPlayerIds.Contains(pid) && selectedSessionNumber == session.SessionNumber;
-                                    <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "")"
-                                        style="cursor: grab"
-                                        draggable="true"
+                                    var isAbsent = table.AbsentPlayerIds.Contains(pid);
+                                    var locked = tableLocked || isAbsent;
+                                    var isSelected = !locked && selectedPlayerIds.Contains(pid) && selectedSessionNumber == session.SessionNumber;
+                                    <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "") @(locked ? "text-muted" : "")"
+                                        style="cursor: @(locked ? "not-allowed" : "grab")"
+                                        title="@(tableLocked ? Lang.Get("SwapBlockedScored") : isAbsent ? Lang.Get("AbsentPlayers") : GetParticipantDisplay(pid))"
+                                        draggable="@(!locked)"
                                         @ondragstart="() => OnDragStart(pid, session.SessionNumber)"
                                         @ondragover:preventDefault
                                         @ondrop="() => OnDrop(pid, session.SessionNumber)"
                                         @onclick="() => OnPlayerClick(pid, session.SessionNumber)">
-                                        <span class="player-name-clip" title="@GetParticipantDisplay(pid)">@GetParticipantDisplay(pid)</span>
+                                        <span class="player-name-clip">
+                                            @if (isAbsent)
+                                            {
+                                                <s>@GetParticipantDisplay(pid)</s>
+                                            }
+                                            else
+                                            {
+                                                @GetParticipantDisplay(pid)
+                                            }
+                                        </span>
                                     </li>
                                 }
                             </ul>
@@ -294,6 +314,7 @@ else
                             <div class="table-scroll-anchor" id="@ScoreAnchorId(session.SessionNumber, table.TableNumber)">
                                 <ScoreTable @key="(scoreTableVersion, session.Id, table.TableNumber)"
                                             Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                            OnScoresChanged="SaveScores" AllowAbsence="true" OnAbsenceChanged="OnAbsenceChanged"
                                             DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                             </div>
                         }
@@ -324,6 +345,7 @@ else
                             <h6 class="text-muted mb-1">@entry.Label</h6>
                             <ScoreTable @key="(scoreTableVersion, entry.Label, tableGroup.TableNumber)"
                                         Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                        OnScoresChanged="SaveScores" AllowAbsence="true" OnAbsenceChanged="OnAbsenceChanged"
                                         DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                         </div>
                     }
@@ -662,7 +684,9 @@ else
         {
             foreach (var table in session.Tables)
             {
-                if (table.PlayerCount == 3 && table.PlayerIds.Contains(participantId))
+                // A player who dropped out is why the table is a 3-player table; they didn't
+                // themselves play one.
+                if (table.PlayerCount == 3 && table.ActivePlayerIds().Contains(participantId))
                     count++;
             }
         }
@@ -687,8 +711,22 @@ else
         StateHasChanged();
     }
 
+    /// <summary>A player can be reseated only while their table has no scores at all — scores are
+    /// bound to the seat, not the person, so reseating a scored table would silently re-label
+    /// them — and only while they are still playing.</summary>
+    private bool IsSwappable(int sessionNumber, Guid playerId)
+    {
+        var session = tournament?.Sessions.FirstOrDefault(s => s.SessionNumber == sessionNumber);
+        var table = session?.Tables.FirstOrDefault(t => t.PlayerIds.Contains(playerId));
+        return table != null
+            && !table.AbsentPlayerIds.Contains(playerId)
+            && !ScoreStatusHelper.HasAnyScore(table);
+    }
+
     private void OnPlayerClick(Guid playerId, int sessionNumber)
     {
+        if (!IsSwappable(sessionNumber, playerId)) return;
+
         if (selectedSessionNumber != sessionNumber)
         {
             selectedPlayerIds.Clear();
@@ -741,6 +779,7 @@ else
 
     private void OnDragStart(Guid playerId, int sessionNumber)
     {
+        if (!IsSwappable(sessionNumber, playerId)) return;
         draggedPlayerId = playerId;
         draggedSessionNumber = sessionNumber;
     }
@@ -750,6 +789,7 @@ else
         if (draggedPlayerId == null || draggedSessionNumber != sessionNumber ||
             draggedPlayerId == targetPlayerId || tournament == null)
             return;
+        if (!IsSwappable(sessionNumber, targetPlayerId)) return;
 
         var session = tournament.Sessions.FirstOrDefault(s => s.SessionNumber == sessionNumber);
         if (session == null) return;
@@ -777,8 +817,20 @@ else
 
         if (tableA == null || tableB == null) return;
 
+        // Backstop for the drag path: a scored table can't be reseated (the score rows would end
+        // up against the wrong people), and an absent player isn't a real seat to trade.
+        if (ScoreStatusHelper.HasAnyScore(tableA) || ScoreStatusHelper.HasAnyScore(tableB)) return;
+        if (tableA.AbsentPlayerIds.Contains(playerA) || tableB.AbsentPlayerIds.Contains(playerB)) return;
+
         tableA.PlayerIds[indexA] = playerB;
         tableB.PlayerIds[indexB] = playerA;
+
+        // The (still empty) score rows must follow the new seating, or the next initialise would
+        // pair them by the old order. Only tables that already have a Score — initialising the
+        // rest here would create score models from the Assignments view.
+        var reseated = new[] { tableA, tableB }.Where(t => t.Score != null).ToList();
+        if (reseated.Count > 0)
+            ScoreTable.InitializeScores(reseated, Lang.Get, tournamentStartingPoints);
     }
 
     private void AppendTablesHtml(System.Text.StringBuilder html, System.Text.StringBuilder text, List<TableAssignment> tables)
@@ -1191,6 +1243,16 @@ else
         await TournamentService.SaveAsync(tournament);
     }
 
+    /// <summary>A player was marked as dropped out (or restored) on one table. ScoreTable has
+    /// already rebuilt that table's score rows in place, so this only has to persist — deliberately
+    /// no <c>scoreTableVersion</c> bump, which would tear down the very component that raised the
+    /// event (the two scores views are mutually exclusive, so no second copy needs rebuilding).</summary>
+    private async Task OnAbsenceChanged()
+    {
+        if (tournament == null) return;
+        await TournamentService.SaveAsync(tournament);
+    }
+
     private string WrapAsHtmlDocument(string title, string bodyContent, bool includePrintButton = false)
     {
         var printBtn = includePrintButton
@@ -1271,7 +1333,7 @@ else
     {
         return session.Tables.Select(t =>
         {
-            var names = t.PlayerIds.Select(id => GetParticipantDisplay(id)).ToList();
+            var names = t.ActivePlayerIds().Select(id => GetParticipantDisplay(id)).ToList();
             if (t.PlayerCount == 3)
                 names.Add(Lang.Get("MrX"));
             // When scanning is on, stamp the table's invite QR onto the scoresheet's side panel.

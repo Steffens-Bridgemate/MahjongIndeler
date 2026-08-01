@@ -68,13 +68,23 @@ Sections appear only for pages with cross-file behaviour worth recording. Pages 
 
 ## TournamentDetail.razor / WeeklySessionPage.razor
 
-Cross-cutting concerns covered in [domain.md](domain.md) (status classification, Mr. X, Uma) and [score-import-ui.md](score-import-ui.md) (import panel, share actions, QR overlays). The pages themselves are mostly straightforward wiring around those.
+Cross-cutting concerns covered in [domain.md](domain.md) (status classification, Mr. X, Uma, dropped-out players) and [score-import-ui.md](score-import-ui.md) (import panel, share actions, QR overlays). The pages themselves are mostly straightforward wiring around those.
+
+**Mark-absent is TournamentDetail-only.** Both of its `<ScoreTable>`s pass `AllowAbsence="true"` + `OnAbsenceChanged`; WeeklySessionPage and the scan-log preview leave the parameter at its default `false`, so the control doesn't render there (nor in the scoring app). `OnAbsenceChanged` deliberately does *not* bump `scoreTableVersion` — that would tear down the component that raised the event, and the two scores views are mutually exclusive so no second copy needs rebuilding.
 
 Both pages now host the **table-nav strip** and a **contextual sidebar nav** — both documented in [styles.md](styles.md#11-table-nav-strip-jump-to-table). In short: the in-page tab strips moved into the sidebar, so on a tournament/session route the sidebar *is* that page's nav. **Both** pages now publish their entries via `ContextNavService` and clear them on `Dispose`. The tournament's three view selectors — **Assignments / Scores per hanchan / Scores per table** (`ScoresPerHanchan`/`ScoresPerTable` keys, matching how each groups its `ScoreTable`s) — are sidebar entries driving `tournamentActiveTab` (no in-page tab strip remains); the active one is followed by an indented (`Indent = 1`) jump list of its hanchans or table numbers. Before a tournament is generated (and on the other `/tournament/{id}/…` sub-pages), the sidebar falls back to NavMenu's URL-based tournament branch. See [styles.md §12](styles.md#12-contextual-sidebar-nav).
 
+### Manual player swap (both pages)
+
+Undocumented until now, and easy to miss. On the **Assignments** view of both pages a player can be reseated by dragging one onto another, or by clicking two and pressing **Swap players** in the selection banner. Swaps are confined to one hanchan.
+
+- **The banner must sit with the hanchan it belongs to.** TournamentDetail renders every hanchan on one page; the banner used to render once *above* the whole session list, which put the Swap button off-screen for every hanchan but the first — selection worked, the button was just nowhere near the cards, so the feature read as broken. It now renders inside the per-hanchan block (above that hanchan's `.table-assign-grid`), gated on `selectedSessionNumber`. WeeklySessionPage never had the problem: one hanchan, banner directly above the grid.
+- **A table that already has any score cannot be reseated** — scores are bound to the seat, not the person (see [domain.md](domain.md#tables-and-scores)). `IsSwappable` on both pages gates click/drag on `ScoreStatusHelper.HasAnyScore`, the `<li>`s go `text-muted` + `not-allowed` + `draggable="false"` with a `SwapBlockedScored` tooltip, and `SwapInSession`/`SwapPlayers` re-check as a backstop for the drag path. Players marked as dropped out aren't swappable either.
+- **After a swap both pages re-run `ScoreTable.InitializeScores`**, so the (still empty) score rows follow the new seating instead of being re-paired by the old order on some later initialise.
+
 Two non-obvious things specific to WeeklySessionPage worth flagging:
 
-- `scoreTableVersion` is bumped on `SaveScores`, `SaveHanchan`, and `OnHanchanScoreApplied` (the `<ScoreImportPanel>` callback). It's part of every `ScoreTable`'s `@key` tuple so Blazor disposes/recreates each `ScoreTable` after a save — needed because the underlying `TableAssignment` references are replaced when `hanchansOnDate` is reloaded.
+- `scoreTableVersion` is bumped on `OnHanchanScoreApplied` (the `<ScoreImportPanel>` callback) — **not** on `SaveScores`, which would tear down the score inputs mid-entry. It's part of every `ScoreTable`'s `@key` tuple so Blazor disposes/recreates each `ScoreTable` after an import — needed because the underlying `TableAssignment` references are replaced when `hanchansOnDate` is reloaded.
 - `CurrentHanchanNumber` derives the 1-based "Hanchan N of the day" by ordering `hanchansOnDate` by `StartTime`. There's no stored hanchan number (see [domain.md](domain.md)).
 - The sidebar's weekly nav rebuilds only on a visible-signature change (`PublishNav`), and hanchan-click handlers resolve the live `Hanchan` by id at click time to dodge the stale-reference gotcha after a save/reload.
 

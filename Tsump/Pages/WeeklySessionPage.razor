@@ -319,6 +319,7 @@ else
                         <h6 class="text-muted mb-1">@entry.Label</h6>
                         <ScoreTable Table="entry.Table" PlayerNameResolver="GetPlayerName"
                                     OnScoresComplete="SaveAllScores" OnScoresCleared="SaveAllScores"
+                                    OnScoresChanged="SaveAllScores"
                                     DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                     </div>
                 }
@@ -416,19 +417,25 @@ else
                                 }
                             </div>
                             <ul class="list-group list-group-flush">
+                                @{
+                                    // Scores are bound to the seat, so a table that already has any
+                                    // score can no longer be reseated.
+                                    var tableLocked = IsLockedPastSession || ScoreStatusHelper.HasAnyScore(table);
+                                }
                                 @foreach (var playerId in table.PlayerIds)
                                 {
                                     var pid = playerId;
                                     var player = members.FirstOrDefault(m => m.Id == pid);
-                                    var isSelected = selectedPlayerIds.Contains(pid);
+                                    var isSelected = !tableLocked && selectedPlayerIds.Contains(pid);
                                     <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "")"
-                                        style="cursor: @(IsLockedPastSession ? "default" : "grab")"
-                                        draggable="@(!IsLockedPastSession)"
+                                        style="cursor: @(tableLocked ? "default" : "grab")"
+                                        title="@(ScoreStatusHelper.HasAnyScore(table) ? Lang.Get("SwapBlockedScored") : player?.Name ?? Lang.Get("Unknown"))"
+                                        draggable="@(!tableLocked)"
                                         @ondragstart="() => OnDragStart(pid)"
                                         @ondragover:preventDefault
                                         @ondrop="() => OnDrop(pid)"
                                         @onclick="() => OnPlayerClick(pid)">
-                                        <span class="player-name-clip" title="@(player?.Name ?? Lang.Get("Unknown"))">@(player?.Name ?? Lang.Get("Unknown"))</span>
+                                        <span class="player-name-clip">@(player?.Name ?? Lang.Get("Unknown"))</span>
                                     </li>
                                 }
                             </ul>
@@ -477,6 +484,7 @@ else
                         <ScoreTable @key="(scoreTableVersion, table.TableNumber)"
                                     Table="table" PlayerNameResolver="GetPlayerName"
                                     OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
+                                    OnScoresChanged="PersistScoresOnly"
                                     DefaultStartingPoints="weeklyStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                     </div>
                 }
@@ -1334,7 +1342,7 @@ else
     {
         return tablesToRender.Select(t =>
         {
-            var names = t.PlayerIds.Select(id => GetPlayerName(id)).ToList();
+            var names = t.ActivePlayerIds().Select(id => GetPlayerName(id)).ToList();
             if (t.PlayerCount == 3)
                 names.Add(Lang.Get("MrX"));
             // When scanning is on, stamp the table's invite QR onto the scoresheet's side panel.
@@ -1470,9 +1478,17 @@ else
         return members?.FirstOrDefault(m => m.Id == id)?.Name ?? Lang.Get("Unknown");
     }
 
+    /// <summary>A player can be reseated only while their table has no scores — scores are bound to
+    /// the seat, not the person, so reseating a scored table would silently re-label them.</summary>
+    private bool IsSwappable(Guid playerId)
+    {
+        var table = tables.FirstOrDefault(t => t.PlayerIds.Contains(playerId));
+        return table != null && !ScoreStatusHelper.HasAnyScore(table);
+    }
+
     private void OnPlayerClick(Guid playerId)
     {
-        if (IsLockedPastSession) return;
+        if (IsLockedPastSession || !IsSwappable(playerId)) return;
 
         if (selectedPlayerIds.Contains(playerId))
         {
@@ -1505,13 +1521,14 @@ else
 
     private void OnDragStart(Guid playerId)
     {
-        if (IsLockedPastSession) return;
+        if (IsLockedPastSession || !IsSwappable(playerId)) return;
         draggedPlayerId = playerId;
     }
 
     private async Task OnDrop(Guid targetPlayerId)
     {
         if (IsLockedPastSession || draggedPlayerId == null || draggedPlayerId == targetPlayerId) return;
+        if (!IsSwappable(targetPlayerId)) return;
         await SwapPlayers(draggedPlayerId.Value, targetPlayerId);
         draggedPlayerId = null;
         selectedPlayerIds.Clear();
@@ -1533,8 +1550,17 @@ else
 
         if (tableA == null || tableB == null) return;
 
+        // Backstop for the drag path: a scored table can't be reseated (the score rows would end
+        // up against the wrong people).
+        if (ScoreStatusHelper.HasAnyScore(tableA) || ScoreStatusHelper.HasAnyScore(tableB)) return;
+
         tableA.PlayerIds[indexA] = playerB;
         tableB.PlayerIds[indexB] = playerA;
+        // The (still empty) score rows must follow the new seating. Only tables that already have
+        // a Score — initialising the rest here would create score models on the Assignments tab.
+        var reseated = new[] { tableA, tableB }.Where(t => t.Score != null).ToList();
+        if (reseated.Count > 0)
+            ScoreTable.InitializeScores(reseated, Lang.Get, weeklyStartingPoints);
         saved = false;
         // Tables only exist once a hanchan is saved, so currentHanchan is always set here;
         // guard anyway to keep the "no save without a hanchan" invariant.
@@ -1674,6 +1700,17 @@ else
         currentHanchan.Tables = tables;
         await SessionService.SaveAsync(currentHanchan);
         StateHasChanged();
+    }
+
+    /// <summary>Per-edit persist for <c>ScoreTable.OnScoresChanged</c>. Deliberately *not*
+    /// <see cref="SaveScores"/>: that one re-reads storage and re-points <c>tables</c> at freshly
+    /// deserialised objects, which mid-typing would churn the score inputs under the caret. This
+    /// only needs the write — the in-memory model is already correct.</summary>
+    private async Task PersistScoresOnly()
+    {
+        if (currentHanchan == null) return;
+        currentHanchan.Tables = tables;
+        await SessionService.SaveAsync(currentHanchan);
     }
 
     private async Task SaveScores()

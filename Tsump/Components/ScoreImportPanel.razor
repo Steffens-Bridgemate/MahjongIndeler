@@ -106,7 +106,7 @@
                                 @for (int i = 0; i < pendingResult!.Scores.Count; i++)
                                 {
                                     var s = pendingResult.Scores[i];
-                                    var pids = pendingLookup!.Context.Table.PlayerIds;
+                                    var pids = pendingLookup!.Context.Table.ActivePlayerIds();
                                     var playerName = i < pids.Count ? ResolveName(pids[i]) : "—";
                                     var end = s[ScoringPayloadCodec.ScoreEndPoints];
                                     var loan = s[ScoringPayloadCodec.ScoreLoan];

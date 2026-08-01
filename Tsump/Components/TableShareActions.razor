@@ -110,7 +110,8 @@
     private List<int> UmaFor(TableAssignment t) => t.PlayerCount == 3 ? Uma3 : Uma4;
     private string TitleFor(TableAssignment t) => $"{TitlePrefix} — {Lang.Get("Table")} {t.TableNumber}";
     private string ShortTitleFor(TableAssignment t) => $"{ShortTitlePrefix} — {Lang.Get("Table")} {t.TableNumber}";
-    private string PlayersFor(TableAssignment t) => string.Join(", ", t.PlayerIds.Select(PlayerNameResolver));
+    // Matches what the invite actually carries — dropped-out players aren't in it.
+    private string PlayersFor(TableAssignment t) => string.Join(", ", t.ActivePlayerIds().Select(PlayerNameResolver));
 
     // The payload carries only the compact ShortName (or null) — not the full display title — so the
     // QR stays small; the scoring app rebuilds "Hanchan N — Table M" from the numbers it already has.

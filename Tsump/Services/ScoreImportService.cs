@@ -130,11 +130,15 @@ public class ScoreImportService
     // Resolves a player id to a display name by its position in the table, falling back to the
     // raw id when out of range.
     private static Func<Guid, string> ByPosition(TableAssignment table, List<string> names)
-        => id =>
+    {
+        // names is built from the active players, so index into the same list.
+        var activeIds = table.ActivePlayerIds();
+        return id =>
         {
-            var idx = table.PlayerIds.IndexOf(id);
+            var idx = activeIds.IndexOf(id);
             return idx >= 0 && idx < names.Count ? names[idx] : id.ToString();
         };
+    }
 
     /// <summary>Describes a (contextId, tableNumber) for the scan-log header without applying
     /// anything: friendly label when recognised, plus whether the table still exists.</summary>
