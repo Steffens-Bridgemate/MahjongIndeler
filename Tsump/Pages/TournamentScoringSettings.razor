@@ -57,6 +57,31 @@ else
                     </div>
                 </div>
             </div>
+            <div class="row mb-2">
+                <div class="col-md-8 mb-2">
+                    <label class="form-label">@Lang.Get("AbsentScoring")</label>
+                    @{ var effectiveMode = tournament.AbsentScoringMode ?? clubAbsentScoringMode; }
+                    @foreach (var mode in Enum.GetValues<AbsentScoringMode>())
+                    {
+                        var m = mode;
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="absent-mode-override"
+                                   id="@($"absent-override-{(int)m}")"
+                                   checked="@(effectiveMode == m)"
+                                   @onchange="() => OnOverrideAbsentMode(m)" />
+                            <label class="form-check-label" for="@($"absent-override-{(int)m}")">@Lang.Get($"AbsentScoring{m}")</label>
+                        </div>
+                    }
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label">@Lang.Get("AbsentScoringCorrection")</label>
+                    @* No substitution happens in Excluded mode, so the correction has nothing to apply to. *@
+                    <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
+                           disabled="@(effectiveMode == AbsentScoringMode.Excluded)"
+                           value="@FormatPointsSigned(tournament.AbsentCorrection ?? clubAbsentCorrection)"
+                           @onchange="OnOverrideAbsentCorrection" />
+                </div>
+            </div>
             <button class="btn btn-sm btn-outline-secondary" @onclick="ResetScoringOverrides">@Lang.Get("UseDefaults")</button>
         </div>
     </div>
@@ -69,6 +94,8 @@ else
     private int clubTournamentStartingPoints = 30000;
     private List<int> clubUma4Players = new() { 15000, 5000, -5000, -15000 };
     private List<int> clubUma3Players = new() { 12500, 0, -12500 };
+    private AbsentScoringMode clubAbsentScoringMode = AbsentScoringMode.Zero;
+    private int clubAbsentCorrection;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -82,6 +109,8 @@ else
             clubTournamentStartingPoints = settings.TournamentStartingPoints;
             clubUma4Players = new List<int>(settings.TournamentUma4Players);
             clubUma3Players = new List<int>(settings.TournamentUma3Players);
+            clubAbsentScoringMode = settings.TournamentAbsentScoringMode;
+            clubAbsentCorrection = settings.TournamentAbsentCorrection;
             StateHasChanged();
         }
         if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
@@ -121,12 +150,28 @@ else
         await TournamentService.SaveAsync(tournament);
     }
 
+    private async Task OnOverrideAbsentMode(AbsentScoringMode mode)
+    {
+        if (tournament == null) return;
+        tournament.AbsentScoringMode = mode;
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task OnOverrideAbsentCorrection(ChangeEventArgs e)
+    {
+        if (tournament == null) return;
+        tournament.AbsentCorrection = ParsePoints(e.Value?.ToString(), clubAbsentCorrection);
+        await TournamentService.SaveAsync(tournament);
+    }
+
     private async Task ResetScoringOverrides()
     {
         if (tournament == null) return;
         tournament.StartingPoints = null;
         tournament.Uma4Players = null;
         tournament.Uma3Players = null;
+        tournament.AbsentScoringMode = null;
+        tournament.AbsentCorrection = null;
         await TournamentService.SaveAsync(tournament);
     }
 }

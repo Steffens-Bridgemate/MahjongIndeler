@@ -24,16 +24,29 @@ else
                 @{ int rank = 1; }
                 @foreach (var entry in Entries)
                 {
-                    <tr>
-                        <td>@rank</td>
+                    <tr class="@(entry.Excluded ? "text-muted" : null)">
+                        <td>@(entry.Excluded ? "—" : rank.ToString())</td>
                         <td>@entry.Name</td>
                         <td class="text-center fw-bold">@FormatScore(entry.Total)</td>
                         @foreach (var hs in entry.HanchanScores)
                         {
-                            <td class="text-center">@(hs.Score.HasValue ? FormatScore(hs.Score.Value) : "—")</td>
+                            <td class="text-center">
+                                @if (!hs.Score.HasValue)
+                                {
+                                    <text>—</text>
+                                }
+                                else if (hs.Substituted)
+                                {
+                                    <em class="text-muted">@FormatScore(hs.Score.Value)</em>
+                                }
+                                else
+                                {
+                                    @FormatScore(hs.Score.Value)
+                                }
+                            </td>
                         }
                     </tr>
-                    rank++;
+                    if (!entry.Excluded) { rank++; }
                 }
             </tbody>
         </table>
@@ -73,7 +86,8 @@ else
         const int NameWidth = 20;
         const int ScoreWidth = 6;
         const int RankWidth = 3;
-        int hanchanWidth = Math.Max(ScoreWidth, hanchanLabels.Count > 0 ? hanchanLabels.Max(l => l.Length) : ScoreWidth);
+        // +1 leaves room for the "*" suffix on substituted (absent-scoring) values.
+        int hanchanWidth = Math.Max(ScoreWidth + 1, hanchanLabels.Count > 0 ? hanchanLabels.Max(l => l.Length) : ScoreWidth);
 
         string Clip(string s, int w) => s.Length <= w ? s : s.Substring(0, w);
         string PadR(string s, int w) => Clip(s, w).PadRight(w);
@@ -102,24 +116,32 @@ else
         int rank = 1;
         foreach (var entry in entries)
         {
-            html.Append("<tr>");
-            html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;\">{rank}</td>");
+            // Excluded (dropped-out) players: unranked, greyed, listed below the ranking.
+            var rowStyle = entry.Excluded ? " style=\"color:#888;\"" : "";
+            var rankCell = entry.Excluded ? "—" : rank.ToString();
+            html.Append($"<tr{rowStyle}>");
+            html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;\">{rankCell}</td>");
             html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;\">{entry.Name}</td>");
             html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;text-align:center;font-weight:bold;\">{FormatScore(entry.Total)}</td>");
             foreach (var hs in entry.HanchanScores)
             {
-                var cell = hs.Score.HasValue ? FormatScore(hs.Score.Value) : "—";
+                // Substituted (absent-scoring) values in italics, matching the on-screen table.
+                var cell = !hs.Score.HasValue ? "—"
+                    : hs.Substituted ? $"<em>{FormatScore(hs.Score.Value)}</em>"
+                    : FormatScore(hs.Score.Value);
                 html.Append($"<td style=\"border:1px solid #999;padding:4px 8px;text-align:center;\">{cell}</td>");
             }
             html.Append("</tr>");
 
-            var line = PadL(rank.ToString(), RankWidth)
+            var line = PadL(entry.Excluded ? "-" : rank.ToString(), RankWidth)
                        + " " + PadR(AlignName(entry.Name), NameWidth)
                        + " " + PadL(FormatScore(entry.Total), ScoreWidth);
             foreach (var hs in entry.HanchanScores)
-                line += " " + PadL(hs.Score.HasValue ? FormatScore(hs.Score.Value) : "-", hanchanWidth);
+                line += " " + PadL(!hs.Score.HasValue ? "-"
+                    : hs.Substituted ? FormatScore(hs.Score.Value) + "*"
+                    : FormatScore(hs.Score.Value), hanchanWidth);
             textLines.Add(line);
-            rank++;
+            if (!entry.Excluded) rank++;
         }
         html.Append("</tbody></table>");
 
@@ -146,20 +168,34 @@ else
             + $"<body style=\"font-family:Verdana,sans-serif;margin:20px;\">{printButton}{body}</body></html>";
     }
 
-    public record HanchanScore(string Label, int? Score);
-    public record RankingEntry(string Name, int Total, List<HanchanScore> HanchanScores);
+    /// <summary>One ranking cell. <paramref name="Substituted"/> marks a value that was not
+    /// played but filled in by the absent-scoring policy (zero/average + correction) — rendered
+    /// in italics so it reads as "counted as", not "scored".</summary>
+    public record HanchanScore(string Label, int? Score, bool Substituted = false);
+    /// <summary><paramref name="Excluded"/> = dropped-out player under AbsentScoringMode.Excluded:
+    /// rendered on an unranked line below the ranking, actual scores only.</summary>
+    public record RankingEntry(string Name, int Total, List<HanchanScore> HanchanScores, bool Excluded = false);
 
     /// <summary>
     /// Builds ranking entries from a list of hanchans (sessions with tables).
+    /// Hanchans where a player is marked absent (<c>TableAssignment.AbsentPlayerIds</c>) get a
+    /// substituted score per <paramref name="absentScoringMode"/> plus
+    /// <paramref name="absentCorrection"/> (×1000, signed, per missed hanchan). A hanchan that is
+    /// merely not scored yet is NOT substituted — only a deliberate dropout is. The defaults
+    /// (Zero, 0) keep the historical totals: a missed hanchan contributes nothing.
     /// </summary>
     public static List<RankingEntry> BuildRankings(
         List<(string Label, List<Models.TableAssignment> Tables)> hanchans,
         Func<Guid, string> nameResolver,
-        HashSet<Guid>? allParticipantIds = null)
+        HashSet<Guid>? allParticipantIds = null,
+        Models.AbsentScoringMode absentScoringMode = Models.AbsentScoringMode.Zero,
+        int absentCorrection = 0)
     {
         if (hanchans.Count == 0) return new();
 
         var playerScores = new Dictionary<Guid, List<int?>>();
+        // Per hanchan column: the players marked absent there (deliberate dropouts).
+        var absentPerHanchan = new List<HashSet<Guid>>();
 
         // Pre-populate all known participants if provided
         if (allParticipantIds != null)
@@ -170,6 +206,8 @@ else
 
         foreach (var (label, tables) in hanchans)
         {
+            absentPerHanchan.Add(tables.SelectMany(t => t.AbsentPlayerIds).ToHashSet());
+
             var scoresInHanchan = new Dictionary<Guid, int>();
             foreach (var table in tables)
             {
@@ -200,12 +238,42 @@ else
         var labels = hanchans.Select(h => h.Label).ToList();
 
         return playerScores
-            .Select(kv => new RankingEntry(
-                nameResolver(kv.Key),
-                kv.Value.Where(s => s.HasValue).Sum(s => s!.Value),
-                kv.Value.Select((s, i) => new HanchanScore(labels[i], s)).ToList()
-            ))
-            .OrderByDescending(e => e.Total)
+            .Select(kv =>
+            {
+                var actuals = kv.Value.Where(s => s.HasValue).Select(s => s!.Value).ToList();
+                var missedAny = kv.Value.Select((s, i) => !s.HasValue && absentPerHanchan[i].Contains(kv.Key)).Any(m => m);
+
+                // Excluded mode: a dropped-out player leaves the ranking entirely — actual scores
+                // only, no substitution, listed unranked below the others.
+                if (absentScoringMode == Models.AbsentScoringMode.Excluded && missedAny)
+                {
+                    var plainCells = kv.Value.Select((s, i) => new HanchanScore(labels[i], s)).ToList();
+                    return new RankingEntry(nameResolver(kv.Key), actuals.Sum(), plainCells, Excluded: true);
+                }
+
+                // Average over *played* hanchans only; a player with no played hanchan yet
+                // averages to 0. Recomputed on every build, so it tracks incoming results.
+                var substitutedBase = absentScoringMode == Models.AbsentScoringMode.Average && actuals.Count > 0
+                    ? (int)Math.Round(actuals.Average())
+                    : 0;
+                var substitutedValue = substitutedBase + absentCorrection;
+
+                var cells = kv.Value.Select((s, i) =>
+                {
+                    if (s.HasValue) return new HanchanScore(labels[i], s);
+                    if (absentPerHanchan[i].Contains(kv.Key))
+                        return new HanchanScore(labels[i], substitutedValue, Substituted: true);
+                    return new HanchanScore(labels[i], null);
+                }).ToList();
+
+                return new RankingEntry(
+                    nameResolver(kv.Key),
+                    cells.Where(c => c.Score.HasValue).Sum(c => c.Score!.Value),
+                    cells);
+            })
+            // Ranked entries first (by total), excluded ones on their own lines below.
+            .OrderBy(e => e.Excluded ? 1 : 0)
+            .ThenByDescending(e => e.Total)
             .ToList();
     }
 }

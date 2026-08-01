@@ -36,21 +36,6 @@
         }
     </div>
     <div class="card-body p-2">
-        @* Inline confirm for "mark absent" — one banner for both layouts (the layouts are twins;
-           duplicating it inside each would need two copies of the same state). *@
-        @if (absenceConfirmFor is { } confirmId)
-        {
-            <div class="alert alert-warning py-2 mb-2 small d-flex align-items-center flex-wrap gap-2">
-                <span class="flex-grow-1">@Lang.Get("MarkAbsentConfirm") (@GetPlayerName(confirmId))</span>
-                <button class="btn btn-sm btn-warning py-0 px-2" @onclick="() => MarkAbsent(confirmId)">
-                    @Lang.Get("YesMarkAbsent")
-                </button>
-                <button class="btn btn-sm btn-secondary py-0 px-2" @onclick="() => absenceConfirmFor = null">
-                    @Lang.Get("Cancel")
-                </button>
-            </div>
-        }
-
         @* Narrow layout — shown when the card's own width is below the wide threshold (container
            query in ScoreTable.razor.css), not the viewport width, so a narrow content column
            (sidebar nav, page padding, multi-column score grid) gets it even on a wide screen. The
@@ -140,18 +125,15 @@
                                 }
                             </td>
                             <td class="text-center px-1">
-                                <div class="d-flex align-items-center justify-content-end gap-1">
-                                    @if (!ps.IsVirtual && !ReadOnly)
-                                    {
-                                        <button class="btn btn-sm btn-outline-secondary py-0 px-2"
-                                                style="font-size:1.1rem;line-height:1;min-width:2rem;"
-                                                @onclick="() => ToggleExtrasFor(idx)"
-                                                title="@Lang.Get("Advanced")">
-                                            @(extras ? "−" : "+")
-                                        </button>
-                                    }
-                                    @AbsenceButton(psRef)
-                                </div>
+                                @if (!ps.IsVirtual && !ReadOnly)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                            style="font-size:1.1rem;line-height:1;min-width:2rem;"
+                                            @onclick="() => ToggleExtrasFor(idx)"
+                                            title="@Lang.Get("Advanced")">
+                                        @(extras ? "−" : "+")
+                                    </button>
+                                }
                             </td>
                         </tr>
                         @if (extras && !ps.IsVirtual)
@@ -212,7 +194,6 @@
                         </th>
                         @foreach (var ps in score.PlayerScores)
                         {
-                            var psRef = ps;
                             var name = ps.IsVirtual ? ps.VirtualName : GetPlayerName(ps.PlayerId);
                             <th class="text-center" style="min-width:90px;">
                                 <span class="player-name-clip" title="@name">
@@ -225,7 +206,6 @@
                                         @name
                                     }
                                 </span>
-                                @AbsenceButton(psRef)
                             </th>
                         }
                     </tr>
@@ -383,44 +363,10 @@
                 </tbody>
             </table>
         </div>
-
-        @* Absent players have no score row left, so the undo lives here rather than on a row. *@
-        @if (AllowAbsence && !ReadOnly && Table.AbsentPlayerIds.Count > 0)
-        {
-            <div class="d-flex align-items-center flex-wrap gap-2 mt-2 small text-muted">
-                <span><i class="bi bi-person-dash me-1"></i>@Lang.Get("AbsentPlayers"):</span>
-                @foreach (var absentId in Table.AbsentPlayerIds.ToList())
-                {
-                    var aid = absentId;
-                    <span class="d-inline-flex align-items-center gap-1">
-                        <s>@GetPlayerName(aid)</s>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="line-height:1;"
-                                @onclick="() => RestorePlayer(aid)" title="@Lang.Get("RestorePlayer")">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </button>
-                    </span>
-                }
-            </div>
-        }
     </div>
 </div>
 
 @code {
-    /// <summary>The per-player "mark absent" button. Renders nothing unless the host opted in
-    /// (organizer only) — the scoring app must never offer it. Only offered on a 4-player table:
-    /// a second dropout would leave two real players plus Mr. X, which isn't a playable table and
-    /// has no Uma set — that case has to be fixed by reseating, not by marking absent.</summary>
-    private RenderFragment AbsenceButton(PlayerScore ps) => @<text>
-        @if (AllowAbsence && !ReadOnly && !ps.IsVirtual && absenceConfirmFor == null && Table.PlayerCount > 3)
-        {
-            <button class="btn btn-sm btn-outline-danger py-0 px-1" style="line-height:1;"
-                    @onclick="() => absenceConfirmFor = ps.PlayerId"
-                    title="@Lang.Get("MarkAbsent")">
-                <i class="bi bi-person-dash"></i>
-            </button>
-        }
-    </text>;
-
     [Parameter, EditorRequired]
     public TableAssignment Table { get; set; } = default!;
 
@@ -439,17 +385,6 @@
     /// reload. Wire it to a plain save; keep it cheap, it runs per committed field.</summary>
     [Parameter]
     public EventCallback OnScoresChanged { get; set; }
-
-    /// <summary>Organizer-only: shows the per-player "mark absent" control and the restore footer.
-    /// Off by default so the scoring app renders exactly as before — it never learns a player
-    /// dropped out, it just receives a 3-player invite.</summary>
-    [Parameter]
-    public bool AllowAbsence { get; set; }
-
-    /// <summary>Fires after a player is marked absent or restored. The table's score rows have
-    /// already been rebuilt; the handler only needs to persist.</summary>
-    [Parameter]
-    public EventCallback OnAbsenceChanged { get; set; }
 
     [Parameter]
     public int DefaultStartingPoints { get; set; } = 30000;
@@ -470,8 +405,6 @@
 
     private bool showExtras;
     private bool showClearConfirm;
-    // Player id awaiting the "mark absent" inline confirmation (null = none armed).
-    private Guid? absenceConfirmFor;
     // Per-player advanced toggle for the narrow (smartphone-portrait) layout.
     // Keyed by player index inside Table.Score.PlayerScores.
     private HashSet<int> expandedPlayers = new();
@@ -665,37 +598,6 @@
         // Always: an edit that leaves the table incomplete or unbalanced still has to be persisted,
         // or reload resurrects the previous values (Mr. X's derived one included).
         await OnScoresChanged.InvokeAsync();
-    }
-
-    /// <summary>Marks a seated player as no longer playing: their score row is dropped, Mr. X takes
-    /// the seat and 3-player Uma applies. Reversible via <see cref="RestorePlayer"/>.</summary>
-    private async Task MarkAbsent(Guid playerId)
-    {
-        absenceConfirmFor = null;
-        if (Table.AbsentPlayerIds.Contains(playerId)) return;
-
-        Table.AbsentPlayerIds.Add(playerId);
-        RebuildAfterAbsenceChange();
-        await OnAbsenceChanged.InvokeAsync();
-    }
-
-    private async Task RestorePlayer(Guid playerId)
-    {
-        if (!Table.AbsentPlayerIds.Remove(playerId)) return;
-
-        RebuildAfterAbsenceChange();
-        await OnAbsenceChanged.InvokeAsync();
-    }
-
-    // The seat composition changed, so the score rows have to be rebuilt (drop/re-add the player's
-    // row, add or strip Mr. X). InitializeScores re-derives Mr. X; Uma has to follow separately
-    // because the 3-vs-4-player table has different values. Per-player expand state is keyed by
-    // row index, which the rebuild invalidates.
-    private void RebuildAfterAbsenceChange()
-    {
-        InitializeScores(new List<TableAssignment> { Table }, Lang.Get, DefaultStartingPoints);
-        CalculateUma();
-        expandedPlayers.Clear();
     }
 
     private void CalculateUma()

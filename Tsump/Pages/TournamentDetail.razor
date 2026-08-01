@@ -243,7 +243,7 @@ else
                                     var isSelected = !locked && selectedPlayerIds.Contains(pid) && selectedSessionNumber == session.SessionNumber;
                                     <li class="list-group-item d-flex align-items-center @(isSelected ? "list-group-item-primary" : "") @(locked ? "text-muted" : "")"
                                         style="cursor: @(locked ? "not-allowed" : "grab")"
-                                        title="@(tableLocked ? Lang.Get("SwapBlockedScored") : isAbsent ? Lang.Get("AbsentPlayers") : GetParticipantDisplay(pid))"
+                                        title="@(tableLocked ? Lang.Get("SwapBlockedScored") : isAbsent ? Lang.Get("DroppedOutPlayers") : GetParticipantDisplay(pid))"
                                         draggable="@(!locked)"
                                         @ondragstart="() => OnDragStart(pid, session.SessionNumber)"
                                         @ondragover:preventDefault
@@ -259,6 +259,27 @@ else
                                                 @GetParticipantDisplay(pid)
                                             }
                                         </span>
+                                        @* Mark-absent lives here on the card, but only reveals on the
+                                           selected row — always-visible buttons on every player of
+                                           every table would be clutter for a rarely-used action. *@
+                                        @if (isAbsent)
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-1 ms-auto" style="line-height:1;"
+                                                    title="@Lang.Get("RestorePlayer")"
+                                                    @onclick="() => RestorePlayer(tableRef, pid)"
+                                                    @onclick:stopPropagation="true">
+                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                            </button>
+                                        }
+                                        else if (isSelected && table.PlayerCount > 3)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-auto" style="line-height:1;"
+                                                    title="@Lang.Get("MarkAbsent")"
+                                                    @onclick="() => MarkAbsent(tableRef, pid)"
+                                                    @onclick:stopPropagation="true">
+                                                <i class="bi bi-person-dash"></i>
+                                            </button>
+                                        }
                                     </li>
                                 }
                             </ul>
@@ -314,7 +335,7 @@ else
                             <div class="table-scroll-anchor" id="@ScoreAnchorId(session.SessionNumber, table.TableNumber)">
                                 <ScoreTable @key="(scoreTableVersion, session.Id, table.TableNumber)"
                                             Table="table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
-                                            OnScoresChanged="SaveScores" AllowAbsence="true" OnAbsenceChanged="OnAbsenceChanged"
+                                            OnScoresChanged="SaveScores"
                                             DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                             </div>
                         }
@@ -345,7 +366,7 @@ else
                             <h6 class="text-muted mb-1">@entry.Label</h6>
                             <ScoreTable @key="(scoreTableVersion, entry.Label, tableGroup.TableNumber)"
                                         Table="entry.Table" PlayerNameResolver="GetParticipantDisplay" OnScoresComplete="SaveScores" OnScoresCleared="SaveScores"
-                                        OnScoresChanged="SaveScores" AllowAbsence="true" OnAbsenceChanged="OnAbsenceChanged"
+                                        OnScoresChanged="SaveScores"
                                         DefaultStartingPoints="tournamentStartingPoints" Uma4Players="uma4Players" Uma3Players="uma3Players" />
                         </div>
                     }
@@ -1243,14 +1264,45 @@ else
         await TournamentService.SaveAsync(tournament);
     }
 
-    /// <summary>A player was marked as dropped out (or restored) on one table. ScoreTable has
-    /// already rebuilt that table's score rows in place, so this only has to persist — deliberately
-    /// no <c>scoreTableVersion</c> bump, which would tear down the very component that raised the
-    /// event (the two scores views are mutually exclusive, so no second copy needs rebuilding).</summary>
-    private async Task OnAbsenceChanged()
+    /// <summary>Strikes a player off their table: they stay in PlayerIds (seating record) but stop
+    /// counting, so the table becomes 3-player with Mr. X and 3-player uma. Only while the table
+    /// has four active players (two real + Mr. X isn't playable) and no scores yet (scores are
+    /// seat-bound; discarding them belongs to an explicit clear, not this button).</summary>
+    private async Task MarkAbsent(TableAssignment table, Guid playerId)
+    {
+        if (table.PlayerCount <= 3 || ScoreStatusHelper.HasAnyScore(table)) return;
+        if (table.AbsentPlayerIds.Contains(playerId)) return;
+
+        table.AbsentPlayerIds.Add(playerId);
+        selectedPlayerIds.Clear();
+        RebuildRowsAfterAbsence(table);
+        await PersistAbsenceChange();
+    }
+
+    private async Task RestorePlayer(TableAssignment table, Guid playerId)
+    {
+        if (!table.AbsentPlayerIds.Remove(playerId)) return;
+        RebuildRowsAfterAbsence(table);
+        await PersistAbsenceChange();
+    }
+
+    // Rebuild only when score rows already exist (drop/restore the player's row, add or strip
+    // Mr. X). When Score is still null, don't create it as a side effect — entering a scores view
+    // runs InitializeAllTournamentScores and picks up the new seat count there.
+    private void RebuildRowsAfterAbsence(TableAssignment table)
+    {
+        if (table.Score != null)
+            ScoreTable.InitializeScores(new List<TableAssignment> { table }, Lang.Get, tournamentStartingPoints);
+    }
+
+    /// <summary>Persist an absence change and bump the ScoreTable @key — the seat count changed,
+    /// so any score view of that table must be rebuilt rather than diffed (its per-row expand
+    /// state is index-keyed).</summary>
+    private async Task PersistAbsenceChange()
     {
         if (tournament == null) return;
         await TournamentService.SaveAsync(tournament);
+        scoreTableVersion++;
     }
 
     private string WrapAsHtmlDocument(string title, string bodyContent, bool includePrintButton = false)

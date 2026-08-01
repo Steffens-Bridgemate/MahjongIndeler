@@ -294,6 +294,32 @@
                 </div>
             </div>
         </div>
+        @* Ranking treatment of the hanchans a dropped-out player did not play. Overridable per
+           tournament on its Scoring Settings page. *@
+        <div class="row mb-2">
+            <div class="col-md-8 mb-2">
+                <label class="form-label">@Lang.Get("AbsentScoring")</label>
+                @foreach (var mode in Enum.GetValues<AbsentScoringMode>())
+                {
+                    var m = mode;
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="tournament-absent-mode"
+                               id="@($"absent-mode-{(int)m}")"
+                               checked="@(tournamentAbsentScoringMode == m)"
+                               @onchange="() => SetTournamentAbsentMode(m)" />
+                        <label class="form-check-label" for="@($"absent-mode-{(int)m}")">@Lang.Get($"AbsentScoring{m}")</label>
+                    </div>
+                }
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label">@Lang.Get("AbsentScoringCorrection")</label>
+                @* No substitution happens in Excluded mode, so the correction has nothing to apply to. *@
+                <input type="text" inputmode="decimal" class="form-control" style="max-width:120px;"
+                       disabled="@(tournamentAbsentScoringMode == AbsentScoringMode.Excluded)"
+                       value="@FormatPointsSigned(tournamentAbsentCorrection)"
+                       @onchange="async e => { tournamentAbsentCorrection = ParsePoints(e.Value?.ToString(), 0); await Save(); }" />
+            </div>
+        </div>
     </div>
 </div>
 
@@ -600,6 +626,8 @@
     private int tournamentStartingPoints = 30000;
     private List<int> tournamentUma4Players = new() { 15000, 5000, -5000, -15000 };
     private List<int> tournamentUma3Players = new() { 12500, 0, -12500 };
+    private AbsentScoringMode tournamentAbsentScoringMode = AbsentScoringMode.Zero;
+    private int tournamentAbsentCorrection;
     private bool enableExternalScoring;
     private bool enableScanLogging;
     private ClubStyle style = new();
@@ -661,6 +689,8 @@
             tournamentStartingPoints = settings.TournamentStartingPoints;
             tournamentUma4Players = new List<int>(settings.TournamentUma4Players);
             tournamentUma3Players = new List<int>(settings.TournamentUma3Players);
+            tournamentAbsentScoringMode = settings.TournamentAbsentScoringMode;
+            tournamentAbsentCorrection = settings.TournamentAbsentCorrection;
             enableExternalScoring = settings.EnableExternalScoring;
             enableScanLogging = settings.EnableScanLogging;
             style = settings.Style.Clone();
@@ -738,6 +768,12 @@
         await Save();
     }
 
+    private async Task SetTournamentAbsentMode(AbsentScoringMode mode)
+    {
+        tournamentAbsentScoringMode = mode;
+        await Save();
+    }
+
     private static string FormatPoints(int value) => (value / 1000.0).ToString("0.0");
     private static string FormatPointsSigned(int value) => (value / 1000.0).ToString("+0.0;-0.0;0.0");
     private static int ParsePoints(string? input, int fallback)
@@ -779,6 +815,8 @@
             TournamentStartingPoints = tournamentStartingPoints,
             TournamentUma4Players = new List<int>(tournamentUma4Players),
             TournamentUma3Players = new List<int>(tournamentUma3Players),
+            TournamentAbsentScoringMode = tournamentAbsentScoringMode,
+            TournamentAbsentCorrection = tournamentAbsentCorrection,
             EnableExternalScoring = enableExternalScoring,
             EnableScanLogging = enableScanLogging,
             Style = style,

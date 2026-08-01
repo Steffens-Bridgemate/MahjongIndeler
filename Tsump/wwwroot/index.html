@@ -695,6 +695,27 @@
         (function () {
             if (!('serviceWorker' in navigator)) return;
 
+            // Local dev: never keep a service worker — tear down instead of registering.
+            // A real (published-style) service worker once got installed on localhost:5051 inside
+            // Visual Studio's hidden WebTools debug-browser profile (while testing the PWA update
+            // flow, May 2026) and, because this app's worker deliberately never self-activates,
+            // it kept serving a months-stale cached app over every later debug run: boot died at
+            // 100% and VS killed the dev server with exit -1. The dev worker is a no-op stub, so
+            // nothing is lost by removing it here; production origins are never localhost. To test
+            // the real service worker locally, comment this block out temporarily.
+            var host = location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1') {
+                navigator.serviceWorker.getRegistrations()
+                    .then(function (regs) { regs.forEach(function (r) { r.unregister(); }); })
+                    .catch(function () { });
+                if (window.caches) {
+                    caches.keys()
+                        .then(function (keys) { keys.forEach(function (k) { caches.delete(k); }); })
+                        .catch(function () { });
+                }
+                return;
+            }
+
             var dotNetRef = null;      // the Blazor AppUpdateBanner, once it registers
             var updatePending = false; // an update was detected (maybe before the banner mounted)
 

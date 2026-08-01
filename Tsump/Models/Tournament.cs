@@ -18,6 +18,8 @@ public class Tournament
     public int? StartingPoints { get; set; }
     public List<int>? Uma4Players { get; set; }
     public List<int>? Uma3Players { get; set; }
+    public AbsentScoringMode? AbsentScoringMode { get; set; }
+    public int? AbsentCorrection { get; set; }
 }
 
 public class TournamentParticipant

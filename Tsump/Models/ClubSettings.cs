@@ -1,5 +1,20 @@
 namespace Tsump.Models;
 
+/// <summary>How a tournament ranking treats the hanchans a dropped-out player did not play.
+/// For the substitution modes (Zero/Average) a signed per-hanchan correction can be added on top.</summary>
+public enum AbsentScoringMode
+{
+    /// <summary>A hanchan not played contributes zero.</summary>
+    Zero = 0,
+    /// <summary>A hanchan not played contributes the average of the player's *played* hanchans —
+    /// recomputed as results come in, so the substituted value can change over time.</summary>
+    Average = 1,
+    /// <summary>The player is excluded from the ranking altogether and listed on a separate,
+    /// unranked line below it: played hanchans show their actual scores, missed ones show "—".
+    /// The correction does not apply in this mode.</summary>
+    Excluded = 2,
+}
+
 public class ClubSettings
 {
     public string CompetitionPeriod { get; set; } = "";
@@ -27,6 +42,10 @@ public class ClubSettings
     public int TournamentStartingPoints { get; set; } = 30000;
     public List<int> TournamentUma4Players { get; set; } = new() { 15000, 5000, -5000, -15000 };
     public List<int> TournamentUma3Players { get; set; } = new() { 12500, 0, -12500 };
+    // Ranking treatment of hanchans a dropped-out player did not play (see AbsentScoringMode);
+    // the correction is ×1000 points, added per missed hanchan on top of the mode's base value.
+    public AbsentScoringMode TournamentAbsentScoringMode { get; set; } = AbsentScoringMode.Zero;
+    public int TournamentAbsentCorrection { get; set; } = 0;
 
     // When true, the "Share scoring link" feature is exposed per-table. The scoring app's
     // URL is hard-coded in Tsump.Scoring.ScoringAppConfig (not user-configurable, since

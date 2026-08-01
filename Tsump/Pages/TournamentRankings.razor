@@ -37,6 +37,9 @@ else
     private Tournament? tournament;
     private bool showExportRankings;
     private bool copiedRankingsToClipboard;
+    // Effective absent-scoring policy: tournament override, else club default.
+    private AbsentScoringMode absentScoringMode = AbsentScoringMode.Zero;
+    private int absentCorrection;
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -46,6 +49,9 @@ else
         if (firstRender)
         {
             tournament = await TournamentService.GetByIdAsync(Id);
+            var settings = await SettingsService.GetAsync();
+            absentScoringMode = tournament?.AbsentScoringMode ?? settings.TournamentAbsentScoringMode;
+            absentCorrection = tournament?.AbsentCorrection ?? settings.TournamentAbsentCorrection;
             StateHasChanged();
         }
         if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
@@ -68,7 +74,8 @@ else
             .ToList();
 
         var allParticipantIds = tournament.Participants.Select(p => p.Id).ToHashSet();
-        return RankingTable.BuildRankings(hanchans, GetParticipantDisplay, allParticipantIds);
+        return RankingTable.BuildRankings(hanchans, GetParticipantDisplay, allParticipantIds,
+            absentScoringMode, absentCorrection);
     }
 
     private (string html, string text) BuildRankingsContent()
