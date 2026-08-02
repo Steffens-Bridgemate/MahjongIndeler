@@ -191,10 +191,13 @@ else
             </TableNavStrip>
             @* Selection banner sits with the hanchan it belongs to. It used to render once above
                the whole session list, which put the Swap button off-screen for every hanchan but
-               the first — the selection worked, the button was just nowhere near the cards. *@
-            @if (selectedPlayerIds.Count > 0 && selectedSessionNumber == stripSess.SessionNumber)
-            {
-                <div class="mb-2">
+               the first — the selection worked, the button was just nowhere near the cards.
+               The container renders UNCONDITIONALLY with a reserved height: appearing/disappearing
+               with the selection reflowed the whole grid at the exact moment the row's mark-absent
+               button appeared, yanking every card ~2rem under the pointer. *@
+            <div class="mb-2 d-flex align-items-center flex-wrap gap-1" style="min-height:2rem;">
+                @if (selectedPlayerIds.Count > 0 && selectedSessionNumber == stripSess.SessionNumber)
+                {
                     <span class="text-muted me-2">
                         @Lang.Get("Selected"): @string.Join(", ", selectedPlayerIds.Select(id => GetParticipantDisplay(id)))
                     </span>
@@ -207,8 +210,8 @@ else
                     <button class="btn btn-sm btn-outline-secondary" @onclick="() => selectedPlayerIds.Clear()">
                         @Lang.Get("ClearSelection")
                     </button>
-                </div>
-            }
+                }
+            </div>
             <div class="table-assign-grid">
                 @foreach (var table in session.Tables)
                 {
@@ -261,24 +264,42 @@ else
                                         </span>
                                         @* Mark-absent lives here on the card, but only reveals on the
                                            selected row — always-visible buttons on every player of
-                                           every table would be clutter for a rarely-used action. *@
+                                           every table would be clutter for a rarely-used action.
+                                           The button sits inside a full-height click SHIELD that
+                                           overhangs the li's 1rem right padding: the bare py-0
+                                           button was a 24×16px target in an inert moat of row
+                                           padding, and a near-miss ran the row's click — which
+                                           DESELECTS and removes the very button being aimed at,
+                                           reading as "clicking does nothing". Misses on the shield
+                                           are now no-ops; the button itself is also bigger.
+                                           draggable=false: a few px of press-travel on a child of
+                                           a draggable li would otherwise start a drag and eat the
+                                           click. *@
                                         @if (isAbsent)
                                         {
-                                            <button class="btn btn-sm btn-outline-secondary py-0 px-1 ms-auto" style="line-height:1;"
-                                                    title="@Lang.Get("RestorePlayer")"
-                                                    @onclick="() => RestorePlayer(tableRef, pid)"
-                                                    @onclick:stopPropagation="true">
-                                                <i class="bi bi-arrow-counterclockwise"></i>
-                                            </button>
+                                            <span class="ms-auto align-self-stretch d-flex align-items-center ps-2 pe-3" style="margin-right:-1rem;"
+                                                  @onclick:stopPropagation="true">
+                                                <button class="btn btn-sm btn-outline-secondary px-2 d-flex align-items-center"
+                                                        style="min-height:1.75rem;" draggable="false"
+                                                        title="@Lang.Get("RestorePlayer")"
+                                                        @onclick="() => RestorePlayer(tableRef, pid)"
+                                                        @onclick:stopPropagation="true">
+                                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                                </button>
+                                            </span>
                                         }
                                         else if (isSelected && table.PlayerCount > 3)
                                         {
-                                            <button class="btn btn-sm btn-outline-danger py-0 px-1 ms-auto" style="line-height:1;"
-                                                    title="@Lang.Get("MarkAbsent")"
-                                                    @onclick="() => MarkAbsent(tableRef, pid)"
-                                                    @onclick:stopPropagation="true">
-                                                <i class="bi bi-person-dash"></i>
-                                            </button>
+                                            <span class="ms-auto align-self-stretch d-flex align-items-center ps-2 pe-3" style="margin-right:-1rem;"
+                                                  @onclick:stopPropagation="true">
+                                                <button class="btn btn-sm btn-outline-danger px-2 d-flex align-items-center"
+                                                        style="min-height:1.75rem;" draggable="false"
+                                                        title="@Lang.Get("MarkAbsent")"
+                                                        @onclick="() => MarkAbsent(tableRef, pid)"
+                                                        @onclick:stopPropagation="true">
+                                                    <i class="bi bi-person-dash"></i>
+                                                </button>
+                                            </span>
                                         }
                                     </li>
                                 }
