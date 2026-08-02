@@ -59,4 +59,11 @@ public class TournamentService
         tournaments.RemoveAll(t => t.Id == id);
         await _storage.SetAsync(StorageKey, tournaments);
     }
+
+    /// <summary>Wipes every stored tournament. Used when a new competition round starts
+    /// (see <see cref="ClubDataService"/>).</summary>
+    public async Task DeleteAllAsync()
+    {
+        await _storage.RemoveAsync(StorageKey);
+    }
 }

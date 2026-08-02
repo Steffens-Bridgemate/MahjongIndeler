@@ -548,6 +548,7 @@ else
     private List<int> uma4Players = new() { 15000, 5000, -5000, -15000 };
     private List<int> uma3Players = new() { 12500, 0, -12500 };
     private bool externalScoringEnabled;
+    private List<TimeSpan> clubStartTimes = new();
     // Bumped after each successful import so @key changes on the rendered ScoreTables,
     // forcing Blazor to dispose stale instances and rebuild with the freshly written model.
     private int scoreTableVersion;
@@ -597,6 +598,7 @@ else
             uma4Players = tournament?.Uma4Players != null ? new List<int>(tournament.Uma4Players) : new List<int>(settings.TournamentUma4Players);
             uma3Players = tournament?.Uma3Players != null ? new List<int>(tournament.Uma3Players) : new List<int>(settings.TournamentUma3Players);
             externalScoringEnabled = settings.EnableExternalScoring;
+            clubStartTimes = new List<TimeSpan>(settings.TournamentStartTimes);
             if (tournament != null && tournament.IsGenerated)
             {
                 BuildTournamentMatrix();
@@ -669,15 +671,8 @@ else
             tournament.Participants, tournament.SessionCount);
         tournament.IsGenerated = true;
 
-        // Assign default start times from settings
-        var settings = await SettingsService.GetAsync();
-        var defaultTimes = settings.TournamentStartTimes.OrderBy(t => t).ToList();
-        for (int i = 0; i < tournament.Sessions.Count; i++)
-        {
-            tournament.Sessions[i].StartTime = i < defaultTimes.Count
-                ? defaultTimes[i]
-                : null;
-        }
+        // Stamp the tournament's own start times (or the club defaults) onto the fresh sessions
+        HanchanStartTimes.ApplyToSessions(tournament, clubStartTimes);
 
         BuildTournamentMatrix();
         expandedHanchans = new HashSet<int>(tournament.Sessions.Select(s => s.SessionNumber));
@@ -688,34 +683,25 @@ else
         StateHasChanged();
     }
 
+    // Editing a time here is an override like any other, so it goes through the same helper as the
+    // Settings page rather than writing session.StartTime directly — otherwise the tournament's
+    // override list would still be showing the club defaults there.
     private async Task OnSessionHourChanged(TournamentSession session, ChangeEventArgs e)
     {
-        if (int.TryParse(e.Value?.ToString(), out var h) && h >= 0)
-        {
-            var currentMinute = session.StartTime?.Minutes ?? 0;
-            session.StartTime = new TimeSpan(h, currentMinute, 0);
-        }
-        else
-        {
-            session.StartTime = null;
-        }
-        if (tournament != null)
-            await TournamentService.SaveAsync(tournament);
+        if (tournament == null) return;
+        var h = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : -1;
+        HanchanStartTimes.Set(tournament, session.SessionNumber,
+            HanchanStartTimes.WithHour(session.StartTime, h), clubStartTimes);
+        await TournamentService.SaveAsync(tournament);
     }
 
     private async Task OnSessionMinuteChanged(TournamentSession session, ChangeEventArgs e)
     {
-        if (int.TryParse(e.Value?.ToString(), out var m) && m >= 0)
-        {
-            var currentHour = session.StartTime?.Hours ?? 0;
-            session.StartTime = new TimeSpan(currentHour, m, 0);
-        }
-        else
-        {
-            session.StartTime = null;
-        }
-        if (tournament != null)
-            await TournamentService.SaveAsync(tournament);
+        if (tournament == null) return;
+        var m = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : -1;
+        HanchanStartTimes.Set(tournament, session.SessionNumber,
+            HanchanStartTimes.WithMinute(session.StartTime, m), clubStartTimes);
+        await TournamentService.SaveAsync(tournament);
     }
 
     private int CountThreePlayerTables(Guid participantId)

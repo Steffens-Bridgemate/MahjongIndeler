@@ -3,6 +3,7 @@
 @using Tsump.Services
 @using Microsoft.JSInterop
 @inject SettingsService SettingsService
+@inject ClubDataService ClubData
 @inject LanguageService Lang
 @inject IJSRuntime JS
 @implements IDisposable
@@ -45,9 +46,47 @@
 <div class="card mb-4">
     <div class="card-body">
         <h5 class="card-title">@Lang.Get("CompetitionPeriod")</h5>
-        <input type="text" class="form-control" style="max-width:250px;" maxlength="20"
-               value="@competitionPeriod"
-               @onchange="OnCompetitionPeriodChanged" />
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <input type="text" class="form-control" style="max-width:250px;" maxlength="20"
+                   value="@competitionPeriod"
+                   @onchange="OnCompetitionPeriodChanged" />
+            @if (!showNewRound)
+            {
+                <button class="btn btn-outline-danger" @onclick="ShowNewRound">
+                    <i class="bi bi-arrow-repeat me-1"></i>@Lang.Get("StartNewRound")
+                </button>
+            }
+        </div>
+
+        @if (showNewRound)
+        {
+            <div class="alert alert-warning mt-3 mb-0">
+                <p class="mb-2">@Lang.Get("StartNewRoundDesc")</p>
+                <ul class="mb-3">
+                    <li>@Lang.Get("StartNewRoundExplainExport")</li>
+                    <li>@Lang.Get("StartNewRoundExplainSettings")</li>
+                    <li>@Lang.Get("StartNewRoundExplainMembers")</li>
+                    <li>@Lang.Get("StartNewRoundExplainClear")</li>
+                </ul>
+                <label class="form-label">@Lang.Get("NewRoundName")</label>
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <input type="text" class="form-control" style="max-width:250px;" maxlength="20"
+                           @bind="newRoundName" @bind:event="oninput" />
+                    <button class="btn btn-warning" disabled="@(string.IsNullOrWhiteSpace(newRoundName) || newRoundRunning)"
+                            title="@Lang.Get("NewRoundName")" @onclick="ConfirmNewRound">
+                        @Lang.Get("StartNewRound")
+                    </button>
+                    <button class="btn btn-secondary" disabled="@newRoundRunning" @onclick="CancelNewRound">@Lang.Get("Cancel")</button>
+                </div>
+            </div>
+        }
+
+        @if (newRoundBackupFile != null)
+        {
+            <div class="alert alert-success mt-3 mb-0">
+                @Lang.Get("StartNewRoundSuccess") <strong>@newRoundBackupFile</strong>
+            </div>
+        }
     </div>
 </div>
 
@@ -638,6 +677,12 @@
     private bool confirmReset;
     private bool confirmCommit;
 
+    // Start-of-round reset (export + wipe). newRoundBackupFile doubles as the success flag.
+    private bool showNewRound;
+    private bool newRoundRunning;
+    private string newRoundName = "";
+    private string? newRoundBackupFile;
+
     // Colour-from-image eyedropper (reference image is transient — never persisted).
     private const int PickerMaxDim = 900;
     private DotNetObjectReference<Settings>? selfRef;
@@ -789,6 +834,39 @@
     {
         competitionPeriod = e.Value?.ToString() ?? string.Empty;
         await Save();
+    }
+
+    private void ShowNewRound()
+    {
+        showNewRound = true;
+        newRoundName = "";
+        newRoundBackupFile = null;
+    }
+
+    private void CancelNewRound()
+    {
+        showNewRound = false;
+        newRoundName = "";
+    }
+
+    private async Task ConfirmNewRound()
+    {
+        if (string.IsNullOrWhiteSpace(newRoundName) || newRoundRunning) return;
+
+        newRoundRunning = true;
+        try
+        {
+            newRoundBackupFile = await ClubData.StartNewRoundAsync(newRoundName);
+            // ClubDataService wrote the new period straight to storage; mirror it into the page's
+            // own state or the next Save() would put the old name back.
+            competitionPeriod = newRoundName.Trim();
+            showNewRound = false;
+            newRoundName = "";
+        }
+        finally
+        {
+            newRoundRunning = false;
+        }
     }
 
     private async Task Save()

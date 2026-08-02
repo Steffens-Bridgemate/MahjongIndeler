@@ -40,4 +40,11 @@ public class SessionService
         sessions.RemoveAll(s => s.Id == id);
         await _storage.SetAsync(StorageKey, sessions);
     }
+
+    /// <summary>Wipes every stored hanchan. Used when a new competition round starts
+    /// (see <see cref="ClubDataService"/>).</summary>
+    public async Task DeleteAllAsync()
+    {
+        await _storage.RemoveAsync(StorageKey);
+    }
 }

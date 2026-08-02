@@ -47,4 +47,11 @@ public class MemberService
         members.RemoveAll(m => m.Id == id);
         await _storage.SetAsync(StorageKey, members);
     }
+
+    /// <summary>Overwrites the whole roster in one write. Used when a new competition round drops
+    /// the inactive members (see <see cref="ClubDataService"/>).</summary>
+    public async Task ReplaceAllAsync(List<Member> members)
+    {
+        await _storage.SetAsync(StorageKey, members);
+    }
 }

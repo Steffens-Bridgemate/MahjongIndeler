@@ -15,11 +15,54 @@
 }
 else
 {
-    <h1><i class="bi bi-gear-fill me-2"></i>@Lang.Get("ScoringOverrides")</h1>
+    <h1><i class="bi bi-gear-fill me-2"></i>@Lang.Get("Settings")</h1>
     <p class="text-muted">@tournament.Name &middot; @Lang.FormatDate(tournament.Date)</p>
 
     <div class="card mb-3">
         <div class="card-body">
+            <h5 class="card-title">@Lang.Get("HanchanStartTimes")</h5>
+            <p class="text-muted">@Lang.Get("HanchanStartTimesDesc")</p>
+            @{ var times = HanchanStartTimes.Effective(tournament, clubStartTimes); }
+            <div class="d-flex flex-wrap gap-3 mb-3">
+                @for (int idx = 0; idx < times.Count; idx++)
+                {
+                    var i = idx;
+                    var time = times[i];
+                    <div>
+                        <label class="form-label">@Lang.Get("Hanchan") @(i + 1)</label>
+                        <div class="d-flex align-items-center gap-1">
+                            <select class="form-select form-select-sm" style="max-width:65px;"
+                                    value="@(time.HasValue ? time.Value.Hours : -1)"
+                                    @onchange="e => OnHourChanged(i + 1, e)">
+                                <option value="-1">--</option>
+                                @for (int h = 0; h < 24; h++)
+                                {
+                                    var hh = h;
+                                    <option value="@hh">@hh.ToString("D2")</option>
+                                }
+                            </select>
+                            <span>:</span>
+                            <select class="form-select form-select-sm" style="max-width:65px;"
+                                    value="@(time.HasValue ? time.Value.Minutes : -1)"
+                                    @onchange="e => OnMinuteChanged(i + 1, e)">
+                                <option value="-1">--</option>
+                                @for (int m = 0; m < 60; m += 5)
+                                {
+                                    var mm = m;
+                                    <option value="@mm">@mm.ToString("D2")</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ResetStartTimes">@Lang.Get("UseDefaults")</button>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@Lang.Get("ScoringOverrides")</h5>
             <p class="text-muted">@Lang.Get("ScoringOverridesDesc")</p>
             <div class="row mb-2">
                 <div class="col-md-4 mb-2">
@@ -96,6 +139,7 @@ else
     private List<int> clubUma3Players = new() { 12500, 0, -12500 };
     private AbsentScoringMode clubAbsentScoringMode = AbsentScoringMode.Zero;
     private int clubAbsentCorrection;
+    private List<TimeSpan> clubStartTimes = new();
 
     protected override void OnInitialized() => Lang.OnLanguageChanged += StateHasChanged;
     public void Dispose() => Lang.OnLanguageChanged -= StateHasChanged;
@@ -111,6 +155,7 @@ else
             clubUma3Players = new List<int>(settings.TournamentUma3Players);
             clubAbsentScoringMode = settings.TournamentAbsentScoringMode;
             clubAbsentCorrection = settings.TournamentAbsentCorrection;
+            clubStartTimes = new List<TimeSpan>(settings.TournamentStartTimes);
             StateHasChanged();
         }
         if (tournament != null) TournamentNav.Set(Id, tournament.IsGenerated);
@@ -125,6 +170,31 @@ else
         if (decimal.TryParse(normalized, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
             return (int)Math.Round(d * 1000);
         return fallback;
+    }
+
+    private async Task OnHourChanged(int sessionNumber, ChangeEventArgs e)
+    {
+        if (tournament == null) return;
+        var current = HanchanStartTimes.Effective(tournament, clubStartTimes).ElementAtOrDefault(sessionNumber - 1);
+        var h = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : -1;
+        HanchanStartTimes.Set(tournament, sessionNumber, HanchanStartTimes.WithHour(current, h), clubStartTimes);
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task OnMinuteChanged(int sessionNumber, ChangeEventArgs e)
+    {
+        if (tournament == null) return;
+        var current = HanchanStartTimes.Effective(tournament, clubStartTimes).ElementAtOrDefault(sessionNumber - 1);
+        var m = int.TryParse(e.Value?.ToString(), out var parsed) ? parsed : -1;
+        HanchanStartTimes.Set(tournament, sessionNumber, HanchanStartTimes.WithMinute(current, m), clubStartTimes);
+        await TournamentService.SaveAsync(tournament);
+    }
+
+    private async Task ResetStartTimes()
+    {
+        if (tournament == null) return;
+        HanchanStartTimes.Reset(tournament, clubStartTimes);
+        await TournamentService.SaveAsync(tournament);
     }
 
     private async Task OnOverrideStartingPoints(ChangeEventArgs e)

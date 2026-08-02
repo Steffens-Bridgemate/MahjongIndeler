@@ -20,6 +20,7 @@ builder.Services.AddScoped<ScanLogService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<TournamentService>();
 builder.Services.AddScoped<TournamentAssignmentService>();
+builder.Services.AddScoped<ClubDataService>();
 builder.Services.AddScoped<AppModeService>();
 builder.Services.AddScoped<TournamentNavContext>();
 builder.Services.AddScoped<ContextNavService>();

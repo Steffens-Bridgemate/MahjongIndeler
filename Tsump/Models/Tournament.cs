@@ -14,6 +14,12 @@ public class Tournament
     public List<TournamentSession> Sessions { get; set; } = new();
     public bool IsGenerated { get; set; }
 
+    /// <summary>Per-hanchan start times, index i = hanchan i+1 (null entry = no time set).
+    /// null list = follow the club's default tournament start times. Kept in step with the copy on
+    /// each <see cref="TournamentSession.StartTime"/> — which is what every consumer actually reads
+    /// — by <c>HanchanStartTimes</c>; don't write either side directly.</summary>
+    public List<TimeSpan?>? StartTimes { get; set; }
+
     // Scoring overrides (null = use club defaults)
     public int? StartingPoints { get; set; }
     public List<int>? Uma4Players { get; set; }
