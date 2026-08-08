@@ -80,7 +80,9 @@
     <div class="card mb-4" id="member-edit-form">
         <div class="card-body">
             <h5 class="card-title">@(isEditing ? Lang.Get("EditMember") : Lang.Get("AddNewMember"))</h5>
-            <EditForm Model="currentMember" OnValidSubmit="SaveMember">
+            @* novalidate: the 3-table head start carries min/max/step so its spinner stays in the
+               normal range, but a deliberate out-of-range correction must still be typeable. *@
+            <EditForm Model="currentMember" OnValidSubmit="SaveMember" novalidate>
                 <DataAnnotationsValidator />
                 <div class="mb-3">
                     <label class="form-label">@Lang.Get("Name")</label>
@@ -99,8 +101,22 @@
                     <InputText class="form-control" @bind-Value="currentMember.LeagueId" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">@Lang.Get("ExtraThreePlayerTables")</label>
-                    <InputNumber class="form-control" style="max-width: 120px;" @bind-Value="currentMember.ExtraThreePlayerTableCount" />
+                    <label class="form-label">
+                        @Lang.Get("ExtraThreePlayerTables")
+                        @* Same explainer pattern as the History page's % column header. *@
+                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
+                           title="@Lang.Get("ExtraThreePlayerTablesExplainTitle")"
+                           @onclick="() => showExtraHelp = !showExtraHelp"></i>
+                    </label>
+                    @if (showExtraHelp)
+                    {
+                        <div class="alert alert-info alert-dismissible py-2 small">
+                            @Lang.Get("ExtraThreePlayerTablesExplain")
+                            <button type="button" class="btn-close" @onclick="() => showExtraHelp = false"></button>
+                        </div>
+                    }
+                    <InputNumber class="form-control" style="max-width: 120px;" step="0.1" min="-0.5" max="0.5"
+                                 @bind-Value="currentMember.ExtraThreePlayerTableCount" />
                     <small class="text-muted">@Lang.Get("ExtraThreePlayerTablesDesc")</small>
                 </div>
                 <div class="mb-3 form-check">
@@ -247,6 +263,7 @@ else
     private List<Member>? members;
     private Member currentMember = new();
     private bool showForm;
+    private bool showExtraHelp;
     private bool isEditing;
     private bool userLoweredFirst;
     private Guid? deleteConfirmId;

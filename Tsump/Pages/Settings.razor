@@ -65,7 +65,49 @@
                 <ul class="mb-3">
                     <li>@Lang.Get("StartNewRoundExplainExport")</li>
                     <li>@Lang.Get("StartNewRoundExplainSettings")</li>
-                    <li>@Lang.Get("StartNewRoundExplainMembers")</li>
+                    <li>
+                        @Lang.Get("StartNewRoundExplainMembers")
+                        @if (newRoundPlan != null)
+                        {
+                            @if (newRoundPlan.RemovedMembers.Count == 0)
+                            {
+                                <div class="text-muted">@Lang.Get("StartNewRoundNoInactive")</div>
+                            }
+                            else
+                            {
+                                <div class="mt-1">
+                                    @foreach (var member in newRoundPlan.RemovedMembers)
+                                    {
+                                        <span class="badge bg-secondary me-1 mb-1">@member.Name</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </li>
+                    <li>
+                        @Lang.Get("StartNewRoundExplainThree")
+                        @if (newRoundPlan != null)
+                        {
+                            @if (newRoundPlan.Nudged.Count == 0)
+                            {
+                                <div class="text-muted">@Lang.Get("StartNewRoundNoThreeCarryOver")</div>
+                            }
+                            else
+                            {
+                                <div class="mt-1">
+                                    @foreach (var carry in newRoundPlan.Nudged)
+                                    {
+                                        @* Names only. The carried value is a fractional nudge; showing
+                                           it would only puzzle the reader. Detail sits in the tooltip. *@
+                                        <span class="badge bg-warning text-dark me-1 mb-1"
+                                              title="@($"{Math.Round(carry.ThreeCount):0} / {carry.SessionsAttended}")">
+                                            @carry.Name
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </li>
                     <li>@Lang.Get("StartNewRoundExplainClear")</li>
                 </ul>
                 <label class="form-label">@Lang.Get("NewRoundName")</label>
@@ -682,6 +724,7 @@
     private bool newRoundRunning;
     private string newRoundName = "";
     private string? newRoundBackupFile;
+    private NewRoundPlan? newRoundPlan;
 
     // Colour-from-image eyedropper (reference image is transient — never persisted).
     private const int PickerMaxDim = 900;
@@ -836,17 +879,19 @@
         await Save();
     }
 
-    private void ShowNewRound()
+    private async Task ShowNewRound()
     {
         showNewRound = true;
         newRoundName = "";
         newRoundBackupFile = null;
+        newRoundPlan = await ClubData.BuildNewRoundPlanAsync();
     }
 
     private void CancelNewRound()
     {
         showNewRound = false;
         newRoundName = "";
+        newRoundPlan = null;
     }
 
     private async Task ConfirmNewRound()
@@ -862,6 +907,7 @@
             competitionPeriod = newRoundName.Trim();
             showNewRound = false;
             newRoundName = "";
+            newRoundPlan = null;
         }
         finally
         {

@@ -352,7 +352,7 @@ class Sim
 {
     readonly List<Guid> present;
     readonly Dictionary<Guid, int> att;
-    readonly Dictionary<Guid, int> threeCounts;
+    readonly Dictionary<Guid, double> threeCounts;
     readonly Dictionary<string, int> meetings;
     readonly Dictionary<string, int> coAtt;
     readonly Dictionary<string, int> sameDayMeetings;
@@ -365,7 +365,7 @@ class Sim
     public readonly int ThreeTables;
     public int EligibleCount => eligible.Count;
 
-    public Sim(List<Guid> present, List<Session> history, Dictionary<Guid, int> extraCounts, DateTime day)
+    public Sim(List<Guid> present, List<Session> history, Dictionary<Guid, double> extraCounts, DateTime day)
     {
         this.present = present;
         att = CountAttendance(history, present);
@@ -854,7 +854,7 @@ class Sim
         return c;
     }
 
-    static Dictionary<Guid, int> CountThreePlayerAssignments(List<Session> history, List<Guid> relevant, Dictionary<Guid, int> extra)
+    static Dictionary<Guid, double> CountThreePlayerAssignments(List<Session> history, List<Guid> relevant, Dictionary<Guid, double> extra)
     {
         var c = relevant.ToDictionary(id => id, id => extra.GetValueOrDefault(id, 0));
         foreach (var s in history)
@@ -941,6 +941,8 @@ class Sim
 // ─── Export records (field-subsets of the app's models, deserialized case-insensitively) ───
 
 record ExportData(List<Member> Members, List<Session> Sessions);
-record Member(Guid Id, string Name, string Email, int ExtraThreePlayerTableCount);
+// ExtraThreePlayerTableCount is fractional: the organizer's start-of-round reset writes a decimal
+// head start there, so an int would fail to deserialise any export taken after a round change.
+record Member(Guid Id, string Name, string Email, double ExtraThreePlayerTableCount);
 record Session(Guid Id, DateTime Date, TimeSpan? StartTime, List<Guid> PresentMemberIds, List<Table> Tables, bool IsFinalized, bool ExcludeFromOptimization);
 record Table(int TableNumber, List<Guid> PlayerIds);

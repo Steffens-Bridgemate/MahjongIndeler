@@ -35,11 +35,11 @@ public class TableAssignmentService
     /// the least attractive candidates (ratio 1.0) instead of the most attractive (0.0).
     /// </summary>
     private static double PostAssignmentThreeRatio(
-        Guid id, Dictionary<Guid, int> threePlayerCounts, Dictionary<Guid, int> attendance)
+        Guid id, Dictionary<Guid, double> threePlayerCounts, Dictionary<Guid, int> attendance)
     {
         var attended = attendance.GetValueOrDefault(id, 0) + 1;
         var threeCount = threePlayerCounts.GetValueOrDefault(id, 0) + 1;
-        return (double)threeCount / attended;
+        return threeCount / attended;
     }
 
     public async Task<List<TableAssignment>> AssignTables(List<Guid> presentPlayerIds, Guid? currentSessionId = null, DateTime? currentDate = null, bool currentDateExcluded = false)
@@ -66,9 +66,9 @@ public class TableAssignmentService
                 || (!currentDateExcluded && !s.ExcludeFromOptimization))
             .ToList();
         List<Member> members = await _memberService.GetAllAsync();
-        Dictionary<Guid, int> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
+        Dictionary<Guid, double> extraCounts = members.ToDictionary(m => m.Id, m => m.ExtraThreePlayerTableCount);
         Dictionary<Guid, int> attendance = CountAttendance(history, presentPlayerIds);
-        Dictionary<Guid, int> threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
+        Dictionary<Guid, double> threePlayerCounts = CountThreePlayerAssignments(history, presentPlayerIds, extraCounts);
         Dictionary<string, int> meetingCounts = BuildMeetingMatrix(history, presentPlayerIds);
         Dictionary<string, int> sameDayMeetingCounts = currentDay.HasValue
             ? BuildMeetingMatrix(history.Where(s => s.Date.Date == currentDay.Value).ToList(), presentPlayerIds)
@@ -132,7 +132,7 @@ public class TableAssignmentService
     private static (List<TableAssignment> tables, List<Guid> threePool) BuildOneAttempt(
         List<Guid> presentPlayerIds,
         List<Guid> eligible, List<Guid> excluded, int threePlayerSlots,
-        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, double> threePlayerCounts,
         Dictionary<Guid, int> attendance,
         PairCostModel pairCosts)
     {
@@ -430,7 +430,7 @@ public class TableAssignmentService
     /// </summary>
     private static double ScoreThreePlayerFairness(
         List<Guid> threePlayerPool,
-        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, double> threePlayerCounts,
         Dictionary<Guid, int> attendance)
     {
         if (threePlayerPool.Count == 0)
@@ -451,7 +451,7 @@ public class TableAssignmentService
     /// </summary>
     private static double ComputeIdealThreeFairnessScore(
         List<Guid> eligible, List<Guid> excluded, int slots,
-        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, double> threePlayerCounts,
         Dictionary<Guid, int> attendance)
     {
         if (slots == 0)
@@ -636,7 +636,7 @@ public class TableAssignmentService
     /// </summary>
     private static List<Guid> SelectThreePlayerCandidates(
         List<Guid> sortedEligible, int slots,
-        Dictionary<Guid, int> threePlayerCounts,
+        Dictionary<Guid, double> threePlayerCounts,
         Dictionary<Guid, int> attendance,
         PairCostModel pairCosts)
     {
@@ -948,11 +948,11 @@ public class TableAssignmentService
         return counts;
     }
 
-    private static Dictionary<Guid, int> CountThreePlayerAssignments(
+    private static Dictionary<Guid, double> CountThreePlayerAssignments(
         List<Hanchan> history, List<Guid> relevantPlayerIds,
-        Dictionary<Guid, int>? extraCounts = null)
+        Dictionary<Guid, double>? extraCounts = null)
     {
-        var counts = new Dictionary<Guid, int>();
+        var counts = new Dictionary<Guid, double>();
         foreach (var id in relevantPlayerIds)
             counts[id] = extraCounts?.GetValueOrDefault(id, 0) ?? 0;
 

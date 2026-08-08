@@ -113,6 +113,13 @@ else
 
     <div class="mt-4">
         <h4>@Lang.Get("PlayerStatistics")</h4>
+        @if (showPctHelp)
+        {
+            <div class="alert alert-info alert-dismissible py-2 small">
+                @Lang.Get("ThreePctExplain")
+                <button type="button" class="btn-close" @onclick="() => showPctHelp = false"></button>
+            </div>
+        }
         <table class="table table-sm table-striped">
             <thead>
                 <tr>
@@ -127,6 +134,11 @@ else
                     </th>
                     <th style="cursor:pointer;" @onclick='() => SetSort("threepct")'>
                         % @SortIndicator("threepct")
+                        @* stopPropagation so opening the explainer doesn't also re-sort the table. *@
+                        <i class="bi bi-question-circle ms-1" style="cursor:pointer;"
+                           title="@Lang.Get("ThreePctExplainTitle")"
+                           @onclick:stopPropagation="true"
+                           @onclick="() => showPctHelp = !showPctHelp"></i>
                     </th>
                     <th style="cursor:pointer;" @onclick='() => SetSort("four")'>
                         @Lang.Get("TimesAt4Table") @SortIndicator("four")
@@ -139,8 +151,11 @@ else
                     <tr>
                         <td>@stat.Name</td>
                         <td>@stat.SessionsAttended</td>
-                        <td>@stat.ThreePlayerCount</td>
-                        <td>@(stat.SessionsAttended > 0 ? $"{Math.Round(100.0 * stat.ThreePlayerCount / stat.SessionsAttended):0}" : "")</td>
+                        @* Whole tables only — the fractional head start is an internal nudge, and
+                           "2,2 tables" would read as a bug to anyone looking at this page. The
+                           sorting and the percentage still run on the exact value. *@
+                        <td>@Whole(stat.ThreePlayerCount)</td>
+                        <td>@(stat.SessionsAttended > 0 ? Whole(100.0 * stat.ThreePlayerCount / stat.SessionsAttended) : "")</td>
                         <td>@stat.FourPlayerCount</td>
                     </tr>
                 }
@@ -154,6 +169,7 @@ else
     private List<Member> members = new();
     private List<PlayerStat> playerStats = new();
     private Guid? deleteConfirmId;
+    private bool showPctHelp;
     private string sortColumn = "name";
     private bool sortDescending = false;
     private string? secondarySortColumn = null;
@@ -187,6 +203,11 @@ else
         "four"     => descending ? source.ThenByDescending(s => s.FourPlayerCount)   : source.ThenBy(s => s.FourPlayerCount),
         _          => descending ? source.ThenByDescending(s => s.Name)              : source.ThenBy(s => s.Name),
     };
+
+    /// <summary>Rounds to a whole number for display. Via int, because Math.Round leaves a small
+    /// negative head start as -0.0, which formats as the nonsensical "-0".</summary>
+    private static string Whole(double value) =>
+        ((int)Math.Round(value, MidpointRounding.AwayFromZero)).ToString();
 
     private static double ThreePercentage(PlayerStat s) =>
         s.SessionsAttended > 0 ? (double)s.ThreePlayerCount / s.SessionsAttended : 0;
@@ -308,7 +329,9 @@ else
     {
         public string Name { get; set; } = "";
         public int SessionsAttended { get; set; }
-        public int ThreePlayerCount { get; set; }
+        // Fractional: seeded from Member.ExtraThreePlayerTableCount, which the start-of-round
+        // reset writes as a decimal head start.
+        public double ThreePlayerCount { get; set; }
         public int FourPlayerCount { get; set; }
     }
 }
